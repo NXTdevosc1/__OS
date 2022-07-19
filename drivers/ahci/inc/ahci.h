@@ -307,8 +307,72 @@ typedef struct _ATA_FIS_H2D {
     UINT8 Reserved1[4];
 } ATA_FIS_H2D;
 
+typedef struct _ATA_FIS_D2H {
+    UINT8 FisType;
+    UINT8 PortMultiplier : 4;
+    UINT8 Reserved0 : 2;
+    UINT8 Interrupt : 1;
+    UINT8 Reserved1 : 1;
+    UINT8 Status;
+    UINT8 Error;
+
+    UINT8 Lba0, Lba1, Lba2, Device;
+    UINT8 Lba3, Lba4, Lba5, Reserved2;
+    UINT16 Count;
+    UINT8 Reserved3[2];
+    DWORD Reserved4;
+} ATA_FIS_D2H;
+
+typedef struct _ATA_FIS_DMA_SETUP {
+    UINT8 FisType;
+    UINT8 PortMultiplier : 4;
+    UINT8 Reserved0 : 1;
+    UINT8 Direction : 1;
+    UINT8 Interrupt : 1;
+    UINT8 AutoActivate : 1;
+    UINT16 Reserved2;
+    UINT64 DmaBufferId;
+    UINT32 Reserved3;
+    UINT32 DmaBufferOffset;
+    UINT32 TransferCount;
+    UINT32 Reserved4;
+} ATA_FIS_DMA_SETUP;
+
+typedef struct _ATA_FIS_PIO_SETUP {
+    UINT8 FisType;
+    UINT8 PortMultiplier : 4;
+    UINT8 Reserved0 : 1;
+    UINT8 Direction : 1;
+    UINT8 Interrupt : 1;
+    UINT8 Reserved1 : 1;
+    UINT8 Status, Error;
+    UINT8 Lba0, Lba1, Lba2, Device;
+    UINT8 Lba3, Lba4, Lba5, Reserved2;
+    UINT16 Count;
+    UINT8 Reserved3;
+    UINT8 eStatus;
+    UINT16 TransferCount;
+    UINT16 Reserved4;
+} ATA_FIS_PIO_SETUP;
+
+typedef struct _ATA_FIS_DATA {
+    UINT8 FisType;
+    UINT8 PortMultiplier : 4;
+    UINT8 Reserved0 : 4;
+    UINT8 Reserved1[2];
+    UINT32 Data[];
+} ATA_FIS_DATA;
+
 typedef struct _AHCI_RECEVIED_FIS {
-    UINT8 Reserved[0x100];
+    ATA_FIS_DMA_SETUP DmaSetup;
+    UINT32 Reserved0;
+    ATA_FIS_PIO_SETUP PioSetup;
+    UINT8 Reserved1[12];
+    ATA_FIS_D2H D2h;
+    UINT32 Reserved2;
+    UINT64 SetDeviceBitsFis;
+    UINT8 UnknownFis[0x40];
+    UINT8 Reserved[0xFF - 0xA0];
 } AHCI_RECEIVED_FIS;
 
 #pragma pack(pop)
@@ -355,7 +419,7 @@ typedef struct _AHCI_COMMAND_ADDRESS AHCI_COMMAND_ADDRESS;
 void AhciReset(RFAHCI_DEVICE Ahci);
 void AhciInitializePort(RFAHCI_DEVICE_PORT Port);
 KERNELSTATUS AhciHostToDevice(RFAHCI_DEVICE_PORT Port, UINT64 Lba, UINT8 Command, UINT8 Device, UINT16 Count, UINT16 NumCommandAddressDescriptors, AHCI_COMMAND_ADDRESS* CommandAddresses);
-AHCI_COMMAND_TABLE* AhciAllocateCommand(RFAHCI_DEVICE_PORT Port, UINT16 PrdtCount, UINT8 FisSize, UINT8* CommandIndex);
+UINT32 AhciAllocateCommand(RFAHCI_DEVICE_PORT Port);
 
 int AhciSataComReset(HBA_PORT* HbaPort);
 

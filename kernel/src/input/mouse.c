@@ -2,6 +2,7 @@
 #include <preos_renderer.h>
 #include <IO/utility.h>
 #include <MemoryManagement.h>
+#include <interrupt_manager/idt.h>
 
 
 uint32_t* previous_buffer = NULL;
@@ -41,7 +42,7 @@ static inline void DrawMouseCursor(){
 struct GFX_OBJECT* mouse = NULL;
 
 void handle_mouse_input(unsigned char data){
-	if(!_HandleMouseInput) return;
+	// if(!_HandleMouseInput) return;
 	switch(packet_switch){
 		case 0:{
 			if((data & (1<<3)) == 0) break;
@@ -64,7 +65,6 @@ void handle_mouse_input(unsigned char data){
 }
 
 void handle_mouse_packet(){
-	return;
 	//GP_draw_rect(mouse_icon_x,mouse_icon_y,mouse_icon_width,mouse_icon_height,0xFF000000);
 	mouse_icon_prev_x = mouse_icon_x;
 	mouse_icon_prev_y = mouse_icon_y;
@@ -168,6 +168,7 @@ void init_ps2_mouse(){
 	// mouse_icon_y = (fb->vertical_resolution-mouse_icon_height)/2;
 	// mouse_icon_prev_x = mouse_icon_x;
 	// mouse_icon_prev_y = mouse_icon_y;
+	KeControlIrq((KEIRQ_ROUTINE)INTH_mouse, 0xC, IRQ_DELIVERY_NORMAL, 0);
 	previous_buffer = kpalloc(1);
 	memset64(previous_buffer,0,512);
 	_HandleMouseInput = TRUE;
@@ -186,7 +187,6 @@ void init_ps2_mouse(){
 	mouse_write(0xF4);
 	mouse_read();
 	
-
 // mouse = GfxCreateRect(0,
 // 	(struct GFX_COLOR){255,255,255,0.5},
 // 	(struct GFX_POSITION){mouse_icon_x,mouse_icon_y,0},mouse_icon_width,mouse_icon_height);

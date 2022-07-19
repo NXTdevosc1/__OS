@@ -213,24 +213,8 @@ void INTH_DBL_FAULT(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFram
 }
 
 
-void INTH_keyboard(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFrame){
-	uint64_t process_cr3 = __getCR3();
-
-	
-	__setCR3(KeGlobalCR3);
-
-	handle_keyboard(InPortB(0x60));
-	pic_end_master();
-	__setCR3(process_cr3);
-
+void INTH_keyboard(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFrame){	handle_keyboard(InPortB(0x60));
 }
 void INTH_mouse(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFrame){
-
-	uint64_t process_cr3 = __getCR3();
-	
-	__setCR3(KeGlobalCR3);
 	handle_mouse_input(InPortB(0x60));
-	*(UINT32*)(LAPIC_ADDRESS + CPU_LAPIC_END_OF_INTERRUPT) = 0;
-	__setCR3(process_cr3);
-
 }

@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <CPU/ioapic.h>
 #include <input/mouse.h>
+#include <input/keyboard.h>
 #include <IO/pit.h>
 #include <sys/drv.h>
 #include <sys/bootconfig.h>
@@ -576,8 +577,8 @@ __setCR3((UINT64)kproc->PageMap);
 
 	// Setting Up ACPI SCI_INT
 	if(KeControlIrq(AcpiSystemControlInterruptHandler, AcpiGetFadt()->SCI_Interrupt, IRQ_DELIVERY_NORMAL, 0) != KERNEL_SOK) SET_SOD_INITIALIZATION;
-
-
+	init_ps2_keyboard();
+	init_ps2_mouse();
 	RtcInit();
 
 	
