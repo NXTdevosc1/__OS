@@ -1,0 +1,4 @@
+#pragma once
+
+// PCI PROGRAM INTERFACE (USB3)
+#define XHCI_CONTROLLER 0x30

@@ -1,0 +1,328 @@
+#include <MemoryManagement.h>
+#include <interrupt_manager/SOD.h>
+#include <preos_renderer.h>
+#include <cstr.h>
+#include <kernel.h>
+#include <CPU/paging.h>
+
+#define MEMHEAPLIST_SIZE sizeof(MEMHEAPLIST)+(64 - (sizeof(MEMHEAPLIST) % 64))
+
+PHYSICALMEMORYSTATUS PhysicalMemoryStatus = { 0 };
+
+
+void HeapSet(HMEMHEAP heap,
+HMEMHEAP main_heap,
+uint32_t flags,
+uint64_t size,
+HMEMHEAPLIST HeapList,
+HMEMHEAPLIST MainHeapList
+){
+    heap->flags = flags;
+    heap->size = size;
+    heap->address = main_heap->address;
+    UINT64 addrsz = (UINT64)main_heap->address + size;
+    main_heap->address = (LPVOID)addrsz;
+
+    main_heap->size-=size;
+    HeapList->CountAllocated++;
+
+    if(!main_heap->size && !(main_heap->flags & MEMHEAP_USER_FREE_NOT_ALLOWED)) {
+        /*
+        * FIX Allocation Issue
+         main_heap->flags = MEMHEAP_UNALLOCATED;
+         MainHeapList->Count--;
+         */
+    }
+}
+
+HMEMHEAPLIST _page_heap_list_desc_create(HPROCESS process){
+
+    HMEMHEAPLIST memheap = kproc->HeapList;
+    HMEMHEAPLIST _pheaplist = NULL;
+    HMEMHEAP p_heap = HeapCreate(kproc,MEMHEAPLIST_SIZE,0, &_pheaplist);
+    if(!p_heap) SET_SOD_MEMORY_MANAGEMENT;
+    HMEMHEAPLIST new = (HMEMHEAPLIST)p_heap->address;
+    ClearHeapList(new);
+    
+    HeapSet(&new->Heaps[0], p_heap,MEMHEAP_ALLOCATED | MEMHEAP_USER_FREE_NOT_ALLOWED,MEMHEAPLIST_SIZE, new, _pheaplist);
+
+    
+    new->IndexMax = 2; // this heap + return heap
+    new->Count = 2;
+
+    new->Next = process->HeapList;
+    process->HeapList->After = new;
+    process->HeapList = new;
+
+    return new;
+
+}
+HMEMHEAP HeapAllocateDescriptor(HPROCESS process){
+    HMEMHEAPLIST __DISCARD = NULL;
+    return HeapAllocateDescriptorEx(process, &__DISCARD);
+}
+HMEMHEAP HeapAllocateDescriptorEx(HPROCESS process, HMEMHEAPLIST* SrcList){
+    HMEMHEAPLIST memheap = process->HeapList;
+    for(;;) {
+        if(memheap->Count == HEAP_LIST_MAX){
+            if(!memheap->Next) break;
+            memheap = memheap->Next;
+            continue;
+        }
+        if(memheap->LastUnset >= 0){
+            UINT16 Index = memheap->LastUnset;
+            memheap->Heaps[Index].size = 0;
+            memheap->Heaps[Index].flags = MEMHEAP_ALLOCATED;
+            if(Index < memheap->IndexMin){
+                memheap->IndexMin = Index;
+            }else if(Index > memheap->IndexMax){
+                memheap->IndexMax = Index;
+            }
+            memheap->LastUnset = -1;
+            memheap->Count++;
+            *SrcList = memheap;
+            return &memheap->Heaps[Index];
+        }
+        HMEMHEAP heap = &memheap->Heaps[memheap->IndexMin];
+        if(memheap->IndexMax <= HEAP_LIST_MAX){
+
+            heap = &memheap->Heaps[memheap->IndexMax]; 
+            memheap->Count++;
+            heap->size = 0;
+            heap->flags = MEMHEAP_ALLOCATED;
+            memheap->IndexMax++;
+            *SrcList = memheap;
+            return heap;
+        }
+        //HMEMHEAP heap;
+        for(uint64_t x = memheap->IndexMin;x<memheap->IndexMax;x++){
+            heap = &memheap->Heaps[x];
+            if(!heap->flags){
+                if(memheap->LastUnset == x) memheap->LastUnset = -1;
+                heap->size = 0;
+                heap->flags = MEMHEAP_ALLOCATED;
+                memheap->Count++;
+                *SrcList = memheap;
+                return heap;
+            }
+        }
+        if(!memheap->Next) break;
+    }
+
+    memheap = _page_heap_list_desc_create(process);
+    if(!memheap) SET_SOD_MEMORY_MANAGEMENT;
+    return &memheap->Heaps[1]; // index 0 is addr of list, 1 is usable
+}
+
+HMEMHEAP HeapCreate(HPROCESS process, size_t size, UINT16 EnsureAlign, HMEMHEAPLIST* SrcList){
+    if (!size || !process) return NULL;
+    if (EnsureAlign < 16) EnsureAlign = 16; // Force 16 Byte Alignment
+    if (size % 16) size += 16 - (size % 16);
+    HMEMHEAPLIST memheap = process->HeapList;
+    UINT SearchRange = 10;
+    for(;;){
+        if (!SearchRange) {
+            memheap = process->InitialHeapList;
+        }
+        if (memheap->CountAllocated == HEAP_LIST_MAX) goto NextList;
+        if(memheap->LastFree >= 0){
+            UINT16 Index = memheap->LastFree;
+            HMEMHEAP _heap = &memheap->Heaps[Index];
+            if(_heap->size >= size){
+                if(!((UINT64)_heap->address % EnsureAlign) ||
+                _heap->size >= size + (EnsureAlign - ((UINT64)_heap->address % EnsureAlign))
+                ) {
+                    if(Index < memheap->IndexMin){
+                        memheap->IndexMin = Index;
+                    }else if(Index > memheap->IndexMax) memheap->IndexMax = Index;
+
+                    memheap->LastFree = -1;
+                    *SrcList = memheap;
+                    return _heap;
+                }
+            }
+        }
+        if (!memheap->IndexMax) goto NextList;
+        HMEMHEAP heap = &memheap->Heaps[memheap->IndexMax - 1];
+        for(int64_t x = memheap->IndexMax;x>=memheap->IndexMin;heap--){
+            heap = &memheap->Heaps[x];
+            x--;
+            if(
+                heap->size >= size &&
+                heap->flags & MEMHEAP_FREE
+            ) {
+                if(!((UINT64)heap->address % EnsureAlign) ||
+                heap->size >= size + (EnsureAlign - ((UINT64)heap->address % EnsureAlign))
+                ) {
+                    *SrcList = memheap;
+                    return heap;
+                }
+            }
+        }
+        NextList:
+        if (SearchRange) {
+            if (!memheap->Next) break;
+            memheap = memheap->Next;
+            SearchRange--;
+
+        }
+        else {
+            if (!memheap->After) break;
+            memheap = memheap->After;
+        }
+    }
+    return NULL;
+}
+void* ExtendedMemoryAlloc(size_t size, HPROCESS process, uint16_t align, BOOL AllocateForProcess){
+    if(!process || !process->Set || !size) return NULL;
+    HMEMHEAPLIST MainHeapList = NULL;
+    HMEMHEAPLIST DescHeapList = NULL;
+
+    HMEMHEAP main_heap = HeapCreate(process, size, align, &MainHeapList);
+    if(!main_heap) return NULL;
+    HMEMHEAP heap_desc = HeapAllocateDescriptorEx(process, &DescHeapList);
+     
+    if(!heap_desc) return NULL;
+    
+    if(align && ((UINT64)main_heap->address % align)){
+        HMEMHEAPLIST AlignHeapList = NULL;
+        HMEMHEAP align_heap = HeapAllocateDescriptorEx(process, &AlignHeapList);
+        if(!align_heap) return NULL;
+        process->RemainingMemory-=align - ((UINT64)main_heap->address % align);
+        PhysicalMemoryStatus.AllocatedMemory += align - ((UINT64)main_heap->address % align);
+        HeapSet(align_heap, main_heap, MEMHEAP_ALLOCATED, align - ((UINT64)main_heap->address % align), AlignHeapList, MainHeapList);
+    }
+    HeapSet(heap_desc, main_heap, MEMHEAP_ALLOCATED, size, DescHeapList, MainHeapList);
+
+
+    if(!AllocateForProcess){ // 0xFFFF means that kernel allocates for another process
+        process->RemainingMemory-=size;
+        PhysicalMemoryStatus.AllocatedMemory+=size;
+    }else{
+        heap_desc->flags |= MEMHEAP_DONT_COUNT; // set doesn't count bit
+    }
+    
+
+    return (void*)heap_desc->address;
+}
+
+
+void* free(const void* address, HPROCESS Process){
+    return KeFree(address, Process, FALSE);
+}
+
+void* KeFree(const void* address, HPROCESS process, BOOL FreeSourceHeap){
+    if(!address || !process) return NULL;
+    HMEMHEAPLIST memheap = process->HeapList; 
+    for(;;){
+        
+        for(UINT64 x = memheap->IndexMin;x<memheap->IndexMax;x++){
+            if(
+                memheap->Heaps[x].address == address &&
+                memheap->Heaps[x].flags & MEMHEAP_ALLOCATED
+            ){
+                if(!FreeSourceHeap && (memheap->Heaps[x].flags & MEMHEAP_USER_FREE_NOT_ALLOWED))
+                    return NULL;
+                
+
+                memheap->Heaps[x].flags = MEMHEAP_ALLOCATED_FREE;
+                if(!(memheap->Heaps[x].flags & MEMHEAP_DONT_COUNT)){
+                    process->RemainingMemory+=memheap->Heaps[x].size;
+                    PhysicalMemoryStatus.AllocatedMemory-=memheap->Heaps[x].size;
+                }
+                memheap->LastFree = x;
+                memheap->CountAllocated--;
+                if(FreeSourceHeap && memheap->Heaps[x].phys_heap){
+                    return KeFree(memheap->Heaps[x].phys_heap, kproc, FALSE);
+                }
+
+                return (void*)memheap->Heaps[x].address;
+            };
+        }
+        if(!memheap->Next) break;
+        memheap = memheap->Next;
+    }
+    return NULL;
+}
+
+
+size_t GetUsedPhysicalMemory(){
+    return PhysicalMemoryStatus.AllocatedMemory;
+}
+size_t GetPhysicalMemorySize(){
+    return PhysicalMemoryStatus.TotalMemory;
+}
+
+void* malloc(size_t size, HPROCESS process){
+    return MallocExtended(size, process, 0, FALSE);
+}
+void* kmalloc(size_t size){
+    return MallocExtended(size, kproc, 0, FALSE);
+}
+void* palloc(size_t count, HPROCESS process){
+    return MallocExtended(count * 0x1000, process, 0x1000, FALSE);
+}
+extern void* kpalloc(size_t count){
+    return MallocExtended(count * 0x1000, kproc, 0x1000, FALSE);
+}
+
+void* UserMalloc(size_t size){
+    return UserExtendedMalloc(size, 0);
+}
+void* UserExtendedMalloc(size_t size, uint16_t align){
+    if(!size) return NULL;
+    void* ptr = MallocExtended(size, GetCurrentThread()->Process, align, FALSE);
+    if(!ptr){
+        HPROCESS process = GetCurrentThread()->Process;
+        uint64_t sz = 0x1000;
+        sz+=size + (0x1000 - (size % 0x1000));
+        void* heap = MallocExtended(size, kproc, 0x1000, TRUE);
+        if(!heap) SET_SOD_OUT_OF_RESOURCES;
+        
+        HMEMHEAP desc = HeapAllocateDescriptor(process);
+        desc->flags = MEMHEAP_ALLOCATED_FREE | MEMHEAP_USER_FREE_NOT_ALLOWED;
+        desc->phys_heap = heap;
+        desc->size = sz;
+        desc->address = (void*)(USER_HEAP_BASE + process->TotalMemory);
+    
+        MapPhysicalPages(process->PageMap, (LPVOID)(USER_HEAP_BASE + process->TotalMemory), heap, sz>>12, PM_PRESENT | PM_USER | PM_READWRITE);
+        process->TotalMemory+=sz;       
+        return UserExtendedMalloc(size, align);
+    }
+    return ptr;
+}
+
+void* UserFree(void* Heap){
+    return free(Heap, GetCurrentThread()->Process);
+}
+
+BOOL GlobalMemoryStatus(LPMEMORYSTATUS lpMemoryStatus){
+    HPROCESS process = ((HTHREAD)GetCurrentThread())->Process;
+    lpMemoryStatus = GetPhysAddr(lpMemoryStatus);
+    lpMemoryStatus->MemoryLoad = ((PhysicalMemoryStatus.AllocatedMemory) * 100)/PhysicalMemoryStatus.TotalMemory;
+    lpMemoryStatus->VirtualMemoryLoad = (process->TotalMemory * 100)/PhysicalMemoryStatus.TotalMemory;
+    
+    lpMemoryStatus->TotalPhys = PhysicalMemoryStatus.TotalMemory;
+    lpMemoryStatus->AvailaiblePhys = PhysicalMemoryStatus.TotalMemory - PhysicalMemoryStatus.AllocatedMemory;
+    lpMemoryStatus->TotalVirtual = process->TotalMemory;
+    lpMemoryStatus->RemainingVirtual = process->RemainingMemory;
+
+    return TRUE;
+}
+
+void* kfree(const void* address) {
+    return free(address, kproc);
+}
+
+void* MSABI ProcessMalloc(size_t size) {
+    HPROCESS Process = GetCurrentThread()->Process;
+    if (Process->Subsystem == SUBSYSTEM_NATIVE) {
+        // Creates a handle to the allocation
+
+        return kmalloc(size);
+    }else
+        return malloc(size, GetCurrentThread()->Process);
+}
+void* MSABI ProcessFree(const void* address) {
+    return free(address, GetCurrentThread()->Process);
+}

@@ -1,0 +1,28 @@
+Driver MANAGER:
+- OpenDriver
+
+- CloseDriver
+
+- ValidateDriver
+
+- CreateDriver
+
+- ShutdownDriver
+
+
+DYNAMIC COMMUNICATION INTERFACE (DCI):
+
+- HDRVINTERFACE GetCommunicationInterface(HDRIVER Driver, UINT InterfaceId);
+- CallDriverProcedure(HDRVINTERFACE CommunicationInterface, UINT ProcedureId, UINT NumParameters, ...)
+
+- CreateCommunicationInterface(UINT InterfaceId, UINT Access, UINT NumProcedures, DCI_PROCEDURE_LIST* Procedures)
+- GetMessage(MSG Msg)
+- SendMessage(MSG Msg)
+
+- DispatchMessage
+
+- HSERVER CreateServer
+- HSERVER OpenServer(HPROCESS HostProcess, UINT ServerId)
+- BOOL CloseServer
+- UINT64 SendServerMessage
+- INT64 GetServerMessage

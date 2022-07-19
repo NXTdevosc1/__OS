@@ -1,0 +1,624 @@
+#include <typography/defs.h>
+#include <typography/typography.h>
+#include <preos_renderer.h>
+#include <stdint.h>
+#include <cstr.h>
+#include <stdlib.h>
+#include <MemoryManagement.h>
+#include <math.h>
+
+
+#define DT(x,y,z) GP_draw_sf_text(x,0xffffffff,y,z)
+
+
+
+uint32_t max = 400;
+struct GOP_FRAME_BUFFER_INFO* fb;
+void GGOP_DrawPoint(uint32_t x, uint32_t y, uint32_t color){
+	*(uint32_t*)(fb->address+(x*4)+(y*fb->pitch)) = color;
+	*(uint32_t*)(fb->address+(x*4)+(y*fb->pitch)+4) = color;
+	*(uint32_t*)(fb->address+(x*4)+(y*fb->pitch)+4+fb->pitch) = color;
+	*(uint32_t*)(fb->address+(x*4)+(y*fb->pitch)+fb->pitch) = color;
+	
+}
+void GGOP_SetPixel(uint32_t x, uint32_t y, uint32_t color){
+	*(uint32_t*)(fb->address+(x*4)+(y*fb->pitch)) = color;
+}
+void print_data(const char* ch1, const char* ch2, unsigned int x, unsigned int y, unsigned int color){
+	uint32_t len1 = strlen(ch1);
+	GP_draw_sf_text(ch1,color,x,y);
+	GP_draw_sf_text(ch2,color,x+(len1*8),y);
+	
+
+}
+
+
+unsigned char LoadFont(void* _fb, void* font, unsigned int font_file_size, struct PROCESS_TABLE* kernel_process)
+{
+	fb = (struct GOP_FRAME_BUFFER_INFO*)_fb;
+	int y1 = 100, x1 = 100;
+
+	TTF_TABLE_DIRECTORY___TTF_TABLE_HEADER* hdr = font;
+	hdr->sfnt_version = SWAPLONG(hdr->sfnt_version);
+	hdr->table_count = SWAPWORD(hdr->table_count);
+	hdr->search_range =  SWAPWORD(hdr->search_range);
+	hdr->entry_selector = SWAPWORD(hdr->entry_selector);
+	hdr->range_shift = SWAPWORD(hdr->range_shift);
+	
+	//print_data("table_count swapped : ",to_stringu64(SWAPWORD(hdr->table_count)),100,120,0xffffffff);
+
+	uint8_t tables_validated = 0;
+	
+	if(hdr->sfnt_version == 0x10000 || hdr->sfnt_version == 0x4F54544F){
+		tables_validated = 1;
+	} 
+	
+	if(!tables_validated) return 0;
+	
+	if(hdr->range_shift != ((hdr->table_count * 16)-hdr->search_range) || hdr->table_count == 0){
+		 tables_validated = 0;
+		GP_draw_sf_text("Invalid font file header",0xffffffff,100,120);
+	}
+
+	
+	if(tables_validated == 0) return 0;
+	unsigned char tables[hdr->table_count] = malloc(hdr->table_count,kernel_process);
+	if(!tables) return 0;
+	for(uint32_t i = 0;i<hdr->table_count;i++){
+		hdr->records[i].check_sum = SWAPLONG(table_records[i].check_sum);
+		hdr->records[i].offset =SWAPLONG(table_records[i].offset);
+		hdr->records[i].table_length = SWAPLONG(table_records[i].table_length);
+		uint8_t validated = 0;
+		// if(FP_calculate_table_checksum((uint64_t*)((uint64_t)position),sizeof(TTF_TABLE_RECORD)) != table_records[i].check_sum){
+		// 	tables_validated = 0;
+		// 	break;
+		// }
+		for(uint8_t x = 0;x<sizeof(OPENTYPE_TABLES);x++){
+			
+			if(memcmp(hdr->records[i].table_tag,OPENTYPE_TABLES[x])){
+				validated = 1;
+				tables[i] = x;
+				break;
+			}
+			
+			
+		}
+		if(!validated) {tables_validated = 0;break;};
+
+	}
+	GP_clear_screen(0xfffffffffffffffff);
+	while(1);
+	if(!tables_validated) return 0;
+	struct OPENTYPE_HEAD head_table = {};
+
+	uint32_t maxp_version = 0;
+	void* maxp_table;
+	struct OPENTYPE_HHEA hhea;
+	struct OPENTYPE_HMTX hmtx;
+	struct OPENTYPE_POST_HDR post_hdr;
+	struct OPENTYPE_GLYF glyph_hdr;
+	void* post_table;
+	uint8_t gpos_type = 0;
+	void* gpos_table;
+	for(int i = 0;i<hdr->table_count;i++){
+			const char* header = OPENTYPE_TABLES[tables[i]];
+			if(header == "name"){
+				uint16_t version = SWAPWORD(*(uint16_t*)(font+table_records[i].offset));
+				
+				if(version == 0){
+					struct OPENTYPE_NAME_TABLE_V0 name_table = *(struct OPENTYPE_NAME_TABLE_V0*)(&font+table_records[i].offset+2);
+					name_table.count = SWAPWORD(name_table.count);
+					name_table.storage_offset = SWAPWORD(name_table.storage_offset);
+					if(name_table.count > 0){
+					name_table.name_records = (struct OPENTYPE_NAME_RECORD*)(font+table_records[i].offset+6);
+					DT(to_hstring16(name_table.count),120,120);
+					for(uint16_t i = 0;i<name_table.count;i++){
+						struct OPENTYPE_NAME_RECORD name_record = *(struct OPENTYPE_NAME_RECORD*)(font+table_records[i].offset+name_table.storage_offset);
+					}
+					}
+				}else if(version == 1){
+					struct OPENTYPE_NAME_TABLE_V1 name_table = *(struct OPENTYPE_NAME_TABLE_V1*)(&font+table_records[i].offset+2);
+				}else{
+					GP_draw_sf_text("Invalid font file",0xffffffff,100,100);
+					return 0;
+					
+				}
+
+
+			}else if(header == "cmap"){
+				struct OPENTYPE_CMAP_HDR cmap = *(struct OPENTYPE_CMAP_HDR*)(font+table_records[i].offset);
+				cmap.version = SWAPWORD(cmap.version);
+				cmap.table_count = SWAPWORD(cmap.table_count);
+				position = (uint64_t)font+table_records[i].offset+4;
+				cmap.encoding_records = (struct OPENTYPE_ENCODING_RECORD*)((uint64_t)position);
+				if(cmap.version != 0){
+				}else{
+				for(uint16_t c = 0;c<cmap.table_count;c++){
+					cmap.encoding_records[c] = *(struct OPENTYPE_ENCODING_RECORD*)((uint64_t)position);
+					cmap.encoding_records[c].platform_id = SWAPWORD(cmap.encoding_records[c].platform_id);
+					cmap.encoding_records[c].encoding_id = SWAPWORD(cmap.encoding_records[c].encoding_id);
+					cmap.encoding_records[c].subtable_offset = SWAPLONG(cmap.encoding_records[c].subtable_offset);
+
+					position+=sizeof(struct OPENTYPE_ENCODING_RECORD);
+				}
+					uint16_t subtable_format = SWAPWORD(*(uint16_t*)((font+table_records[i].offset)+cmap.encoding_records[0].subtable_offset));
+					if(subtable_format == 0){
+
+					}else if(subtable_format == 2){
+
+					}else if(subtable_format == 4){
+						struct OPENTYPE_CMAP_SUBTABLE_FORMAT_4 cmap_subtable = *(struct OPENTYPE_CMAP_SUBTABLE_FORMAT_4*)((font+table_records[i].offset)+cmap.encoding_records[0].subtable_offset+2);
+						position = (uint64_t)(font+table_records[i].offset)+cmap.encoding_records[0].subtable_offset+2;
+						cmap_subtable.length = SWAPWORD(cmap_subtable.length);
+						cmap_subtable.language = SWAPWORD(cmap_subtable.language);
+						cmap_subtable.seg_count_x2 = SWAPWORD(cmap_subtable.seg_count_x2);
+						cmap_subtable.search_range = SWAPWORD(cmap_subtable.search_range);
+						cmap_subtable.entry_selector = SWAPWORD(cmap_subtable.entry_selector);
+						cmap_subtable.range_shift = SWAPWORD(cmap_subtable.range_shift);
+						position+=12;
+						cmap_subtable.end_code = (uint16_t*)position;
+						
+						uint16_t seg_count = cmap_subtable.seg_count_x2/2;
+
+						for(uint16_t sc = 0;sc<seg_count;sc++){
+							if(*(uint16_t*)position == 0xFFFF) {
+								if(seg_count != sc+1) return 0;
+								position+=2;
+								break;
+							};
+							cmap_subtable.end_code[sc] = SWAPWORD(*(uint16_t*)position);
+							position+=2;
+						}
+
+					
+					cmap_subtable.id_delta = (int16_t*)position;
+					for(uint16_t i = 0;i<seg_count;i++){
+						if(*(int16_t*)position == 0xFFFF){
+							if(seg_count != i+1) return 0;
+							break;
+						}
+						cmap_subtable.id_delta[i] == SWAPWORD(*(int16_t*)position);
+						position+=2;
+					}
+					position+=2;
+					cmap_subtable.id_range_offset = (uint16_t*)position;
+					uint8_t switcher1 = 0;
+					if(*cmap_subtable.id_range_offset != 0){
+						for(uint16_t i = 0;i<seg_count;i++){
+							cmap_subtable.id_range_offset[i] = SWAPWORD(*(uint16_t*)position);
+							position+=2;
+						}
+
+					}else{
+						switcher1 = 1;
+						position+=2;
+					}
+					uint16_t glyph_id_array_size = (cmap_subtable.length - (12+(switcher1? 2 : seg_count)) - (cmap_subtable.seg_count_x2*3))/2;
+
+					cmap_subtable.glyph_id_array = (uint16_t*)position;
+
+					for(uint16_t c = 0;c<glyph_id_array_size;c++){
+						cmap_subtable.glyph_id_array[c] = *(uint16_t*)position;
+						position+=2;
+					}
+
+					
+					}else return 0;
+				}
+			}else if(header == "GDEF"){
+				struct OPENTYPE_GDEF_SELECTOR_HDR selector = *(struct OPENTYPE_GDEF_SELECTOR_HDR*)(font+table_records[i].offset);
+				selector.major_version = SWAPWORD(selector.major_version);
+				selector.minor_version = SWAPWORD(selector.minor_version);
+				position = (uint64_t)(font+table_records[i].offset);
+				if(selector.major_version != 1) return 0;
+				switch(selector.minor_version){
+					case 0:
+					{
+						struct OPENTYPE_GDEF_V1_0 gdef = *(struct OPENTYPE_GDEF_V1_0*)(position+4);
+						gdef.glyph_class_def_offset = SWAPWORD(gdef.glyph_class_def_offset);
+						gdef.lig_caret_list_offset = SWAPWORD(gdef.lig_caret_list_offset);
+						gdef.attach_list_offset = SWAPWORD(gdef.attach_list_offset);
+						gdef.mark_attach_class_def_offset = SWAPWORD(gdef.mark_attach_class_def_offset);
+
+						if(gdef.glyph_class_def_offset){
+							uint16_t glyph_classdef = SWAPWORD(*(uint16_t*)(position+gdef.glyph_class_def_offset));
+						
+							
+							if(glyph_classdef == Opentype_gct_base_glyph){
+							} else if(glyph_classdef == Opentype_gct_ligature_glyph){
+							} else if(glyph_classdef == Opentype_gct_component_glyph){
+
+							}else if(glyph_classdef == Opentype_gct_mark_glyph){
+							}else return 0;
+						}
+
+						break;
+					}
+					case 2:{
+						break;
+					};
+					case 3:{
+
+						break;
+					}
+					default:{
+						return 0;
+					}
+				}
+			}else if(header == "head"){
+				head_table = *(struct OPENTYPE_HEAD*)(font+table_records[i].offset);
+				
+				head_table.major_version = SWAPWORD(head_table.major_version);
+				head_table.minor_version = SWAPWORD(head_table.minor_version);
+				head_table.font_revision = SWAPLONG(head_table.font_revision);
+				head_table.checksum_adjustment = SWAPLONG(head_table.checksum_adjustment);
+				head_table.magic_number = SWAPLONG(head_table.magic_number);
+				//head_table.flags = (struct OPENTYPE_HEAD_FLAGS) SWAPWORD((uint16_t)head_table.flags);
+				head_table.unites_per_em = SWAPWORD(head_table.unites_per_em);
+				//head_table.created = SWAPLONGLONG(head_table.created);
+				//head_table.modified = SWAPLONGLONG(head_table.modified);
+				head_table.xmin = SWAPWORD(head_table.xmin);
+				head_table.ymin = SWAPWORD(head_table.ymin);
+				head_table.xmax = SWAPWORD(head_table.xmax);
+				head_table.ymax = SWAPWORD(head_table.ymax);
+				//head_table.mac_style = (struct OPENTYPE_HEAD_MAC_STYLE)SWAPWORD((uint16_t)head_table.mac_style);
+				head_table.lowest_rect_pixels_per_em = SWAPWORD(head_table.lowest_rect_pixels_per_em);
+				head_table.font_direction_hint = SWAPWORD(head_table.font_direction_hint);
+				head_table.index_to_loc_format = SWAPWORD(head_table.index_to_loc_format);
+				head_table.glyph_data_format = SWAPWORD(head_table.glyph_data_format);
+
+
+
+		
+			}else if(header == "maxp"){
+				maxp_version = SWAPLONG(*(uint32_t*)(font+table_records[i].offset));
+				if(maxp_version == 0x00005000 || maxp_version == 0x00010000){
+					maxp_table = (void*)(font+table_records[i].offset+4);
+				}else return 0;
+			}else if(header == "hhea"){
+				hhea = *(struct OPENTYPE_HHEA*)(font+table_records[i].offset);
+				hhea.major_version = SWAPWORD(hhea.major_version);
+				hhea.minor_version = SWAPWORD(hhea.minor_version);
+				hhea.ascender = SWAPWORD(hhea.ascender);
+				hhea.descender = SWAPWORD(hhea.descender);
+				hhea.line_gap = SWAPWORD(hhea.line_gap);
+				hhea.advance_width_max = SWAPWORD(hhea.advance_width_max);
+				hhea.min_left_side_bearing = SWAPWORD(hhea.min_left_side_bearing);
+				hhea.min_right_side_bearing = SWAPWORD(hhea.min_right_side_bearing);
+				hhea.xmax_extent = SWAPWORD(hhea.xmax_extent);
+				hhea.caret_slope_rise = SWAPWORD(hhea.caret_slope_rise);
+				hhea.caret_slope_run = SWAPWORD(hhea.caret_slope_run);
+				hhea.caret_offset = SWAPWORD(hhea.caret_offset);
+				hhea.metric_data_format = SWAPWORD(hhea.metric_data_format);
+				hhea.number_of_HMetrics = SWAPWORD(hhea.number_of_HMetrics);
+				
+				if(hhea.major_version != 1 || hhea.minor_version != 0) return 0;
+
+
+			} else if(header == "GPOS"){
+				if(SWAPWORD(*(uint16_t*)(font+table_records[i].offset)) == 1 && SWAPWORD(*(uint16_t*)(font+table_records[i].offset+2)) == 0){
+					struct OPENTYPE_GPOS_1_0 gpos = *(struct OPENTYPE_GPOS_1_0*)(font+table_records[i].offset+4);
+					gpos.script_list_offset = SWAPWORD(gpos.script_list_offset);
+					gpos.feature_list_offset = SWAPWORD(gpos.feature_list_offset);
+					gpos.lookup_list_offset = SWAPWORD(gpos.lookup_list_offset);
+					gpos_type = 0;
+					gpos_table = &gpos;
+				}else if(SWAPWORD(*(uint16_t*)(font+table_records[i].offset)) == 1 && SWAPWORD(*(uint16_t*)(font+table_records[i].offset+2)) == 1){
+					struct OPENTYPE_GPOS_1_1 gpos = *(struct OPENTYPE_GPOS_1_1*)(font+table_records[i].offset+4);
+					gpos.script_list_offset = SWAPWORD(gpos.script_list_offset);
+					gpos.feature_list_offset = SWAPWORD(gpos.feature_list_offset);
+					gpos.lookup_list_offset = SWAPWORD(gpos.lookup_list_offset);
+					gpos.feature_variations_offset = SWAPLONG(gpos.feature_variations_offset);
+					gpos_table = &gpos;
+					gpos_type = 1;
+				}else return 0;
+
+			}else if(header == "GSUB"){
+
+			}
+		}
+		
+	uint16_t glyph_count = SWAPWORD(*(uint16_t*)maxp_table)+1;
+print_data("GLYPH COUNT : ",to_stringu64(glyph_count),300,100,0xffffffff);
+	struct GLYPH_DATA* glyphs = (struct GLYPH_DATA*)(0x90000);
+for(int i = 0;i<hdr->table_count;i++){
+			const char* header = OPENTYPE_TABLES[tables[i]];
+		if(header == "loca"){
+				uint16_t glyph_count = SWAPWORD(*(uint16_t*)maxp_table)+1;
+				uint16_t off = *(uint16_t*)(font+table_records[i].offset);
+			if(head_table.index_to_loc_format == 0){
+				uint16_t begin_offset = (off == 0 ? 0 : off * 2);
+				//if(*(uint16_t*)((uint64_t)font+table_records[i].offset) > 0) begin_offset = (uint16_t*)((uint64_t)begin_offset * 2);
+
+				uint16_t* offsets = (uint16_t*)((uint64_t)font+table_records[i].offset+begin_offset);
+				position = (((uint64_t)font+table_records[i].offset)+(uint64_t)begin_offset);
+	for(uint16_t i = 0;i<glyph_count;i++){
+					offsets[i] = SWAPWORD(*(uint16_t*)position);
+					position+=2;
+				}
+				
+			}else if(head_table.index_to_loc_format == 1){
+		
+			}else return 0;
+		}else if(header == "hmtx"){
+				hmtx = *(struct OPENTYPE_HMTX*)(font+table_records[i].offset);
+				hmtx.h_metric = (struct OPENTYPE_LONG_HOR_METRIC*)(font+table_records[i].offset);
+				hmtx.left_side_bearings = (int16_t*)(font+table_records[i].offset+(hhea.number_of_HMetrics));
+			
+		}else if(header == "post"){
+			post_hdr = *(struct OPENTYPE_POST_HDR*)(font+table_records[i].offset);
+			post_hdr->version = SWAPLONG(post_hdr->version);
+			post_hdr->italic_angle = ISWAPLONG(post_hdr->italic_angle);
+			post_hdr->underline_position = SWAPWORD(post_hdr->underline_position);
+			post_hdr->underline_thickness = SWAPWORD(post_hdr->underline_thickness);
+			post_hdr->is_fixed_pitch = SWAPLONG(post_hdr->is_fixed_pitch);
+			post_hdr->min_mem_type42 = SWAPLONG(post_hdr->min_mem_type42);
+			post_hdr->max_mem_type42 = SWAPLONG(post_hdr->max_mem_type42);
+			post_hdr->min_mem_type1 = SWAPLONG(post_hdr->min_mem_type1);
+			post_hdr->max_mem_type1 = SWAPLONG(post_hdr->max_mem_type1);
+
+			if(post_hdr->version == 0x00010000){
+			
+			}else if(post_hdr->version == 0x00020000){
+				position = (uint64_t)font+table_records[i].offset+sizeof(struct OPENTYPE_POST_HDR);
+				struct OPENTYPE_POST_2_0 ptbl = *(struct OPENTYPE_POST_2_0*)(position);
+				ptbl.glyph_count = SWAPWORD(ptbl.glyph_count);
+			
+				if(ptbl.glyph_count != SWAPWORD(*(uint16_t*)maxp_table)) return 0;
+				position+=2;
+				ptbl.glyph_name_index = (uint16_t*)position;
+
+				for(uint16_t i = 0;i<ptbl.glyph_count;i++){
+					ptbl.glyph_name_index[i] = SWAPWORD(*(uint16_t*)position);
+					position+=2;
+				}
+			
+				post_table = &ptbl;
+			
+			}else if(post_hdr->version == 0x00025000){
+			}else if(post_hdr->version == 0x00030000){
+			}else return 0;
+		}else if(header == "glyf"){
+
+			position = (uint64_t)font+table_records[i].offset;
+			for(uint16_t igc = 0;igc<2;igc++){
+			glyph_hdr = *(struct OPENTYPE_GLYF*)position;
+			
+			glyph_hdr->number_of_contours = SWAPWORD(glyph_hdr->number_of_contours);
+			glyph_hdr->xmin = SWAPWORD(glyph_hdr->xmin);
+			glyph_hdr->ymin = SWAPWORD(glyph_hdr->ymin);
+			glyph_hdr->xmax = SWAPWORD(glyph_hdr->xmax);
+			glyph_hdr->ymax = SWAPWORD(glyph_hdr->ymax);
+
+			
+			
+			if(glyph_hdr->number_of_contours >= 0){
+			position += sizeof(struct OPENTYPE_GLYF);
+				struct OPENTYPE_SIMPLE_GLYPH_TABLE_1 glyph_table = *(struct OPENTYPE_SIMPLE_GLYPH_TABLE_1*)(position);
+				glyph_table.end_pts_of_contours = (uint16_t*)position;
+				for(uint16_t i = 0;i<glyph_hdr->number_of_contours;i++){
+					glyph_table.end_pts_of_contours[i] = SWAPWORD(*(uint16_t*)position);
+					position+=2;
+				}
+
+			
+				glyph_table.instruction_length = SWAPWORD(*(uint16_t*)(position));
+				
+				if(glyph_table.instruction_length > 0){
+				glyph_table.instructions = (uint8_t*)position;
+				for(uint16_t i = 0;i<glyph_table.instruction_length;i++){
+					glyph_table.instructions[i] = *(uint8_t*)position;
+					position++;
+				}
+				}else glyph_table.instructions = 0;
+				position+=2;
+				glyph_table.flags = (struct TRUETYPE_SIMPLE_GLYPH_OUTLINE_FLAGS*)(position);
+				uint16_t flag_length = 0;
+				print_data("FLAG START : ",to_hstring8(*(uint8_t*)position),200,20+(igc*76),0xffffffff);
+				
+				for(flag_length = 0;flag_length<glyph_table.end_pts_of_contours[glyph_hdr->number_of_contours-1]+1;flag_length++){
+					if(glyph_table.flags[flag_length].reserved != 0) return 0;
+					if(glyph_table.flags[flag_length].repeat){
+						flag_length+=*(uint8_t*)position;
+						break;
+					}
+					position++;
+				}
+				print_data("X CORDINATE START : ",to_hstring16(*(uint16_t*)position),200,72+(igc*76),0xffffffff);
+				for(uint16_t i = 0;i<flag_length;i++){
+					if(glyph_table.flags[i].x_short_vector == 1){
+						if(glyph_table.flags[i].this_x_is_same == 0){
+							glyphs[igc].points[i].x = (i>0 ? glyphs[igc].points[i-1].x : 0) - (uint16_t)(*(uint8_t*)position);
+							glyphs[igc].points[i].xnegative = 1;
+						}else{
+							glyphs[igc].points[i].x = (i>0 ? glyphs[igc].points[i-1].x : 0) + (uint16_t)(*(uint8_t*)position);
+						}
+						position++;
+					}else{
+						if(glyph_table.flags[i].this_x_is_same == 1){
+						glyphs[igc].points[i].x = i > 0 ? glyphs[igc].points[i-1].x : 0;
+						if(i > 0 && glyphs[igc].points[i-1].xnegative == 1){
+							glyphs[igc].points[i].xnegative = 1;
+						}
+						}else {
+							glyphs[igc].points[i].x = (i>0 ? glyphs[igc].points[i-1].x : 0) + (int16_t)SWAPWORD(*(uint16_t*)position);
+							if((int16_t)(SWAPWORD(*(uint16_t*)position)) < 0){
+								glyphs[igc].points[i].xnegative = 1;
+							}
+						position+=2;
+						}
+					}
+				}
+				for(uint16_t i = 0;i<flag_length;i++){
+					if(glyph_table.flags[i].y_short_vector == 1){
+						if(glyph_table.flags[i].this_y_is_same == 0){
+							glyphs[igc].points[i].y = (i>0 ? glyphs[igc].points[i-1].y : 0) - (uint16_t)(*(uint8_t*)position);
+							glyphs[igc].points[i].ynegative = 1;
+						}else{
+							glyphs[igc].points[i].y = (i>0 ? glyphs[igc].points[i-1].y : 0) + (uint16_t)(*(uint8_t*)position);
+						}
+						position++;
+					}else{
+						if(glyph_table.flags[i].this_y_is_same == 1){
+						glyphs[igc].points[i].y = i > 0 ? glyphs[igc].points[i-1].y : 0;
+						if(i > 0 && glyphs[igc].points[i-1].ynegative == 1){
+							glyphs[igc].points[i].ynegative = 1;
+						}
+						}else {
+							glyphs[igc].points[i].y = (i>0 ? glyphs[igc].points[i-1].y : 0) + (int16_t)SWAPWORD(*(uint16_t*)position);
+							if((int16_t)(SWAPWORD(*(uint16_t*)position)) < 0){
+								glyphs[igc].points[i].ynegative = 1;
+							}
+						position+=2;
+						}
+					}
+				}
+				glyphs[igc].start_contour_points = (struct SIMPLE_POINTS*)((glyphs[igc].points)+(sizeof(struct SIMPLE_POINTS)*flag_length));
+
+				glyphs[igc].start_contour_points[0].x = glyph_hdr->xmax - glyph_hdr->xmin;
+				glyphs[igc].start_contour_points[0].y = glyph_hdr->ymax;
+
+
+				for(uint16_t i = 1;i<=glyph_hdr->number_of_contours;i++){
+
+					glyphs[igc].start_contour_points[i].x = glyphs[igc].points[glyph_table.end_pts_of_contours[i]+1].x;
+					glyphs[igc].start_contour_points[i].y = glyphs[igc].points[glyph_table.end_pts_of_contours[i]+1].y;
+
+				}
+				print_data("FLAG LENGTH : ",to_stringu64(flag_length),20,36,0xffffffff);
+				
+				print_data("LAST EPOC : ",to_hstring16(glyph_table.end_pts_of_contours[glyph_hdr->number_of_contours-1]),20,98,0xffffffff);
+				
+				print_data("LAST POSITION : ",to_hstring32(SWAPLONG(*(uint32_t*)position)),20+(igc*300),128,0xffffffff);
+
+				print_data("POWER OF 3 : ",to_stringu64(pow(3,3)),600,1000,0xffffffff);
+
+				print_data("CORDINATE END : ",to_hstring64(*(uint64_t*)position),520,68+(igc*16),0xffffffff);
+				uint16_t x = 10, y = 250;
+				uint16_t last_ptx = 0, last_pty = 0, ptx = 0, pty = 0;
+				
+				struct QUADRATIC_BEZIER bz;
+
+				for(uint16_t i = 0;i<flag_length;i++){
+					//if(glyphs[igc].points[i].x < glyph_hdr->xmin || glyphs[igc].points[i].x > glyph_hdr->xmax || glyphs[igc].points[i].y < glyph_hdr->ymin || glyphs[igc].points[i].y > glyph_hdr->ymax) return 0;
+					GGOP_DrawPoint(700+(igc*250)+(glyphs[igc].points[i].x/10),600+(glyphs[igc].points[i].y/10),0xffff0000);
+					
+					ptx =(glyphs[igc].points[i].x/10);
+					pty = (glyphs[igc].points[i].y/10);
+					
+					bz.x0 = last_ptx;
+					bz.y0 = last_pty;
+					bz.x1 = ptx;
+					bz.y1 = pty;
+					bz.x2 = ptx;
+					bz.y2 = pty;
+
+					//GP_draw_triangular_bezier(700+(igc*250),800,&bz);
+
+					last_ptx = glyphs[igc].points[i].x/10;
+					last_pty = glyphs[igc].points[i].y/10;
+					if(i > 35) continue;
+					print_data("X: ",to_string64(glyphs[igc].points[i].x),x+(igc*480),y,0xffffffff);
+					x+=100;
+					print_data("Y: ",to_string64(glyphs[igc].points[i].y),x+(igc*240),y,0xffffffff);
+					x+=100;
+
+					//print_data("ON CURVE : ",to_hstring8(glyph_table.flags[i].on_curve),x+(igc*280),y,0xffffffff);
+					
+					x = 10;
+					y+=16;
+				}
+				uint16_t lsptx = (glyph_hdr->xmax - glyph_hdr->xmin)/10, lspty = (glyph_hdr->ymax - glyph_hdr->ymin)/10, lst_contour_index = 0, ccc= 0;
+				uint16_t tmp_xcordinates[flag_length];
+				uint16_t tmp_ycordinates[flag_length];
+				memset(tmp_xcordinates,0,flag_length*2);
+				memset(tmp_ycordinates,0,flag_length*2);
+				uint16_t curve_count = 0;
+				for(uint16_t i = 0;i<glyph_hdr->number_of_contours;i++){
+					ccc = glyph_table.end_pts_of_contours[i]-lst_contour_index + (i == 0 ? 1 : 0);
+
+					for(uint16_t c = 0; c<ccc;c++){
+					
+					if(c == ccc - 1){
+							tmp_xcordinates[1] = (glyph_hdr->xmax)/10;
+							tmp_xcordinates[0] = lsptx;
+							tmp_ycordinates[1] = (glyph_hdr->ymax)/10;
+							tmp_ycordinates[0] = lspty;
+						}else{
+							tmp_xcordinates[0] = lsptx;
+							tmp_xcordinates[1] = glyphs[igc].points[c+lst_contour_index].x/10;
+							tmp_ycordinates[0] = lspty;
+							tmp_ycordinates[1] = glyphs[igc].points[c+lst_contour_index].y/10;
+						}
+								
+							for(float t = 0;t<1;t+=0.01){
+								GGOP_SetPixel(700+(igc*250)+GetBezierPoint(tmp_xcordinates,2,t),500-GetBezierPoint(tmp_ycordinates,2,t),0xffffffff);
+							}
+
+						
+						
+						lsptx = glyphs[igc].points[c+lst_contour_index].x/10;
+						lspty = glyphs[igc].points[c+lst_contour_index].y/10;
+							
+						
+					}
+						print_data("START PTS X : ",to_stringu64(glyphs[igc].start_contour_points[i].x),700+(igc*200),500+(i*16),0xffffffff);
+						print_data("START PTS Y : ",to_stringu64(glyphs[igc].start_contour_points[i].y),700+(25*8)+(igc*200),500+(i*16),0xffffffff);
+
+				lst_contour_index = glyph_table.end_pts_of_contours[i];
+				}
+
+
+				}else{
+					print_data("FOUND COMPOSITE GLYPH TABLE : ",to_hstring16(*(uint16_t*)position),400,800,0xffffffff);
+					break;
+				}
+			}
+		}
+
+
+		
+}
+
+	const wchar_t* txt = L"Hello World";
+
+	wchar_t current_char;
+
+	for(uint16_t i = 0;i<11;i++){
+		current_char = txt[i];
+		if(post_hdr->version == 0x00020000){
+			uint16_t glyph_id = 0;
+			struct OPENTYPE_POST_2_0* pt = (struct OPENTYPE_POST_2_0*)post_table;
+			//pt->glyph_name_index[10] = 0;
+			for(uint16_t c = 0;c<SWAPWORD(*(uint16_t*)maxp_table);c++){
+				if(pt->glyph_name_index[c] == current_char){
+
+					glyph_id = c;
+					break;
+				}
+			}
+
+		print_data("GLYPH ID : ",to_hstring16(glyph_id),1100,20+(i*16),0xffffffff);
+			
+		}else return 0;
+	}
+
+	return 1;
+	/*
+	*/
+
+	//GP_draw_sf_text("f file size :",0xffffffff,100,100);
+	//GP_draw_sf_text(to_stringu64(font_file_size),0xffffffff,100+(14*8),100);
+}
+
+void DrawText(wchar_t* text, unsigned int text_size, wchar_t* font_family){
+
+}
+uint32_t FP_calculate_table_checksum(uint32_t* table, uint32_t length){
+	uint32_t sum = 0;
+	uint32_t* end_ptr = table+((length+3) & ~3) / sizeof(uint32_t);
+
+	while(table < end_ptr) sum+=*table++;
+
+	return sum;
+}

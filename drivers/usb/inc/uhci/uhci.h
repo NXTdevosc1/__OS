@@ -1,0 +1,4 @@
+#pragma once
+
+// PCI PROGRAM INTERFACE (USB1)
+#define UHCI_CONTROLLER 0

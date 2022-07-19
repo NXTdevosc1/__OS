@@ -1,0 +1,61 @@
+#pragma once
+#include <stdint.h>
+enum MEDIA_HDR_TYPE{
+    MEDIA_HDR_INVALID = 0,
+    MEDIA_HDR_MBR = 1,
+    MEDIA_HDR_GPT = 2
+};
+enum MEDIA_DEVICE_TYPE{
+    MDT_SATA = 0,
+    MDT_SATAPI = 1,
+    MDT_USB_FLASH = 2
+};
+enum MEDIA_DEVICE_SUBTYPE{
+    MDS_NULL = 0,
+    MDS_AHCI = 1,
+    MDS_IDE = 2,
+    MDS_RAID = 3,
+    MDS_RAID_AHCI = 4,
+    MDS_USB_1_0 = 5,
+    MDS_USB_2_0 = 6,
+    MDS_USB_3_0 = 7
+};
+struct MEDIA_ALLOCATION_TABLE{
+    void* base;
+    struct MEDIA_ALLOCATION_TABLE* next;
+};
+struct PHYSICAL_DEVICE_INSTANCE{
+    uint8_t present;
+    uint8_t header_type; // 0 invalid header, 1 = mbr, 2 = gpt
+    uint16_t device_type;
+    uint16_t subtype;
+    uint32_t capabilities;
+    uint32_t reserved; // reserved for future use
+    wchar_t* device_name;
+    void* mmio0;
+    void* mmio1;
+    struct MEDIA_ALLOCATION_TABLE* allocation_table;
+    struct PHYSICAL_DEVICE_INSTANCE* next;
+};
+struct VIRTUAL_PARTITION_INSTANCE{
+    uint8_t present;
+    uint8_t reserved;
+    uint16_t fs;
+    uint16_t cluster_size;
+    wchar_t* volume_label;
+    uint64_t base_lba;
+    uint64_t max_lba;
+    void* fs_descriptor;
+    uint64_t guid[4];
+    struct PHYSICAL_DEVICE_INSTANCE* device;
+    struct VIRTUAL_PARTITION_INSTANCE* next;
+};
+
+int RegisterMediaDevice(struct PHYSICAL_DEVICE_INSTANCE** device);
+int RegisterPartitionInstance(struct VIRTUAL_PARTITION_INSTANCE* pinstance);
+int UnregisterMediaDevice(struct PHYSICAL_DEVICE_INSTANCE* device);
+int UnregisterPartitionInstance(struct VIRTUAL_PARTITION_INSTANCE* pinstance);
+int MediaCreateAllocation(struct PHYSICAL_DEVICE_INSTANCE* device, void* base);
+int MediaFreeAllocation(struct PHYSICAL_DEVICE_INSTANCE* device, void* base);
+int8_t GetMountIndex(wchar_t* buffer, uint8_t* path_offset /*the value to add to path to get in partition path*/);
+struct VIRTUAL_PARTITION_INSTANCE* GetMountPoint(wchar_t* drive_letter, uint8_t index);

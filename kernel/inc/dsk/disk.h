@@ -1,0 +1,232 @@
+#pragma once
+#include <krnltypes.h>
+#include <Management/device.h>
+
+// DISK ID 2 "C:/" is  the main disk
+
+#define MAX_FILE_NAME 255
+
+#define MAIN_PARTITION_INDICATOR L"//"
+#define SYSTEM_PARTITION_INDICATOR L"///"
+
+#define DSK_FAILED(x) (x == 0xFFFFFFFFFFFFFFFF)
+#define MAX_FILES_PER_DIRLS_LIST 50
+
+
+enum _DISK_SECURITY_DESCRIPTOR {
+	DISK_READ = 1,
+	DISK_WRITE = 2,
+	DISK_SHOW_INSTANCE = 4, // Show presence of the disk to the user
+	DISK_VIRTUAL = 8, // Means a virtual partition or disk like (VFS)
+	DISK_UNMOUNTABLE = 0x10,
+	DISK_DEFAULT_SECURITY_DESCRIPTOR = DISK_READ | DISK_WRITE | DISK_SHOW_INSTANCE,
+	PARTITION_DEFAULT_SECURITY_DESCRIPTOR = DISK_READ | DISK_WRITE | DISK_SHOW_INSTANCE,
+	DISK_MAIN = 0x20,  // Main partition / Disk (Only set by system)
+	DISK_SYSTEM = 0x40 // e.g. Efi System Partition / Disk
+};
+
+enum FILE_OPEN_ACCESS {
+	FILE_OPEN_READ = 1,
+	FILE_OPEN_WRITE = 2,
+	FILE_OPEN_SET_INFORMATION = 4,
+	FILE_OPEN_LIST_CONTENT = 8
+};
+
+typedef struct _DISK_MANAGEMENT_INTERFACE DISK_MANAGEMENT_INTERFACE;
+typedef struct _PARTITION_MANAGEMENT_INTERFACE PARTITION_MANAGEMENT_INTERFACE;
+
+typedef struct _DISK_DEVICE_INSTANCE DISK_DEVICE_INSTANCE;
+typedef struct _PARTITION_INSTANCE PARTITION_INSTANCE;
+
+
+
+
+typedef struct _OPEN_FILE_LIST OPEN_FILE_LIST;
+
+
+typedef struct _OPEN_FILE_DATA {
+	BOOL		Open;
+	UINT64		FileId;
+	RFPROCESS	Process;
+	HANDLE		Handle;
+	LPWSTR		Path;
+	DWORD		PathLength;
+	DWORD		OpenAccess;
+	PARTITION_INSTANCE* Partition;
+	OPEN_FILE_LIST* FileList;
+} OPEN_FILE_DATA, * FILE;
+
+
+enum FILE_ATTRIBUTES {
+	FILE_ATTRIBUTE_READ_ONLY = 1,
+	FILE_ATTRIBUTE_HIDDEN = 2,
+	FILE_ATTRIBUTE_SYSTEM_FILE = 4,
+	FILE_ATTRIBUTE_DIRECTORY = 8
+};
+
+typedef struct _FILE_INFORMATION_STRUCT {
+	UINT64 CreationTimestamp;
+	UINT64 ModificationTimestamp;
+	UINT64 FileAttributes;
+	UINT64 PartitionId;
+	UINT64 DiskId;
+	UINT64 FileSystem;
+	UINT64 Cluster;
+	UINT64 FileSize;
+} FILE_INFORMATION_STRUCT;
+
+
+typedef struct _DIR_LIST_FILE_ENTRY {
+	BOOL Set;
+	UINT64 StartCluster;
+	UINT64 attributes;
+	LPWSTR FileName;
+	UINT64 FileSize;
+} DIR_LIST_FILE_ENTRY;
+
+typedef struct _FILE_CONTENT_LIST FILE_CONTENT_LIST;
+
+typedef struct _FILE_CONTENT_LIST {
+	DIR_LIST_FILE_ENTRY Files[MAX_FILES_PER_DIRLS_LIST];
+	FILE_CONTENT_LIST* Next;
+} FILE_CONTENT_LIST;
+
+typedef struct _DIRECTORY_FILE_LIST {
+	UINT32 file_count;
+	UINT32 in_index;
+	RFPROCESS Process;
+	FILE_CONTENT_LIST* start;
+	FILE_CONTENT_LIST* current;
+	FILE_CONTENT_LIST ls;
+} DIRECTORY_FILE_LIST;
+
+
+
+
+/* DRIVE IMPLEMENTATIONS */
+
+typedef KERNELSTATUS(__KERNELAPI* RAW_DISK_READ)(DISK_DEVICE_INSTANCE* Disk, UINT64 SectorOffset, UINT64 NumSectors, void* Buffer);
+typedef KERNELSTATUS(__KERNELAPI* RAW_DISK_WRITE)(DISK_DEVICE_INSTANCE* Disk, UINT64 SectorOffset, UINT64 NumSectors, void* Buffer);
+
+/* PARTITION IMPLEMENTATIONS */
+
+
+// Reads partition data, (after MBR & FS Headers etc...)
+
+typedef KERNELSTATUS(__KERNELAPI* RAW_PARTITION_READ)(PARTITION_INSTANCE* Partition, UINT64 ClusterOffset, UINT64 NumClusters, void* Buffer);
+typedef KERNELSTATUS(__KERNELAPI* RAW_PARTITION_WRITE)(PARTITION_INSTANCE* Partition, UINT64 ClusterOffset, UINT64 NumClusters, void* Buffer);
+
+typedef KERNELSTATUS(__KERNELAPI* RAW_PARTITION_SECTOR_READ)(PARTITION_INSTANCE* Partition, UINT64 SectorOffset, UINT64 NumSectors, void* Buffer);
+typedef KERNELSTATUS(__KERNELAPI* RAW_PARTITION_SECTOR_WRITE)(PARTITION_INSTANCE* Partition, UINT64 SectorOffset, UINT64 NumSectors, void* Buffer);
+
+typedef FILE(__KERNELAPI* FILE_OPEN)(PARTITION_INSTANCE* Partition, LPWSTR Path, UINT64 Access, FILE_INFORMATION_STRUCT* FileInformation);
+typedef KERNELSTATUS(__KERNELAPI* FILE_CLOSE)(FILE File);
+typedef BOOL(__KERNELAPI* FILE_VALIDATE)(FILE File);
+
+typedef KERNELSTATUS(__KERNELAPI* FILE_READ)(FILE File, UINT64 Offset, UINT64* NumBytesRead, void* Buffer);
+typedef KERNELSTATUS(__KERNELAPI* FILE_WRITE)(FILE File, UINT64* Offset, UINT64 NumBytes, void* Buffer);
+typedef KERNELSTATUS(__KERNELAPI* FILE_GET_INFO)(FILE File, FILE_INFORMATION_STRUCT* FileInformation, LPWSTR FileName); // File Name Is optionnal
+typedef KERNELSTATUS(__KERNELAPI* FILE_SET_INFO)(FILE File, UINT32 InformationType, void* Information);
+typedef KERNELSTATUS(__KERNELAPI* FILE_LIST_CONTENT)(FILE File, DIRECTORY_FILE_LIST* FileList, UINT64 MaxFileCount); /*List Directory Content*/
+
+
+
+typedef struct _DISK_INFO {
+	UINT64 BaseAddress; // Set to 0 for disks, used in partitions
+	UINT64 MaxAddress; // the size of the disk/partition
+	UINT64 BytesInCluster;
+	UINT64 SectorsInCluster;
+	UINT64 FsType;
+	LPWSTR DiskName;
+} DISK_INFO;
+typedef struct _DISK_MANAGEMENT_INTERFACE {
+	RAW_DISK_READ Read;
+	RAW_DISK_WRITE Write;
+} DISK_MANAGEMENT_INTERFACE;
+
+typedef struct _PARTITION_MANAGEMENT_INTERFACE {
+	RAW_PARTITION_READ RawRead;
+	RAW_PARTITION_SECTOR_READ SectorRawRead;
+	RAW_PARTITION_WRITE RawWrite;
+	RAW_PARTITION_SECTOR_WRITE SectorRawWrite;
+
+	FILE_OPEN Open;
+	FILE_CLOSE Close;
+	FILE_VALIDATE Validate;
+
+	FILE_READ Read;
+	FILE_WRITE Write;
+	FILE_GET_INFO GetInfo;
+	FILE_SET_INFO SetInfo;
+	FILE_LIST_CONTENT ListFileContent;
+} PARTITION_MANAGEMENT_INTERFACE;
+
+typedef struct _DISK_DEVICE_INSTANCE{
+	BOOL Present;
+	UINT64 DiskId;
+	UINT64 SecurityDescriptor;
+	RFDEVICE_OBJECT Device;
+	DISK_INFO DiskInformation;
+} DISK_DEVICE_INSTANCE;
+
+typedef struct _OPEN_FILE_LIST {
+	OPEN_FILE_DATA Files[UNITS_PER_LIST];
+	OPEN_FILE_LIST* Next;
+} OPEN_FILE_LIST;
+
+typedef struct _PARTITION_INSTANCE {
+	BOOL Present;
+	UINT64 PartitionId;
+	LPWSTR PartitionName;
+	UINT64 SecurityDescriptor;
+	DISK_DEVICE_INSTANCE* Disk;
+	DISK_INFO PartitionInformation;
+	LPVOID FsInfo;
+	PARTITION_MANAGEMENT_INTERFACE Interface;
+	OPEN_FILE_LIST FileList;
+} PARTITION_INSTANCE;
+
+
+
+typedef struct _DISK_DEVICE_LIST DISK_DEVICE_LIST;
+typedef struct _PARTITION_LIST PARTITION_LIST;
+
+typedef struct _DISK_DEVICE_LIST {
+	DISK_DEVICE_INSTANCE Disks[UNITS_PER_LIST];
+	DISK_DEVICE_LIST* Next;
+} DISK_DEVICE_LIST;
+
+typedef struct _PARTITION_LIST {
+	PARTITION_INSTANCE Partitions[UNITS_PER_LIST];
+	PARTITION_LIST* Next;
+} PARTITION_LIST;
+
+DISK_DEVICE_INSTANCE* KERNELAPI CreateDisk(UINT64* DiskId, UINT64 SecurityDescriptor, DISK_INFO* DiskInformation, RFDEVICE_OBJECT Device);
+PARTITION_INSTANCE* KERNELAPI CreatePartition(LPWSTR PartitionName, UINT64* PartitionId, UINT64 SecurityDescriptor, DISK_DEVICE_INSTANCE* DiskDevice, DISK_INFO* PartitionInformation, LPVOID FsInfo, PARTITION_MANAGEMENT_INTERFACE* ManagementInterface);
+
+BOOL KERNELAPI SetPartitionName(PARTITION_INSTANCE* Partition, LPWSTR PartitionName);
+// Check existance of disk/partition
+BOOL KERNELAPI ValidateDisk(DISK_DEVICE_INSTANCE* Disk);
+BOOL KERNELAPI ValidatePartition(PARTITION_INSTANCE* Partition);
+PARTITION_INSTANCE* KERNELAPI GetPartition(UINT64 PartitionId);
+
+
+BOOL KERNELAPI DestroyPartition(PARTITION_INSTANCE* Partition);
+BOOL KERNELAPI RemoveDisk(DISK_DEVICE_INSTANCE* Disk);
+
+OPEN_FILE_LIST* KERNELAPI CreateFileTable();
+
+FILE KERNELAPI AllocateFile(OPEN_FILE_LIST* FileList);
+BOOL KERNELAPI ReleaseFile(FILE File);
+
+BOOL KERNELAPI ValidateFile(FILE File);
+
+PARTITION_INSTANCE* KERNELAPI ResolvePartition(LPWSTR Path, LPWSTR* InPartitionPath);
+LPWSTR KERNELAPI ResolveNextFileName(LPWSTR Path, LPWSTR FileName, UINT64* FileNameLength); // Return value is the path pushed
+
+PARTITION_INSTANCE* KERNELAPI GetMainPartition(UINT64* PartitionId);
+PARTITION_INSTANCE* KERNELAPI GetSystemPartition(UINT64* PartitionId);
+
+BOOL KERNELAPI SetMainPartition(PARTITION_INSTANCE* Partition);
+BOOL KERNELAPI SetSystemPartition(PARTITION_INSTANCE* Partition);
+BOOL KERNELAPI FixFilePath(LPWSTR Path);

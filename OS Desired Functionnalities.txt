@@ -1,0 +1,10 @@
+OS DESIRED FUNCTIONNALITIES
+
+1 - TRIGGER A TIMER WITH FUNCTION AFTER CALLING A PROCEDURE :
+	-for ex. if proc a taked more than 10 seconds and is still running, the timer calls the target function
+
+
+2 - IN OS FREE PDF EDITOR :
+	- This will make creators use our os because pdf editors are paid, and free ones are limited
+
+3 - Support for Microsoft & Linux file systems

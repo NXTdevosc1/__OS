@@ -1,0 +1,19 @@
+{
+    "files.associations": {
+        "xiosbase": "c",
+        "madt.h": "c",
+        "ioapic.h": "c",
+        "runtimesymbols.h": "c",
+        "setfile.h": "c",
+        "sod.h": "c",
+        "preos_renderer.h": "c",
+        "istream": "c",
+        "drv.h": "c",
+        "kerneltypes.h": "c",
+        "device.h": "c",
+        "krnltypes.h": "c",
+        "pcidef.h": "c",
+        "kernelruntime.h": "c",
+        "fat32.h": "c"
+    }
+}

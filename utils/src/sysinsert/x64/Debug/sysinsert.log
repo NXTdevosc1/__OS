@@ -1,0 +1,3 @@
+﻿  main.c
+C:\Users\loukd\Desktop\OS\utils\src\sysinsert\main.c(69,17): warning C4022: 'CloseHandle': pointer mismatch for actual parameter 1
+  sysinsert.vcxproj -> C:\Users\loukd\Desktop\OS\utils\src\sysinsert\x64\Debug\sysinsert.exe

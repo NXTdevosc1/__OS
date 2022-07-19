@@ -1,0 +1,29 @@
+[Defines]
+  INF_VERSION = 1.25
+  BASE_NAME = EfiBoot
+  FILE_GUID = e0a78d1a-5c95-4e48-954d-88ff64af9ab1
+  MODULE_TYPE = UEFI_APPLICATION
+  VERSION_STRING = 1.0
+  ENTRY_POINT = UefiEntry
+ 
+[Sources]
+  EfiEntry.c
+ 
+[Packages]
+  MdePkg/MdePkg.dec
+ 
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiLib
+  BaseLib
+ 
+[Guids]
+  gEfiFileInfoGuid
+[Ppis]
+ 
+[Protocols]
+  gEfiLoadedImageProtocolGuid
+  gEfiUgaIoProtocolGuid
+[FeaturePcd]
+ 
+[Pcd]

@@ -1,0 +1,6 @@
+**/UEFI
+**/.vs
+**/kernel/bin
+**/kernel/x86_64
+**/LEGACY/os.img
+**/LEGACY/os.img.bak

@@ -1,0 +1,19 @@
+{
+  "configurations": [
+    {
+      "inheritEnvironments": [
+        "MSVC"
+      ],
+      "name": "Kernel",
+      "includePath": [
+        "${workspaceRoot}\\kernel\\inc",
+        "${workspaceRoot}\\kernel\\lib",
+        "${workspaceRoot}\\libc\\inc",
+        "${workspaceRoot}\\libc\\drv\\inc",
+        "${workspaceRoot}\\UEFI\\gnu-efi\\inc",
+        "${workspaceRoot}\\UEFI\\gnu-efi\\inc\\x86_64"
+      ],
+      "intelliSenseMode": "windows-msvc-x64"
+    }
+  ]
+}

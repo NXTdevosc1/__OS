@@ -1,0 +1,9 @@
+IPC Clients :
+
+- The "Ipc Client Thread" is a kernel thread that dispatches ipc communications to avoid 
+  multiprocessor unsynchronized behaviour
+
+- This thread will have a dynamic priority based on the length of the pending messages
+
+- Each Client have an inMessageQueue (Received Messages) and an outMessageQueue (Asynchronous 
+  Pending Messages to be dispatched by the IpcClientThread)

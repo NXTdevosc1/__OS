@@ -1,0 +1,187 @@
+#include <dsk/media.h>
+#include <stddef.h>
+#include <mem.h>
+#include <MemoryManagement.h>
+#include <interrupt_manager/SOD.h>
+#include <stdlib.h>
+#include <preos_renderer.h>
+struct PHYSICAL_DEVICE_INSTANCE* device0 = NULL;
+struct VIRTUAL_PARTITION_INSTANCE* pinstance0 = NULL;
+
+int RegisterMediaDevice(struct PHYSICAL_DEVICE_INSTANCE** _device){
+    if(!_device) return -1;
+    struct PHYSICAL_DEVICE_INSTANCE* device = *_device;
+    device->allocation_table = kmalloc(sizeof(*device->allocation_table));
+    SZeroMemory(device->allocation_table);
+
+    if(!device0){
+        device0 = device;
+        device->present = 1;
+        return SUCCESS;
+    }
+    struct PHYSICAL_DEVICE_INSTANCE* dev = device0; 
+    for(;;){
+            if(!dev->present){
+                memcpy(dev, device, sizeof(struct PHYSICAL_DEVICE_INSTANCE));
+                dev->present = 1;
+                free(device, kproc);
+                *_device = dev;
+                return SUCCESS;
+            }
+            else if(!dev->next) {
+                dev->next = device;
+                device->present = 1;
+                return SUCCESS;
+            }
+        
+        dev = dev->next;
+    }
+    SET_SOD_DRIVER_ERROR;
+    return -2;
+}
+int RegisterPartitionInstance(struct VIRTUAL_PARTITION_INSTANCE* pinstance){
+    if(!pinstance) return -1;
+    if(!pinstance0){
+        pinstance0 = pinstance;
+        pinstance->present = 1;
+        return SUCCESS;
+    }
+    struct VIRTUAL_PARTITION_INSTANCE* pinst = pinstance0;
+
+
+    for(;;){
+        if(!pinst->present){
+            memcpy(pinst, pinstance, sizeof(struct VIRTUAL_PARTITION_INSTANCE));
+            pinstance->present = 1;
+            return SUCCESS;
+        }else if(!pinst->next){
+            pinst->next = pinstance;
+            pinstance->present = 1;
+            return SUCCESS;
+        }
+        pinst = pinst->next;
+    }
+    return -1;
+}
+int UnregisterMediaDevice(struct PHYSICAL_DEVICE_INSTANCE* device){
+    if(!device) return -1;
+    struct PHYSICAL_DEVICE_INSTANCE* dev = device0;
+    for(;;){
+            if(dev == device){
+                dev->present = 0;
+                return SUCCESS;
+            }else if(!dev->next){
+                return -1;
+            }
+        
+        dev = dev->next;
+    }
+    return -1;
+}
+int UnregisterPartitionInstance(struct VIRTUAL_PARTITION_INSTANCE* pinstance){
+    struct VIRTUAL_PARTITION_INSTANCE* pinst = pinstance0;
+    for(;;){
+        if(pinst == pinstance){
+            pinst->present = 0;
+            return SUCCESS;
+        }else if(!pinst->next){
+            return -1;
+        }
+        pinst = pinst->next;
+    }
+    return -1;
+}
+
+int MediaCreateAllocation(struct PHYSICAL_DEVICE_INSTANCE* device, void* base){
+    if(!base) return -1;
+    struct MEDIA_ALLOCATION_TABLE* entry = device->allocation_table;
+    for(;;){
+        if(!entry->base){
+            entry->base = base;
+            return SUCCESS;
+        }else if(!entry->next){
+            entry->next = kmalloc(sizeof(struct MEDIA_ALLOCATION_TABLE));
+            if(!entry->next) SET_SOD_MEDIA_MANAGEMENT;
+            entry = entry->next;
+            SZeroMemory(entry);
+            entry->base = base;
+            return SUCCESS;
+        }
+        entry = entry->next;
+    }
+    return -1;
+}
+int MediaFreeAllocation(struct PHYSICAL_DEVICE_INSTANCE* device, void* base){
+    struct MEDIA_ALLOCATION_TABLE* entry = device->allocation_table;
+    for(;;){
+        if(entry->base == base){
+            entry->base = NULL;
+            return SUCCESS;
+        }else if(!entry->next) return -1;
+    }
+    return -1;
+}
+static inline int CheckAndToUpperCaseDrvLetter(wchar_t* drv_letter){
+    if((*drv_letter < L'a' ||*drv_letter > L'z') &&
+    (*drv_letter < L'A' ||*drv_letter > L'Z')
+    ) return -1;
+
+    if(*drv_letter >= L'a' && *drv_letter <= L'z'){
+        *drv_letter-=32; // to uppercase
+    }
+    return SUCCESS;
+}
+int8_t GetMountIndex(wchar_t* buffer, uint8_t* path_offset){
+    uint8_t len = wstrlen(buffer);
+    if(len < 3 || len > 220) return -1;
+    if((buffer[0] < L'a' || buffer[0] > L'z') &&
+    (buffer[0] < L'A' || buffer[0] > L'Z')
+    ) return -1;
+    uint8_t buffer_addr_valid = 0;
+    uint8_t buffer_index_size = 0;
+    for(uint8_t i = 1;i<5;i++){
+        if(buffer[i] == L':' &&
+        (
+        buffer[i+1] == '/'
+        ||
+        buffer[i+1] == '\\'
+        )
+        ){
+            buffer_addr_valid = 1;
+            buffer_index_size = i-1;
+            *path_offset = i+2;
+            break;
+        }
+    }
+    if(!buffer_addr_valid) return -1;
+    if(!buffer_index_size) return 0; // first index
+    GP_clear_screen(0xff000000ff);
+    GP_draw_sf_text("TODO : Parse Drive Indexes with strulong",0xffffff,20,20);
+    while (1);
+    
+    return wstrulong(buffer+1, buffer_index_size);
+}
+struct VIRTUAL_PARTITION_INSTANCE* GetMountPoint(wchar_t* drive_letter, uint8_t index){
+struct VIRTUAL_PARTITION_INSTANCE* pinst = pinstance0;
+if(CheckAndToUpperCaseDrvLetter(drive_letter) != SUCCESS) return NULL;
+wchar_t current_letter = 'A';
+uint8_t current_index = 0;
+for(;;){
+    if(pinst->present &&
+    current_letter == *drive_letter &&
+    current_index == index
+    ){
+        return pinst;
+    }else if(!pinst->next){
+        return NULL;
+    }
+    if(current_letter == 'Z'){
+        current_letter = 'A';
+        current_index++;
+    }else{
+        current_letter++;
+    }
+    pinst = pinst->next;
+}
+return NULL;
+}

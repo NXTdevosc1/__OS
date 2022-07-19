@@ -1,0 +1,2 @@
+cl src/*.c "../osdll.lib" /GS- obj/x86_64/Assembly/*.obj /Fo:obj/x86_64/ /Fe:loginui.exe /Od /Iinc /I../../libc/inc /link /entry:main /DYNAMICBASE /FIXED:no /subsystem:windows /nodefaultlib
+copy /b loginui.exe "../../kernel/iso/os/system"

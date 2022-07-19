@@ -1,0 +1,3 @@
+#pragma once
+// PCI PROGRAM INTERFACE (USB1)
+#define OHCI_CONTROLLER 0x10

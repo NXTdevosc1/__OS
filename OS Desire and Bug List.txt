@@ -1,0 +1,30 @@
+OS DESIRE & BUG LIST:
+
+for e.g. [name] : -[undone] / 1 [done]
+
+- Security Check In Kernel Functions : -
+- Write or change file name must not have special characters [/,\,...] : -
+- Call Layers to secure functions : -
+- Set Task Focus : -
+	{
+		- Giving very high cpu time to the selected thread, and idle cpu time for other threads,
+		  and a normal priority for GUI Threads, this is useful for e.g in "Window Moving" which
+		  without a graphics card can be very laggy and slow
+	}
+- Lock User Tasks : -
+	{
+		Maintains only system threads, useful for security for e.g. if user sees a virus running
+		He can disable all user threads with a "Shortcut Key" or Settings, And maybe enters
+		"KERNEL EMERGENCY MODE" To kill the threat
+	}
+- Using the maximum power of CPU in graphics Processing (SSE, AVX...) : -
+
+- PE Files : Initializing uninitialized data (e.g. ".bss") with a custum value
+
+- Optimzed & Extended Virtual Machine Platform (After launch and fame) : - 
+{
+	Creating an environnement for the os executing of VM
+	- Make VM Manager Able to handle Page and General Protection As well as other Faults
+	  to do it's stuff (for e.g. lgdt [%rcx] #GPF ; VM Will handle this and load GDT)
+	- Extensible Virtual Process Management
+}

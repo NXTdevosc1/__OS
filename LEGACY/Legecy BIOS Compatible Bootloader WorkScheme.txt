@@ -1,0 +1,21 @@
+Sector0 with MBR(Master Boot Record) Header:
+
+- Clear Direction Flag
+- Reset Segment Registers
+- Set Stack Pointer to 0x8000
+- Check LBA Extended Features Support (CHS Addressing Unused) to access Higher Sector Addresses
+- 4 Times read with 0x40 Sectors + 1 Sector (BOOT_SECTOR) in Address 0x9000
+- Check BOOTMGR_HEADER
+- Get EntryPointOffset, Pass Boot Parameters and jmp
+BOOT STAGE 2:
+- cli, Disable NMI, DISABLE IRQ
+- ENABLE A20 Gate
+- Get Memory Map
+- Enable Protected Mode
+- Setup 32-BIT Protected Mode Segment Registers
+- Set new ESP, EBP
+- Check Boot Pointer Table
+- jmp EnterLongMode "bootldr64.asm" (Check CPUID Support, Check Long Mode Support)
+- Set address of initial 4MB Page Table and jmp to long mode, setup segment registers ...
+- Load Kernel Image and Required Files
+- jmp [KernelEntryPoint]

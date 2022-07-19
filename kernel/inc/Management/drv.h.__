@@ -1,0 +1,28 @@
+#pragma once
+#include <krnltypes.h>
+#include <CPU/process_defs.h>
+
+typedef struct _DRIVER_OBJECT DRIVER_OBJECT, *PDRIVER_OBJECT;
+
+typedef KERNELSTATUS(__KERNELAPI* DRIVER_TERMINATION_PROCEDURE)(PDRIVER_OBJECT DriverObject);
+
+typedef struct _DRIVER_OBJECT_LIST DRIVER_OBJECT_LIST;
+
+typedef struct _DRIVER_OBJECT{
+	UINT64 DriverId;
+	HPROCESS DriverProcess;
+	DRIVER_TERMINATION_PROCEDURE TerminationProcedure;
+} DRIVER_OBJECT, *PDRIVER_OBJECT;
+
+typedef struct _DRIVER_OBJECT_LIST {
+	DRIVER_OBJECT Drivers[UNITS_PER_LIST];
+	DRIVER_OBJECT_LIST* Next;
+} DRIVER_OBJECT_LIST;
+
+PDRIVER_OBJECT CreateDriver(HPROCESS Process);
+KERNELSTATUS UnloadDriver(PDRIVER_OBJECT DriverObject);
+
+BOOL ValidateDriver(PDRIVER_OBJECT Driver);
+
+HANDLE OpenDriver(LPWSTR DriverName);
+BOOL CloseDriver(HANDLE DriverHandle);
