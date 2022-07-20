@@ -323,6 +323,7 @@ typedef struct _AHCI_DEVICE_PORT {
     RFTHREAD PendingCommands[0x20];
     UINT32 DoneCommands;
     UINT32 UsedCommandSlots;
+    BOOL FirstD2h;
 } AHCI_DEVICE_PORT, *RFAHCI_DEVICE_PORT;
 
 typedef struct _AHCI_DEVICE {

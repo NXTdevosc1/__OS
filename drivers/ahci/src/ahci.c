@@ -112,10 +112,12 @@ void AhciInterruptHandler(RFDRIVER_OBJECT Driver, RFINTERRUPT_INFORMATION Interr
     for(int i = 0;i<Ahci->NumPorts;i++) {
         if(GlobalInterruptStatus & 1) {
             HBA_PORT* HbaPort = &Ahci->HbaPorts[i];
+            AHCI_DEVICE_PORT* Port = &Ahci->Ports[i];
             SystemDebugPrint(L"Interrupt on PORT %d (%x)", (UINT64)i, HbaPort->PortSignature);
             if(HbaPort->InterruptStatus.D2HRegisterFisInterrupt) {
                 
                 SystemDebugPrint(L"D2H_REG_FIS_INT (TYPE : %x)", Ahci->Ports[i].ReceivedFis->D2h.FisType);
+                if(!Port->FirstD2h) Port->FirstD2h = 1;
 
                 DWORD CmdIssue = HbaPort->CommandIssue;
                 RFTHREAD* Pending = Ahci->Ports[i].PendingCommands;
@@ -131,20 +133,37 @@ void AhciInterruptHandler(RFDRIVER_OBJECT Driver, RFINTERRUPT_INFORMATION Interr
                 HbaPort->InterruptStatus.D2HRegisterFisInterrupt = 1;
             }
 
-     
+            if(HbaPort->InterruptStatus.PioSetupFisInterrupt) SystemDebugPrint(L"PIO_SETUP");
+            if(HbaPort->InterruptStatus.DmaSetupFisInterrupt) {
+                SystemDebugPrint(L"DMA_SETUP_FIS");
+                HbaPort->InterruptStatus.DmaSetupFisInterrupt = 1;
+            }
 
 
             if(HbaPort->InterruptStatus.SetDeviceBitsInterrupt) {
                 SystemDebugPrint(L"SET_DEVICE_BITS");
                 HbaPort->InterruptStatus.SetDeviceBitsInterrupt = 1;
             }
-            if(HbaPort->InterruptStatus.DmaSetupFisInterrupt) {
-                SystemDebugPrint(L"DMA_SETUP_FIS");
-                HbaPort->InterruptStatus.DmaSetupFisInterrupt = 1;
+            if(HbaPort->InterruptStatus.UnknownFisInterrupt) {
+                SystemDebugPrint(L"UNKNOWN_FIS");
+                HbaPort->SataError.UnknownFisType = 0;
+            }
+            if(HbaPort->InterruptStatus.DescriptorProcessed) {
+                SystemDebugPrint(L"DESCRIPTOR_PROCESSED");
+                HbaPort->InterruptStatus.DescriptorProcessed = 1;
             }
             if(HbaPort->InterruptStatus.PortConnectChangeStatus) {
                 SystemDebugPrint(L"PORT_CONNECT_CHANGE");
+                wr32(&Port->Port->SataError, *(UINT32*)&Port->Port->SataError);
             }
+            if(HbaPort->InterruptStatus.DeviceMechanicalPresenceStatus) SystemDebugPrint(L"DEVICE_MECHANICAL_PRESENCE");
+            if(HbaPort->InterruptStatus.PhyRdyChangeStatus) {
+                SystemDebugPrint(L"PHY_RDI_CHANGE");
+                // wr32(&HbaPort->SataError, -1);
+                wr32(&Port->Port->SataError, *(UINT32*)&Port->Port->SataError);
+            } 
+            if(HbaPort->InterruptStatus.IncorrectPortMultiplierStatus) SystemDebugPrint(L"INCORRECT_PORT_MULTIPLIER");
+            if(HbaPort->InterruptStatus.OverflowStatus) SystemDebugPrint(L"OVERFLOW");
             if(HbaPort->InterruptStatus.InterfaceNonFatalErrorStatus) {
                 SystemDebugPrint(L"INTERFACE_NON_FATAL");
                 HbaPort->InterruptStatus.InterfaceNonFatalErrorStatus = 1;
@@ -153,18 +172,13 @@ void AhciInterruptHandler(RFDRIVER_OBJECT Driver, RFINTERRUPT_INFORMATION Interr
                 SystemDebugPrint(L"INTERFACE_FATAL");
                 HbaPort->InterruptStatus.InterfaceFatalErrorStatus = 1;
             }
-            if(HbaPort->InterruptStatus.DescriptorProcessed) {
-                SystemDebugPrint(L"DESCRIPTOR_PROCESSED");
-                HbaPort->InterruptStatus.DescriptorProcessed = 1;
-            }
+            if(HbaPort->InterruptStatus.HostBusDataErrorStatus) SystemDebugPrint(L"HOST_BUS_DATA_ERROR");
+            if(HbaPort->InterruptStatus.HostBusFatalErrorStatus) SystemDebugPrint(L"HOST_BUS_FATAL_ERROR");
             if(HbaPort->InterruptStatus.TaskFileErrorStatus) {
                 SystemDebugPrint(L"TASK_FILE_ERROR");
                 HbaPort->InterruptStatus.TaskFileErrorStatus = 1;
             }
-            if(HbaPort->InterruptStatus.UnknownFisInterrupt) {
-                SystemDebugPrint(L"UNKNOWN_FIS");
-                HbaPort->SataError.UnknownFisType = 0;
-            }
+            if(HbaPort->InterruptStatus.ColdPortDetectStatus) SystemDebugPrint(L"COLD_PRESENCE_DETECT");
         }
         GlobalInterruptStatus >>= 1;
     }
@@ -191,15 +205,6 @@ DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver){
         Hba->GlobalHostControl.AhciEnable = 1;
 
         // Check if BIOS is device owner and take device ownership
-        if(Hba->ExtendedHostCapabilities.BiosOsHandoff
-        ){
-            SystemDebugPrint(L"AHCI : Bios Owned");
-            Hba->BiosOsHandoffControlAndStatus.OsOwnedSemaphore = 1;
-            while(!Hba->BiosOsHandoffControlAndStatus.OsOwnedSemaphore);
-            while(Hba->BiosOsHandoffControlAndStatus.BiosBusy);
-            while(Hba->BiosOsHandoffControlAndStatus.BiosOwnedSemaphore);
-            SystemDebugPrint(L"AHCI Ownership Taken : BIOS_OWNED : %x, OS_OWNED : %x", (UINT64)Hba->BiosOsHandoffControlAndStatus.BiosOwnedSemaphore, (UINT64)Hba->BiosOsHandoffControlAndStatus.OsOwnedSemaphore);
-        }
 
 
         RFAHCI_DEVICE Ahci = KeExtendedAlloc(KeGetCurrentThread(), ALIGN_VALUE(sizeof(AHCI_DEVICE), 0x1000), 0x1000, NULL, 0);
@@ -216,6 +221,16 @@ DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver){
 
         AhciReset(Ahci);
 
+        if(Hba->ExtendedHostCapabilities.BiosOsHandoff
+        ){
+            SystemDebugPrint(L"AHCI : Bios Owned");
+            Hba->BiosOsHandoffControlAndStatus.OsOwnedSemaphore = 1;
+            while(!Hba->BiosOsHandoffControlAndStatus.OsOwnedSemaphore);
+            while(Hba->BiosOsHandoffControlAndStatus.BiosBusy);
+            while(Hba->BiosOsHandoffControlAndStatus.BiosOwnedSemaphore);
+            SystemDebugPrint(L"AHCI Ownership Taken : BIOS_OWNED : %x, OS_OWNED : %x", (UINT64)Hba->BiosOsHandoffControlAndStatus.BiosOwnedSemaphore, (UINT64)Hba->BiosOsHandoffControlAndStatus.OsOwnedSemaphore);
+        }
+
         if(Hba->HostCapabilities.x64AddressingCapability){
             SetDeviceFeature(Device, DEVICE_64BIT_ADDRESS_ALLOCATIONS);
             // SystemDebugPrint(L"AHCI Supports 64 Bit Memory Addresses.");
@@ -227,6 +242,8 @@ DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver){
         
 
 
+
+        SetInterruptService(Device, AhciInterruptHandler);
         
         Ahci->Hba->GlobalHostControl.InterruptEnable = 1;
     
@@ -248,8 +265,6 @@ DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver){
             PortsImplemented >>= 1;
         }
         
-
-        SetInterruptService(Device, AhciInterruptHandler);
         for(UINT i = 0;i<Ahci->NumPorts;i++) {
             AHCI_DEVICE_PORT* Port = &Ahci->Ports[i];
             HBA_PORT* HbaPort = Port->Port;
@@ -305,6 +320,22 @@ void AhciReset(RFAHCI_DEVICE Ahci){
 
 #define ATAPI_SIGNATURE 
 
+BOOL AhciComReset(AHCI_DEVICE_PORT* Port) {
+    Port->FirstD2h = 0;
+    wr32(&Port->Port->SataError, -1);
+    Port->Port->SataControl.DeviceDetectionInitialization = 1;
+    Sleep(3);
+    Port->Port->SataControl.DeviceDetectionInitialization = 0;
+    UINT Countdown = 25;
+    while(!Port->FirstD2h) {
+        Sleep(1);
+        Countdown--;
+        if(!Countdown) return FALSE;
+    }
+    return TRUE;
+}
+
+
 void AhciInitializePort(RFAHCI_DEVICE_PORT Port){
     UINT64 NumBytes = ALIGN_VALUE(sizeof(AHCI_COMMAND_LIST_ENTRY) * Port->Ahci->MaxCommandSlots + 0x100 + sizeof(AHCI_COMMAND_TABLE) * Port->Ahci->MaxCommandSlots + 0x100, 0x1000);
     Port->AllocatedBuffer = AllocateDeviceMemory(Port->Controller, NumBytes, 0x1000);
@@ -313,29 +344,26 @@ void AhciInitializePort(RFAHCI_DEVICE_PORT Port){
     AHCI_COMMAND_TABLE* CommandTables = (void*)(ALIGN_VALUE((UINT64)Port->AllocatedBuffer + sizeof(AHCI_COMMAND_LIST_ENTRY) * Port->Ahci->MaxCommandSlots, 0x100)); // Set after command list (struct is 128 bytes aligned)
     AHCI_RECEIVED_FIS* ReceivedFis = (void*)(Port->AllocatedBuffer + NumBytes - 0x100);
     
+    HBA_PORT* HbaPort = Port->Port;
 
+    HbaPort->CommandStatus.Start = 0;
+    HbaPort->CommandStatus.FisReceiveEnable = 0;
+    while(HbaPort->CommandStatus.CurrentCommandSlot || HbaPort->CommandStatus.FisReceiveRunning);
 
-    Port->Port->CommandStatus.Start = 0;
-    Port->Port->CommandStatus.FisReceiveEnable = 0;
-    while(Port->Port->CommandStatus.CurrentCommandSlot || Port->Port->CommandStatus.FisReceiveRunning);
+    Port->FirstD2h = 0;
 
-    if(Port->Port->CommandStatus.ColdPresenceDetection) {
-        Port->Port->CommandStatus.PowerOnDevice = 1;
-    }
 
     Port->ReceivedFis = ReceivedFis;
     Port->CommandList = CommandList;
     Port->CommandTables = CommandTables;
     
-    HBA_PORT* HbaPort = Port->Port;
     
 
+  
+
     
-    
-    BOOL Atapi = HbaPort->CommandStatus.DeviceIsAtapi;
     for(UINT i = 0;i<CMD_LIST_ENTRIES;i++){
         CommandList[i].PrdtLength = NUM_PRDT_PER_CMDTBL;
-        CommandList[i].Atapi = Atapi;
         CommandList[i].CommandTableAddress = (UINT64)&CommandTables[i];
     }
     HbaPort->FisBaseAddressLow = (UINT64)ReceivedFis;
@@ -344,42 +372,61 @@ void AhciInitializePort(RFAHCI_DEVICE_PORT Port){
     HbaPort->FisBaseAddressHigh = (UINT64)ReceivedFis >> 32;
     HbaPort->CommandListBaseAddressHigh = (UINT64)CommandList >> 32;
 
-    Port->Port->CommandStatus.FisReceiveEnable = 1;
-    // Port->Port->CommandStatus.Start = 1;
-    
-    *(DWORD*)&Port->Port->SataError = -1; // Clear SATA_ERROR
+    // if(Port->Port->CommandStatus.ColdPresenceDetection) {
+    //     Port->Port->CommandStatus.PowerOnDevice = 1;
+    // }
     Port->Port->InterruptEnable.D2HRegisterFisInterruptEnable = 1;
-    Port->Port->InterruptEnable.SetDeviceBitsFisInterruptEnable = 1;
+    Port->Port->InterruptEnable.PioSetupFisInterruptEnable = 1;
     Port->Port->InterruptEnable.DmaSetupFisInterruptEnable = 1;
-    Port->Port->InterruptEnable.PortChangeInterruptEnable = 1;
-    Port->Port->InterruptEnable.InterfaceNonFatalErrorEnable = 1;
-    Port->Port->InterruptEnable.InterfaceFatalErrorEnable = 1;
-    Port->Port->InterruptEnable.TaskFileErrorEnable = 1;
+    Port->Port->InterruptEnable.SetDeviceBitsFisInterruptEnable = 1;
     Port->Port->InterruptEnable.UnknownFisInterruptEnable = 1;
     Port->Port->InterruptEnable.DescriptorProcessedInterruptEnable = 1;
+    Port->Port->InterruptEnable.PortChangeInterruptEnable = 1;
+    Port->Port->InterruptEnable.DeviceMechanicalPresenceEnable = 1;
+    Port->Port->InterruptEnable.PhyRdyChangeInterruptEnable = 1;
+    Port->Port->InterruptEnable.IncorrectPortMultiplierEnable = 1;
+    Port->Port->InterruptEnable.OverflowEnable = 1;
+    Port->Port->InterruptEnable.InterfaceNonFatalErrorEnable = 1;
+    Port->Port->InterruptEnable.InterfaceFatalErrorEnable = 1;
+    Port->Port->InterruptEnable.HostBusDataErrorEnable = 1;
+    Port->Port->InterruptEnable.HostBusFatalErrorEnable = 1;
+    Port->Port->InterruptEnable.TaskFileErrorEnable = 1;
+    Port->Port->InterruptEnable.ColdPresenceDetectEnable = 1;
+
+    wr32(&Port->Port->SataError, *(UINT32*)&Port->Port->SataError);
+
+    Port->Port->CommandStatus.FisReceiveEnable = 1;
+    Port->Port->CommandStatus.Start= 1;
+    while(!Port->Port->CommandStatus.FisReceiveRunning);
+    
+    // *(DWORD*)&Port->Port->SataError = -1; // Clear SATA_ERROR
 
     
-
-    Port->Port->SataControl.DeviceDetectionInitialization = 1;
-    Sleep(50);
-    Port->Port->SataControl.DeviceDetectionInitialization = 0;
-
+    BOOL DeviceDetected = 0;
     if(Port->Ahci->Hba->HostCapabilities.SupportsStaggeredSpinup) {
         Port->Port->CommandStatus.SpinupDevice = 1;
     }
+        Port->Port->SataControl.DeviceDetectionInitialization = 1;
+        Sleep(3);
+        Port->Port->SataControl.DeviceDetectionInitialization = 0;
 
-    DWORD Countdown = 20;
-    BOOL DeviceDetected = 0;
+    // while(!Port->Port->InterruptStatus.PortConnectChangeStatus);
+    // AhciComReset(Port);
+    UINT Countdown = 20;
     for(;;) {
+        // if(Port->FirstD2h && !HbaPort->SataStatus.DeviceDetection) break;
+        if(!Countdown) break;
+        Countdown--; 
         if(HbaPort->SataStatus.DeviceDetection == 3) {
+            if(Port->Ahci->Hba->HostCapabilities.SupportsStaggeredSpinup) {
+            }
             DeviceDetected = 1;
             break;
         }
-
-        if(!Countdown) break; // No device detection
         Sleep(1);
-        Countdown--;
     }
+
+
 
 
     if(!DeviceDetected) {
@@ -392,10 +439,18 @@ void AhciInitializePort(RFAHCI_DEVICE_PORT Port){
         Port->DeviceDetected = 1;
         // SystemDebugPrint(L"ATTACHED_DEVICE_ON_PORT");
     }
+     // wait for first D2H FIS (Containing device signature)
+    Countdown = 25;
+    while(!Port->FirstD2h) {
+        Countdown--;
+        if(!Countdown) {
+            if(Port->Port->PortSignature.SectorCount == 0x101) break; // Port signnature received but no interrupt delivered
+            Port->DeviceDetected = 0;
+            return;
+        }
+        Sleep(1);
+    }
 
-    while(!Port->Port->InterruptStatus.D2HRegisterFisInterrupt);
-
-    Port->Port->InterruptStatus.D2HRegisterFisInterrupt = 1; // ACK_INTERRUPT
 
 
     *(DWORD*)&Port->Port->SataError = -1; // Clear SATA_ERROR
@@ -416,12 +471,14 @@ void AhciInitializePort(RFAHCI_DEVICE_PORT Port){
     // Port->Port->CommandStatus.Start = 0; // Clear SATA_STATUS
     // BUFFERWRITE32(Port->Port->InterruptStatus, -1);
 
+    
 
     Port->Port->CommandStatus.FisReceiveEnable = 1;
     Port->Port->CommandStatus.Start = 1;
     
 
 }
+
 
 
 

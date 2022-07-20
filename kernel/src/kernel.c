@@ -72,6 +72,7 @@ __declspec(allocate(_FIMPORT)) FILE_IMPORT_ENTRY FileImportTable[] = {
 	// {FILE_IMPORT_DRIVER, 0, NULL, L"usb.sys", 0, L"OS\\System\\usb.sys"},
 	{FILE_IMPORT_DEVICE_DRIVER, 0, NULL, L"ehci.sys", 0, L"OS\\System\\ehci.sys"},
 	{FILE_IMPORT_DEVICE_DRIVER, 0, NULL, L"ahci.sys", 0, L"OS\\System\\ahci.sys"},
+	{FILE_IMPORT_DEVICE_DRIVER, 0, NULL, L"xhci.sys", 0, L"OS\\System\\xhci.sys"},
 	// {FILE_IMPORT_DRIVER, 0, NULL, L"eodx.sys", 0, L"OS\\System\\eodx.sys"},
 	{0}, // End of table
 };
@@ -600,8 +601,8 @@ __setCR3((UINT64)kproc->PageMap);
 	for(UINT64 i = 0;i<DriverTable->TotalDrivers;i++){
 		if(DriverTable->Drivers[i].Present){
 			DRIVER_IDENTIFICATION_DATA* drv = &DriverTable->Drivers[i];
-			_RT_SystemDebugPrint(L"Driver#%d : Type %d, Enabled: %x, DevSearch : %d, DevClass : %d, DevSubclass : %d, ProgIF : %d", 
-			i, drv->DriverType, drv->Enabled, drv->DeviceSearchType, drv->DeviceClass, drv->DeviceSubclass, drv->ProgramInterface);
+			_RT_SystemDebugPrint(L"DRVD#%d : Type %d, EN: %x, SRC : %d/%d, CLS : %x, SUBCS : %x, IF : %x, UNMSK : %x", 
+			i, drv->DriverType, drv->Enabled, drv->DeviceSource, drv->DeviceSearchType, drv->DeviceClass, drv->DeviceSubclass, drv->ProgramInterface, drv->DataUnmask);
 			if(DriverTable->Drivers[i].DriverType == INVALID_DRIVER_TYPE || DriverTable->Drivers[i].DriverType > MAX_DRIVER_TYPE) SOD(SOD_INITIALIZATION, "INVALID_DRIVER_TYPE");
 			if(DriverTable->Drivers[i].DriverType == KERNEL_EXTENSION_DRIVER) NumKexDrivers++;
 			else Num3rdPartyDrivers++;

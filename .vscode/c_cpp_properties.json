@@ -14,7 +14,9 @@
                 "${workspaceFolder}/UEFI/gnu-efi/inc/x86_64",
                 "${workspaceFolder}/drivers/ehci/inc",
                 "${workspaceFolder}/drivers/ahci/inc",
-                "${workspaceFolder}/drivers/fat32/dll/inc"
+                "${workspaceFolder}/drivers/fat32/dll/inc",
+                "${workspaceFolder}/libc/drv/inc",
+                "${workspaceFolder}/drivers/xhci/inc"
             ],
             "defines": [],
             "windowsSdkVersion": "10.0.22000.0",

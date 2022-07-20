@@ -269,10 +269,10 @@ void SetupLocalApicTimer(){
 
 	CPUID_INFO CpuInfo = {0};
 	__cpuid(&CpuInfo, 1);
-	if (CpuInfo.ecx & (CPUID1_ECX_APICTMR_TSC_DEADLINE)) {
-		LapicTimerSetupTSCDeadlineMode();
-	}
-	else {
+	// if (CpuInfo.ecx & (CPUID1_ECX_APICTMR_TSC_DEADLINE)) {
+	// 	LapicTimerSetupTSCDeadlineMode();
+	// }
+	// else {
 		// Setup LAPIC TIMER Periodic Mode
 		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_DIVISOR) = 0b11; // divide by 16
 
@@ -296,7 +296,7 @@ void SetupLocalApicTimer(){
 		}
 
 		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_INITIAL_COUNT) = ApicTimerBaseQuantum;
-	}
+	// }
 }
 
 

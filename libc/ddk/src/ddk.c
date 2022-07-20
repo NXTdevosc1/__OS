@@ -180,20 +180,25 @@ DDKEXPORT UINT16 DDKAPI IoPciRead16(UINT8 BusNumber, UINT8 Device, UINT8 Functio
     register UINT32 b = BusNumber & 0xF;
     register UINT32 d = Device & 0x3F;
     register UINT32 f = Function & 0xF;
+
     UINT32 Advance = Offset & 3;
     Offset &= ~3;
+
     Address |= Offset | (f << 8) | (d << 11) | (b << 16);
     OutPort(0xCF8, Address);
-	if(Advance) {
-        UINT32 Ret = 0;
-        UINT32 Val = InPort(0xCFC);
-        Val >>= (4 - Advance) << 3;
-        Ret = Val;
-        Advance -= 4 - Advance;
+    if(Advance) {
+        UINT16 Ret = 0;
+        UINT32 Val = InPortW(0xCFC);
+        Val >>= (Advance) << 3;
         if(Advance == 3) {
+            Val &= 0xFF;
+            Ret = Val;
             OutPort(0xCF8, Address + 4);
             Val = InPortB(0xCFC);
             Ret |= Val << 8;
+        } else {
+            Val &= 0xFFFF;
+            Ret = Val;
         }
         return Ret;
     } else return InPortW(0xCFC);
@@ -205,13 +210,16 @@ DDKEXPORT UINT8 DDKAPI IoPciRead8(UINT8 BusNumber, UINT8 Device, UINT8 Function,
     register UINT32 b = BusNumber & 0xF;
     register UINT32 d = Device & 0x3F;
     register UINT32 f = Function & 0xF;
+
     UINT32 Advance = Offset & 3;
     Offset &= ~3;
+
     Address |= Offset | (f << 8) | (d << 11) | (b << 16);
     OutPort(0xCF8, Address);
     if(Advance) {
         UINT32 Val = InPort(0xCFC);
-        Val >>= ((4 - Advance) << 3);
+        Val >>= (Advance << 3);
+        Val &= 0xFF;
         return Val;
     } else return InPortB(0xCFC);
 }

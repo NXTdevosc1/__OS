@@ -34,15 +34,18 @@ UINT16 KERNELAPI IoPciRead16(UINT8 BusNumber, UINT8 Device, UINT8 Function, UINT
     Address |= Offset | (f << 8) | (d << 11) | (b << 16);
     OutPort(0xCF8, Address);
     if(Advance) {
-        UINT32 Ret = 0;
-        UINT32 Val = InPort(0xCFC);
-        Val >>= (4 - Advance) << 3;
-        Ret = Val;
-        Advance -= 4 - Advance;
+        UINT16 Ret = 0;
+        UINT32 Val = InPortW(0xCFC);
+        Val >>= (Advance) << 3;
         if(Advance == 3) {
+            Val &= 0xFF;
+            Ret = Val;
             OutPort(0xCF8, Address + 4);
             Val = InPortB(0xCFC);
             Ret |= Val << 8;
+        } else {
+            Val &= 0xFFFF;
+            Ret = Val;
         }
         return Ret;
     } else return InPortW(0xCFC);
@@ -60,7 +63,8 @@ UINT8 KERNELAPI IoPciRead8(UINT8 BusNumber, UINT8 Device, UINT8 Function, UINT16
     OutPort(0xCF8, Address);
     if(Advance) {
         UINT32 Val = InPort(0xCFC);
-        Val >>= ((4 - Advance) << 3);
+        Val >>= (Advance << 3);
+        Val &= 0xFF;
         return Val;
     } else return InPortB(0xCFC);
 }
