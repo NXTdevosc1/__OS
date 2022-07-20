@@ -292,10 +292,10 @@ KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT 
 	}else RedirectionTable.TriggerMode = 0;
 
 	if(Flags & IRQ_CONTROL_USE_BASIC_INTERRUPT_WRAPPER) {
-		_RT_SystemDebugPrint(L"USE_BASIC_WRAPPER : IV (%d)", (UINT64)IrqControlDescriptor->InterruptVector);
+		// _RT_SystemDebugPrint(L"USE_BASIC_WRAPPER : IV (%d)", (UINT64)IrqControlDescriptor->InterruptVector);
 		RegisterInterruptServiceRoutine((INTERRUPT_SERVICE_ROUTINE)Handler, IrqControlDescriptor->InterruptVector);
 	} else {
-		_RT_SystemDebugPrint(L"IRQ_WRAPPER : IRQ %d | IV : %d", (UINT64)IrqControlDescriptor->PhysicalIrqNumber, (UINT64)IrqControlDescriptor->InterruptVector);
+		// _RT_SystemDebugPrint(L"IRQ_WRAPPER : IRQ %d | IV : %d", (UINT64)IrqControlDescriptor->PhysicalIrqNumber, (UINT64)IrqControlDescriptor->InterruptVector);
 		SetInterruptGate(gIRQCtrlWrapPtr[IrqControlDescriptor->InterruptVector - 0x20], IrqControlDescriptor->InterruptVector, 0, 3, IDT_INTERRUPT_GATE, 0x08);
 	}
 	IoApicWriteRedirectionTable(IoApic, IrqControlDescriptor->IoApicIrqNumber, &RedirectionTable);
@@ -346,18 +346,18 @@ IRQ_CONTROL_DESCRIPTOR* KERNELAPI RegisterIrq(UINT32 IrqSource, void* Handler, U
 KERNELSTATUS KERNELAPI SetInterruptService(RFDEVICE_OBJECT Device, KEIRQ_ROUTINE Handler) {
 	// if(!ValidateDevice(Device)) return KERNEL_SERR_INVALID_PARAMETER;
 	
-	_RT_SystemDebugPrint(L"SET_INT_SERVICE (Device : %x) (Handler : %x)", Device, Handler);
+	// _RT_SystemDebugPrint(L"SET_INT_SERVICE (Device : %x) (Handler : %x)", Device, Handler);
 
 	UINT16 PciStatus = PciDeviceConfigurationRead16(Device, PCI_STATUS);
 
 	// Enable device interrupts
 	UINT16 Command = PciDeviceConfigurationRead16(Device, PCI_COMMAND);
-	_RT_SystemDebugPrint(L"PCI Command (BEFORE) : %x, STATUS : %x", (UINT64)Command, (UINT64)PciStatus);
+	// _RT_SystemDebugPrint(L"PCI Command (BEFORE) : %x, STATUS : %x", (UINT64)Command, (UINT64)PciStatus);
 	Command &= ~0x400; // Remove Interrupt disable
 	Command |= (7); // Set Bus master & IO-Space & Memory Space
 	
 
-	_RT_SystemDebugPrint(L"(TARGET) PCI Command : %x", (UINT64)Command);
+	// _RT_SystemDebugPrint(L"(TARGET) PCI Command : %x", (UINT64)Command);
 
 	PciDeviceConfigurationWrite16(Device, Command , PCI_COMMAND);
 	Command = PciDeviceConfigurationRead16(Device, PCI_COMMAND);
@@ -365,7 +365,7 @@ KERNELSTATUS KERNELAPI SetInterruptService(RFDEVICE_OBJECT Device, KEIRQ_ROUTINE
 	PciStatus = PciDeviceConfigurationRead16(Device, PCI_STATUS);
 
 	
-	_RT_SystemDebugPrint(L"PCI Command : %x, STATUS : %x", (UINT64)Command, (UINT64)PciStatus);
+	// _RT_SystemDebugPrint(L"PCI Command : %x, STATUS : %x", (UINT64)Command, (UINT64)PciStatus);
 
 	if(PciStatus & PCI_STATUS_CAPABILITES_LIST) {
             // Capabilites Supported
@@ -401,7 +401,7 @@ KERNELSTATUS KERNELAPI SetInterruptService(RFDEVICE_OBJECT Device, KEIRQ_ROUTINE
 						MsiX64->MessageControl.MsiEnable = 1;
 						MsiX64->Mask = 0;
 						MsiX64->MessageControl.MultipleMessageEnable = 0;
-                    _RT_SystemDebugPrint(L"PCI : MSI64 Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&MsiX64->MessageControl, (UINT64)MsiX64->MessageAddress, (UINT64)MsiX64->MessageData);
+                    // _RT_SystemDebugPrint(L"PCI : MSI64 Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&MsiX64->MessageControl, (UINT64)MsiX64->MessageAddress, (UINT64)MsiX64->MessageData);
 						PciDeviceConfigurationWrite64(Device, MsiX64->MessageAddress, CapOffset + MSI_MESSAGE_ADDRESS);
 						PciDeviceConfigurationWrite16(Device, MsiX64->MessageData, CapOffset + MSI64_MESSAGE_DATA);
 						PciDeviceConfigurationWrite16(Device, *(UINT16*)&MsiX64->MessageControl, CapOffset + MSI_MESSAGE_CONTROL);
@@ -413,7 +413,7 @@ KERNELSTATUS KERNELAPI SetInterruptService(RFDEVICE_OBJECT Device, KEIRQ_ROUTINE
 						Msi->Mask = 0;
 						Msi->MessageControl.MultipleMessageEnable = 0;
 
-                    _RT_SystemDebugPrint(L"PCI : MSI Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&Msi->MessageControl, (UINT64)Msi->MessageAddress, (UINT64)Msi->MessageData);
+                    // _RT_SystemDebugPrint(L"PCI : MSI Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&Msi->MessageControl, (UINT64)Msi->MessageAddress, (UINT64)Msi->MessageData);
 
 						PciDeviceConfigurationWrite32(Device, Msi->MessageAddress, CapOffset + MSI_MESSAGE_ADDRESS);
 						PciDeviceConfigurationWrite16(Device, Msi->MessageData, CapOffset + MSI_MESSAGE_DATA);
@@ -432,13 +432,13 @@ KERNELSTATUS KERNELAPI SetInterruptService(RFDEVICE_OBJECT Device, KEIRQ_ROUTINE
                     
                     if(Msi->MessageControl.x64AddressCapable) {
 						PCI_MSI_CAPABILITY_64BIT* MsiX64 = (PCI_MSI_CAPABILITY_64BIT*)CapBuffer;
-                    _RT_SystemDebugPrint(L"PCI (RESULT) : MSI64 Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&MsiX64->MessageControl, (UINT64)MsiX64->MessageAddress, (UINT64)MsiX64->MessageData);
+                    // _RT_SystemDebugPrint(L"PCI (RESULT) : MSI64 Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&MsiX64->MessageControl, (UINT64)MsiX64->MessageAddress, (UINT64)MsiX64->MessageData);
 
 					} else {
-                    _RT_SystemDebugPrint(L"PCI (RESULT) : MSI Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&Msi->MessageControl, (UINT64)Msi->MessageAddress, (UINT64)Msi->MessageData);
+                    // _RT_SystemDebugPrint(L"PCI (RESULT) : MSI Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&Msi->MessageControl, (UINT64)Msi->MessageAddress, (UINT64)Msi->MessageData);
 
 					}
-					_RT_SystemDebugPrint(L"IRQ%d HANDLER: %x", (UINT64)Icd->InterruptVector, Icd->Handler);
+					// _RT_SystemDebugPrint(L"IRQ%d HANDLER: %x", (UINT64)Icd->InterruptVector, Icd->Handler);
 					return KERNEL_SOK;
                 } else if(CapabilityHeader->CapabilityId == PCI_CAPABILITY_ID_MSI_X) {
 					_RT_SystemDebugPrint(L"MSI-X Supported");

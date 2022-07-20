@@ -7,6 +7,7 @@
 
 DDKIMPORT void __setCR3(unsigned long long CR3);
 DDKIMPORT void __SyncOr(void* Value, UINT BitOffset);
+DDKIMPORT void __SyncAnd(void* Value, UINT BitOffset);
 #else
 
 #endif

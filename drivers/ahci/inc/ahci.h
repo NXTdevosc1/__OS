@@ -1,6 +1,6 @@
 #pragma once
 #include <kerneltypes.h>
-
+#include <ata.h>
 #pragma pack(push, 1)
 
 typedef struct _HBA_REGISTERS {
@@ -277,91 +277,16 @@ typedef struct _AHCI_COMMAND_TABLE {
     PHYSICAL_REGION_DESCRIPTOR_TABLE Prdt[NUM_PRDT_PER_CMDTBL];
 } AHCI_COMMAND_TABLE;
 
-typedef enum _FIS_TYPE {
-    FIS_TYPE_H2D = 0x27,
-    FIS_TYPE_D2H = 0x34,
-    FIS_TYPE_DMA_ACTIVATE = 0x39,
-    FIS_TYPE_DMA_SETUP = 0x41,
-    FIS_TYPE_DATA = 0x46,
-    FIS_TYPE_BIST = 0x58,
-    FIS_TYPE_PIO_SETUP = 0x5F,
-    FIS_TYPE_SET_DEVICE_BITS = 0xA1
-} FIS_TYPE;
 
-typedef struct _ATA_FIS_H2D {
-    UINT8 FisType;
-    UINT8 PortMultiplierPort : 4;
-    UINT8 Reserved0 : 3;
-    UINT8 CommandControl : 1; // 1 = Command, 0 = Control
-    UINT8 Command;
-    UINT8 FeatureLow;
-    UINT16 Lba0;
-    UINT8 Lba1;
-    UINT8 Device; // 1 << 6 = LBA Mode
-    UINT16 Lba2;
-    UINT8 Lba3;
-    UINT8 FeatureHigh;
-    UINT16 Count;
-    UINT8 IsochronousCommandCompletion;
-    UINT8 Control;
-    UINT8 Reserved1[4];
-} ATA_FIS_H2D;
 
-typedef struct _ATA_FIS_D2H {
-    UINT8 FisType;
-    UINT8 PortMultiplier : 4;
-    UINT8 Reserved0 : 2;
-    UINT8 Interrupt : 1;
-    UINT8 Reserved1 : 1;
-    UINT8 Status;
-    UINT8 Error;
 
-    UINT8 Lba0, Lba1, Lba2, Device;
-    UINT8 Lba3, Lba4, Lba5, Reserved2;
-    UINT16 Count;
-    UINT8 Reserved3[2];
-    DWORD Reserved4;
-} ATA_FIS_D2H;
 
-typedef struct _ATA_FIS_DMA_SETUP {
-    UINT8 FisType;
-    UINT8 PortMultiplier : 4;
-    UINT8 Reserved0 : 1;
-    UINT8 Direction : 1;
-    UINT8 Interrupt : 1;
-    UINT8 AutoActivate : 1;
-    UINT16 Reserved2;
-    UINT64 DmaBufferId;
-    UINT32 Reserved3;
-    UINT32 DmaBufferOffset;
-    UINT32 TransferCount;
-    UINT32 Reserved4;
-} ATA_FIS_DMA_SETUP;
 
-typedef struct _ATA_FIS_PIO_SETUP {
-    UINT8 FisType;
-    UINT8 PortMultiplier : 4;
-    UINT8 Reserved0 : 1;
-    UINT8 Direction : 1;
-    UINT8 Interrupt : 1;
-    UINT8 Reserved1 : 1;
-    UINT8 Status, Error;
-    UINT8 Lba0, Lba1, Lba2, Device;
-    UINT8 Lba3, Lba4, Lba5, Reserved2;
-    UINT16 Count;
-    UINT8 Reserved3;
-    UINT8 eStatus;
-    UINT16 TransferCount;
-    UINT16 Reserved4;
-} ATA_FIS_PIO_SETUP;
 
-typedef struct _ATA_FIS_DATA {
-    UINT8 FisType;
-    UINT8 PortMultiplier : 4;
-    UINT8 Reserved0 : 4;
-    UINT8 Reserved1[2];
-    UINT32 Data[];
-} ATA_FIS_DATA;
+
+
+
+
 
 typedef struct _AHCI_RECEVIED_FIS {
     ATA_FIS_DMA_SETUP DmaSetup;
@@ -396,7 +321,8 @@ typedef struct _AHCI_DEVICE_PORT {
     DWORD CommandListMask;
     char* AllocatedBuffer;
     RFTHREAD PendingCommands[0x20];
-    
+    UINT32 DoneCommands;
+    UINT32 UsedCommandSlots;
 } AHCI_DEVICE_PORT, *RFAHCI_DEVICE_PORT;
 
 typedef struct _AHCI_DEVICE {

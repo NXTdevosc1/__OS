@@ -520,7 +520,6 @@ __setCR3((UINT64)kproc->PageMap);
 		SOD(SOD_INITIALIZATION, "INVALID_BOOT_CONFIGURATION");
 	}
 
-	_RT_SystemDebugPrint(L"STARRRT");
 	
 	__sti();
 	PitEnable();

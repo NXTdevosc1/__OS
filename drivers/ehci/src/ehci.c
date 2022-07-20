@@ -10,6 +10,7 @@ void EhciInterruptHandler(RFDRIVER_OBJECT Driver, RFINTERRUPT_INFORMATION Interr
 }
 
 DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT DriverObject){
+    while(1) Sleep(1000);
     SystemDebugPrint(L"EHCI Driver Startup : EHCI Device Detected. Num Devices : %d", DriverObject->NumDevices);  
 
     for(UINT i = 0;i<DriverObject->NumDevices;i++){

@@ -237,7 +237,12 @@ extern TimerClocksPerSecond
 extern ApicTimerClockQuantum
 section .text
 
-
+; ScheduleTask:
+; 	cli
+; 	push rax
+; 	mov rax, [rel SystemSpaceBase]
+; 	mov ebx, [rax + APIC_ID]
+; 	shr ebx, 24
 
 ScheduleTask:
 	cli

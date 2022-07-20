@@ -499,7 +499,7 @@ int SetupLocalFs(int argc, char** argv, HANDLE OsImage){
     // if(!BufferOriginalPartition) return -1;
     // ReadFile(OriginalPartition, BufferOriginalPartition, SizeOriginalPartition, NULL, NULL);
     
-    UINT32 NumSectors = 0x50000; // 80 MB
+    UINT32 NumSectors = 0x10000; // 80 MB
 
     Image.Partitions[0].FirstLba = IMAGE_START_LBA;
     // Image.Gpt.CRC32_1 = RtlCrc32(Image.Partitions, sizeof(GUID_PARTITION_ENTRY), 0);

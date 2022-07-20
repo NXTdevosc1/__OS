@@ -110,11 +110,24 @@ export __repstos64
 global __SyncOr
 export __SyncOr
 
+global __SyncAnd
+export __SyncAnd
+
 [BITS 64]
 
 
 
 section .text
+
+__SyncAnd:
+	mov r8, rdx
+
+	mov rdx, rcx
+	mov rcx, r8
+	mov r8, 1
+	shl r8, cl
+	lock and [rdx], r8
+	ret
 
 __SyncOr: ; rcx = Address, edx = BitOffset
 	mov r8, rdx
@@ -123,7 +136,7 @@ __SyncOr: ; rcx = Address, edx = BitOffset
 	mov rcx, r8
 	mov r8, 1
 	shl r8, cl
-	lock or [rdx], r8d
+	lock or [rdx], r8
 	ret
 
 __ldmxcsr:
