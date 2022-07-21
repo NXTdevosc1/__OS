@@ -154,13 +154,14 @@ void AhciInterruptHandler(RFDRIVER_OBJECT Driver, RFINTERRUPT_INFORMATION Interr
             }
             if(HbaPort->InterruptStatus.PortConnectChangeStatus) {
                 SystemDebugPrint(L"PORT_CONNECT_CHANGE");
-                wr32(&Port->Port->SataError, *(UINT32*)&Port->Port->SataError);
+                wr32(&Port->Port->SataError, -1);
+                
             }
             if(HbaPort->InterruptStatus.DeviceMechanicalPresenceStatus) SystemDebugPrint(L"DEVICE_MECHANICAL_PRESENCE");
             if(HbaPort->InterruptStatus.PhyRdyChangeStatus) {
                 SystemDebugPrint(L"PHY_RDI_CHANGE");
-                // wr32(&HbaPort->SataError, -1);
-                wr32(&Port->Port->SataError, *(UINT32*)&Port->Port->SataError);
+                wr32(&Port->Port->SataError, -1);
+                Port->FirstD2h = 1; // FIRST_D2H Case 2
             } 
             if(HbaPort->InterruptStatus.IncorrectPortMultiplierStatus) SystemDebugPrint(L"INCORRECT_PORT_MULTIPLIER");
             if(HbaPort->InterruptStatus.OverflowStatus) SystemDebugPrint(L"OVERFLOW");
@@ -396,19 +397,29 @@ void AhciInitializePort(RFAHCI_DEVICE_PORT Port){
     wr32(&Port->Port->SataError, *(UINT32*)&Port->Port->SataError);
 
     Port->Port->CommandStatus.FisReceiveEnable = 1;
-    Port->Port->CommandStatus.Start= 1;
+    // Port->Port->CommandStatus.Start= 1;
     while(!Port->Port->CommandStatus.FisReceiveRunning);
     
     // *(DWORD*)&Port->Port->SataError = -1; // Clear SATA_ERROR
 
     
     BOOL DeviceDetected = 0;
+    
     if(Port->Ahci->Hba->HostCapabilities.SupportsStaggeredSpinup) {
         Port->Port->CommandStatus.SpinupDevice = 1;
+        Port->Port->CommandStatus.PowerOnDevice = 1;
+        Port->Port->CommandStatus.InterfaceCommunicationControl = 1;
+        Sleep(20);
     }
-        Port->Port->SataControl.DeviceDetectionInitialization = 1;
-        Sleep(3);
-        Port->Port->SataControl.DeviceDetectionInitialization = 0;
+    wr32(&Port->Port->SataControl, 0x301);
+
+    Sleep(5);
+
+    wr32(&Port->Port->SataControl, 0x300);
+
+
+
+
 
     // while(!Port->Port->InterruptStatus.PortConnectChangeStatus);
     // AhciComReset(Port);
@@ -426,7 +437,7 @@ void AhciInitializePort(RFAHCI_DEVICE_PORT Port){
         Sleep(1);
     }
 
-
+    while(HbaPort->TaskFileData.Busy || HbaPort->TaskFileData.DataTransferRequested) Sleep(1);
 
 
     if(!DeviceDetected) {
