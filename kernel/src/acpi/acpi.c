@@ -223,7 +223,7 @@ void AcpiInit(void* RsdpAddress){
 				_RT_SystemDebugPrint(L"High Precision Event Timer (HPET) Found.");
 			}else if(memcmp(AcpiSdtHeader->Signature, "SSDT", 4)) {
 				// _RT_SystemDebugPrint(L"SSDT Found.");
-				// AcpiReadDsdt((RFACPI_DSDT)AcpiSdtHeader);
+				AcpiReadDsdt((RFACPI_DSDT)AcpiSdtHeader);
 			}
 		}
 	if(!RequiredFadtTable){

@@ -113,51 +113,53 @@ typedef struct _HBA_PORT{
         DWORD TaskFileErrorStatus : 1;
         DWORD ColdPortDetectStatus : 1;
     } InterruptStatus;
-    struct {
-        DWORD D2HRegisterFisInterruptEnable : 1;
-        DWORD PioSetupFisInterruptEnable : 1;
-        DWORD DmaSetupFisInterruptEnable : 1;
-        DWORD SetDeviceBitsFisInterruptEnable : 1;
-        DWORD UnknownFisInterruptEnable : 1;
-        DWORD DescriptorProcessedInterruptEnable : 1;
-        DWORD PortChangeInterruptEnable : 1;
-        DWORD DeviceMechanicalPresenceEnable : 1;
-        DWORD Reserved0 : 14;
-        DWORD PhyRdyChangeInterruptEnable : 1;
-        DWORD IncorrectPortMultiplierEnable : 1;
-        DWORD OverflowEnable : 1;
-        DWORD Reserved1 : 1;
-        DWORD InterfaceNonFatalErrorEnable : 1;
-        DWORD InterfaceFatalErrorEnable : 1;
-        DWORD HostBusDataErrorEnable : 1;
-        DWORD HostBusFatalErrorEnable : 1;
-        DWORD TaskFileErrorEnable : 1;
-        DWORD ColdPresenceDetectEnable : 1;
-    } InterruptEnable;
-    struct {
-        DWORD Start : 1;
-        DWORD SpinupDevice : 1;
-        DWORD PowerOnDevice : 1;
-        DWORD CommandListOverride : 1;
-        DWORD FisReceiveEnable : 1;
-        DWORD Reserved0 : 3;
-        DWORD CurrentCommandSlot : 5;
-        DWORD MechanicalPresenceSwitchState : 1;
-        DWORD FisReceiveRunning : 1;
-        DWORD CommandListRunning : 1;
-        DWORD ColdPresenceState : 1;
-        DWORD PortMultiplierAttached : 1;
-        DWORD HotPlugCapablePort : 1;
-        DWORD MechanicalPresenceSwitchAttachedToPort : 1;
-        DWORD ColdPresenceDetection : 1;
-        DWORD ExternalSataPort : 1;
-        DWORD FisBasedSwitchingCapablePort : 1;
-        DWORD AutomaticPartialToSlumberTransitionsEnabled : 1;
-        DWORD DeviceIsAtapi : 1;
-        DWORD AggressiveLinkPowerManagementEnable : 1;
-        DWORD AggressiveSlumberPartial : 1;
-        DWORD InterfaceCommunicationControl : 5;
-    } CommandStatus;
+    // struct {
+    //     DWORD D2HRegisterFisInterruptEnable : 1;
+    //     DWORD PioSetupFisInterruptEnable : 1;
+    //     DWORD DmaSetupFisInterruptEnable : 1;
+    //     DWORD SetDeviceBitsFisInterruptEnable : 1;
+    //     DWORD UnknownFisInterruptEnable : 1;
+    //     DWORD DescriptorProcessedInterruptEnable : 1;
+    //     DWORD PortChangeInterruptEnable : 1;
+    //     DWORD DeviceMechanicalPresenceEnable : 1;
+    //     DWORD Reserved0 : 14;
+    //     DWORD PhyRdyChangeInterruptEnable : 1;
+    //     DWORD IncorrectPortMultiplierEnable : 1;
+    //     DWORD OverflowEnable : 1;
+    //     DWORD Reserved1 : 1;
+    //     DWORD InterfaceNonFatalErrorEnable : 1;
+    //     DWORD InterfaceFatalErrorEnable : 1;
+    //     DWORD HostBusDataErrorEnable : 1;
+    //     DWORD HostBusFatalErrorEnable : 1;
+    //     DWORD TaskFileErrorEnable : 1;
+    //     DWORD ColdPresenceDetectEnable : 1;
+    // } InterruptEnable;
+    DWORD InterruptEnable;
+    // struct {
+    //     DWORD Start : 1;
+    //     DWORD SpinupDevice : 1;
+    //     DWORD PowerOnDevice : 1;
+    //     DWORD CommandListOverride : 1;
+    //     DWORD FisReceiveEnable : 1;
+    //     DWORD Reserved0 : 3;
+    //     DWORD CurrentCommandSlot : 5;
+    //     DWORD MechanicalPresenceSwitchState : 1;
+    //     DWORD FisReceiveRunning : 1;
+    //     DWORD CommandListRunning : 1;
+    //     DWORD ColdPresenceState : 1;
+    //     DWORD PortMultiplierAttached : 1;
+    //     DWORD HotPlugCapablePort : 1;
+    //     DWORD MechanicalPresenceSwitchAttachedToPort : 1;
+    //     DWORD ColdPresenceDetection : 1;
+    //     DWORD ExternalSataPort : 1;
+    //     DWORD FisBasedSwitchingCapablePort : 1;
+    //     DWORD AutomaticPartialToSlumberTransitionsEnabled : 1;
+    //     DWORD DeviceIsAtapi : 1;
+    //     DWORD AggressiveLinkPowerManagementEnable : 1;
+    //     DWORD AggressiveSlumberPartial : 1;
+    //     DWORD InterfaceCommunicationControl : 5;
+    // } CommandStatus;
+    DWORD CommandStatus;
     DWORD Reserved0;
     struct {
         DWORD Error : 1;
@@ -168,11 +170,14 @@ typedef struct _HBA_PORT{
         DWORD TaskFileErrorCopy : 8;
         DWORD Reserved0 : 16;
     } TaskFileData;
-    struct {
-        DWORD SectorCount : 8;
-        DWORD LbaLow : 8;
-        DWORD LbaMid : 8;
-        DWORD LbaHigh : 8;
+    union {
+        struct {
+            DWORD SectorCount : 8;
+            DWORD LbaLow : 8;
+            DWORD LbaMid : 8;
+            DWORD LbaHigh : 8;
+        } ParamPortSignature;
+        DWORD Signature;
     } PortSignature;
     struct {
         DWORD DeviceDetection : 4; // 3/1 = Device Present, 0 = Device not present
@@ -259,7 +264,7 @@ typedef struct _AHCI_COMMAND_LIST_ENTRY {
 } AHCI_COMMAND_LIST_ENTRY;
 
 #define NUM_PRDT_PER_CMDTBL 0x20 
-#define MAX_PRDT_BYTE_COUNT 0x400000
+#define MAX_PRDT_BYTE_COUNT 0x40000
 typedef struct _PHYSICAL_REGION_DESCRIPTOR_TABLE {
     // Data Base Address (2 Byte aligned [Bit 0 is reserved])
     UINT64 DataBaseAddress;
@@ -324,6 +329,8 @@ typedef struct _AHCI_DEVICE_PORT {
     UINT32 DoneCommands;
     UINT32 UsedCommandSlots;
     BOOL FirstD2h;
+    BOOL PendingCommandAccess;
+    BOOL Atapi;
 } AHCI_DEVICE_PORT, *RFAHCI_DEVICE_PORT;
 
 typedef struct _AHCI_DEVICE {
