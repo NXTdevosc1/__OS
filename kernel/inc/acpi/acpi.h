@@ -9,3 +9,5 @@ unsigned char IsOemLogoDrawn();
 UINT32 AcpiReadTimer();
 void __cdecl AcpiSystemControlInterruptHandler(RFDRIVER_OBJECT DriverObject, RFINTERRUPT_INFORMATION InterruptInformation);
 ACPI_FADT* AcpiGetFadt();
+
+void AcpiFadt(UINT RsdpRevision, ACPI_FADT* Fadt);

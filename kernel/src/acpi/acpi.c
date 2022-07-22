@@ -176,29 +176,7 @@ void AcpiInit(void* RsdpAddress){
 				#ifdef ___KERNEL_DEBUG___
 					DebugWrite("Enabling ACPI... (Found FACP)");
 				#endif
-				if(RequiredFadtTable->SMI_CommandPort){
-					// If System Management Mode is supported, then take ownership of ACPI
-					OutPortB(RequiredFadtTable->SMI_CommandPort, RequiredFadtTable->AcpiEnable);
-				}
-				RFACPI_DSDT Dsdt = NULL;
-				if(RsdpRevision == 2) {
-					Dsdt = (RFACPI_DSDT)RequiredFadtTable->X_Dsdt;
-					UINT64* Buff = (UINT64*)Dsdt->aml;
-					_RT_SystemDebugPrint(L"PREFERRED_POWER_MANAGEMENT : %d, SCI_INT : %x, DSDT : %x, (= %x %x %x %x)", (UINT64)RequiredFadtTable->PreferredPowerManagementProfile, RequiredFadtTable->SCI_Interrupt, RequiredFadtTable->X_Dsdt, Buff[0], Buff[1], Buff[2], Buff[3]);
-
-					if(RequiredFadtTable->X_PMTimerBlock.Address){
-						_RT_SystemDebugPrint(L"ACPI PM Timer (Current Count : %x) Supported. ADDR_SPACE: %x, BITWIDTH: %d, BITOFF: %d, ACCESS_SIZE : %x, ADDR : %x", AcpiReadTimer() ,(UINT64)RequiredFadtTable->X_PMTimerBlock.AddressSpace, (UINT64)RequiredFadtTable->X_PMTimerBlock.BitWidth, (UINT64)RequiredFadtTable->X_PMTimerBlock.BitOffset, (UINT64)RequiredFadtTable->X_PMTimerBlock.AccessSize, (UINT64)RequiredFadtTable->X_PMTimerBlock.Address);
-					}
-				} else {
-					Dsdt = (RFACPI_DSDT)(UINT64)RequiredFadtTable->Dsdt;
-					UINT64* Buff = (UINT64*)Dsdt->aml;
-					_RT_SystemDebugPrint(L"PREFERRED_POWER_MANAGEMENT : %d, SCI_INT : %x, DSDT : %x, (= %x %x %x %x)", (UINT64)RequiredFadtTable->PreferredPowerManagementProfile, RequiredFadtTable->SCI_Interrupt, RequiredFadtTable->Dsdt, Buff[0], Buff[1], Buff[2], Buff[3]);
-
-					// if(RequiredFadtTable->PMTimerBlock){
-					// 	_RT_SystemDebugPrint(L"ACPI PM Timer (Current Count : %x) Supported. ADDR_SPACE: %x, BITWIDTH: %d, BITOFF: %d, ACCESS_SIZE : %x, ADDR : %x", AcpiReadTimer() ,(UINT64)RequiredFadtTable->X_PMTimerBlock.AddressSpace, (UINT64)RequiredFadtTable->X_PMTimerBlock.BitWidth, (UINT64)RequiredFadtTable->X_PMTimerBlock.BitOffset, (UINT64)RequiredFadtTable->X_PMTimerBlock.AccessSize, (UINT64)RequiredFadtTable->X_PMTimerBlock.Address);
-					// }
-				}
-				// AcpiReadDsdt(Dsdt);
+				AcpiFadt(RsdpRevision, RequiredFadtTable);
 			}
 			else if (memcmp(AcpiSdtHeader->Signature, "APIC", 4))
 			{
