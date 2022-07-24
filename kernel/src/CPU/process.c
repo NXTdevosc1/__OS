@@ -178,6 +178,7 @@ BOOL KERNELAPI SetProcessName(RFPROCESS Process, LPWSTR ProcessName) {
 KERNELSTATUS KERNELAPI SetThreadPriority(RFTHREAD Thread, int Priority){
 #ifdef ___KERNEL_DEBUG___
 DebugWrite("SetThreadPriority()");
+DebugWrite(to_hstring64((UINT64)Thread));
 #endif
     if(!Thread || Priority < THREAD_PRIORITY_MIN || Priority > THREAD_PRIORITY_MAX)
         return KERNEL_SERR_INVALID_PARAMETER;
@@ -189,6 +190,8 @@ DebugWrite("SetThreadPriority()");
 
     RFTHREAD_WAITING_QUEUE WaitingQueue = CpuManagementTable[Thread->ProcessorId]->ThreadQueues[Priority];
     Thread->ThreadPriority = Priority;
+
+
 // Allocate thread in the waiting queue
     for(;;) {
         if(WaitingQueue->NumThreads < NUM_THREADS_PER_WAITING_QUEUE) {

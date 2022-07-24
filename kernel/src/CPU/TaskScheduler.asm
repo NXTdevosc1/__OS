@@ -224,7 +224,6 @@ global SchedulerEntryAVX512
 ; SSE Schedule Task Version (SSE3 supported by all X64 Processors)
 SchedulerEntrySSE:
 	cli
-	jmp $
 	push rdx
 	push rcx
 	push rbx
@@ -238,7 +237,7 @@ SchedulerEntrySSE:
 
 	cmp dword [rax], 0
 	je .Exit
-	mov rbx, [rax + CPM_THREAD]
+	mov rbx, [rax + CPM_CURRENT_THREAD]
 	
 	; SAVE Schedule Registers
 	jmp .SSESaveRegisters
@@ -248,6 +247,7 @@ SchedulerEntrySSE:
 
 .Exit:
 	mov r8, 0xFAFA
+	hlt
 	jmp $
 
 .SSEFindNextTask:

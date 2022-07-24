@@ -81,8 +81,8 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 		CpuManagementTable[i] = kpalloc(CPU_MGMT_NUM_PAGES);
 		if (!CpuManagementTable[i]) SET_SOD_MEMORY_MANAGEMENT;
 		ZeroMemory(CpuManagementTable[i], sizeof(*CpuManagementTable[i]));
-		RFTHREAD_WAITING_QUEUE WaitingQueue = malloc(sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES);
-		if(WaitingQueue)
+		RFTHREAD_WAITING_QUEUE WaitingQueue = ExtendedMemoryAlloc(kproc->StartupThread, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES, 0x1000, NULL, 0);
+		ZeroMemory(WaitingQueue, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES);
 
 		if(i == CurrentProcessor){
 			CpuManagementTable[i]->Initialized = TRUE;
@@ -103,7 +103,7 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 		CpuManagementTable[i]->CurrentThread = hIdleThread;
 		hIdleThread->State |= THS_IDLE | THS_MANUAL;
 		hIdleThread->ProcessorId = i; // Make thread only runnable on this cpu
-		hIdleThread->RunAfter = 0;
+		hIdleThread->SchedulingQuantum = 0;
 		hIdleThread->TimeBurst = 2; // 3 clocks
 
 		// Setup Interrupts Thread
@@ -118,7 +118,6 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 
 
 void DeclareCpuHalt() {
-	GetCurrentThread()->SchedulerCpuTime--;
 	__hlt();
 }
 __declspec(align(0x1000)) USER_SYSTEM_CONFIG GlobalUserSystemConfig = { 0 };
@@ -324,7 +323,7 @@ void SetupLocalApicTimer(){
 // Base Quantum = Timer Update Rate / s
 void KERNELAPI Sleep(UINT64 Milliseconds){
 	HTHREAD Thread = GetCurrentThread();
-	Thread->SleepUntil = ApicTimerClockCounter + (Milliseconds * (TimerClocksPerSecond / MILLISECONDS_PER_SECOND));
+	Thread->SleepUntil[0] = ApicTimerClockCounter + (Milliseconds * (TimerClocksPerSecond / MILLISECONDS_PER_SECOND));
 	Thread->State |= THS_SLEEP;
 	// thread may be schedulled on this instruction...
 	while(Thread->State & THS_SLEEP) __Schedule();
@@ -335,7 +334,7 @@ void KERNELAPI Sleep(UINT64 Milliseconds){
 void KERNELAPI MicroSleep(UINT64 Microseconds){
 	if(ApicTimerBaseQuantum < MICROSECONDS_PER_SECOND) Sleep(Microseconds * MICROSECONDS_PER_MILLISECOND);
 	HTHREAD Thread = GetCurrentThread();
-	Thread->SleepUntil = ApicTimerClockCounter + (Microseconds * (TimerClocksPerSecond / MICROSECONDS_PER_SECOND));
+	Thread->SleepUntil[0] = ApicTimerClockCounter + (Microseconds * (TimerClocksPerSecond / MICROSECONDS_PER_SECOND));
 	Thread->State |= THS_SLEEP;
 	// thread may be schedulled on this instruction...
 	while(Thread->State & THS_SLEEP) __Schedule();
