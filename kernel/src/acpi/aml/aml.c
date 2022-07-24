@@ -23,15 +23,12 @@ void AcpiReadDsdt(RFACPI_DSDT Dsdt){
     char DefName[0x100] = {0};
     for(UINT64 i = 0;i<AmlLength;) {
         if(*Aml == AML_ALIAS_OP) {
-        for(UINT x = 0;x<0x10000000;x++);
-
             INC_AML(1);
 
             _RT_SystemDebugPrint(L"ACPI : ALIAS_OP (%c%c%c%c %c%c%c%c)", Aml[0], Aml[1], Aml[2], Aml[3], Aml[4], Aml[5], Aml[6], Aml[7]);
             INC_AML(8);
         }
         else if(*Aml == AML_NAME_OP) {
-        for(UINT x = 0;x<0x10000000;x++);
             INC_AML(1);
             UINT64 NameStringBytes = 0;
             UINT Namelen = AmlCopyName(DefName, Aml, &NameStringBytes);
@@ -39,8 +36,6 @@ void AcpiReadDsdt(RFACPI_DSDT Dsdt){
             INC_AML(Namelen);
         }
         else if(*Aml == AML_SCOPE_OP) {
-        for(UINT x = 0;x<0x10000000;x++);
-
             // SCOPE OP
             INC_AML(1);
             PKG_LEAD_BYTE* Package = AMLSTRUCT Aml;
@@ -76,11 +71,9 @@ void AcpiReadDsdt(RFACPI_DSDT Dsdt){
 
             // Parsing PkgBuffer
             AmlReadPackage(PkgBuffer, PkgLength);
-
+            
             // while(1) __hlt();
         }else if(*Aml == AML_METHOD_OP) {
-        for(UINT x = 0;x<0x10000000;x++);
-
             INC_AML(1);
             PKG_LEAD_BYTE* Package = AMLSTRUCT Aml;
             // Package Length Parsing

@@ -5,6 +5,7 @@
 #include <CPU/paging.h>
 #include <CPU/process.h>
 #include <preos_renderer.h>
+#include <CPU/cpu.h>
 
 __declspec(align(0x1000)) PHYSICALMEMORYSTATUS PhysicalMemoryStatus = { 0 };
 
@@ -110,7 +111,7 @@ PFREE_HEAP_DESCRIPTOR KERNELAPI AllocateFreeHeapDescriptor(
 	UINT64 HeapLength
 ) {
 	if (!Process) return NULL;
-	EnterLockArea(&Process->LockTable.DescFreeHeapAllocateLock);
+	__SpinLockSyncBitTestAndSet(&Process->ControlMutex0, PROCESS_MUTEX0_ALLOCATE_FREE_HEAP_DESCRIPTOR);
 	FREE_MEMORY_LIST* List = Process->MemoryManagementTable.FreeMemory;
 	for (;;) {
 		if (List->HeapCount == UNITS_PER_LIST) goto NextList;
@@ -126,7 +127,7 @@ PFREE_HEAP_DESCRIPTOR KERNELAPI AllocateFreeHeapDescriptor(
 
 			List->HeapCount++;
 			List->SearchMax++;
-			ExitLockArea(&Process->LockTable.DescFreeHeapAllocateLock);
+			__BitRelease(&Process->ControlMutex0, PROCESS_MUTEX0_ALLOCATE_FREE_HEAP_DESCRIPTOR);
 			return Descriptor;
 		}
 		for (int i = 0; i < List->SearchMax; i++) {
@@ -139,7 +140,7 @@ PFREE_HEAP_DESCRIPTOR KERNELAPI AllocateFreeHeapDescriptor(
 				Descriptor->Address = (UINTPTR)Address;
 				Descriptor->HeapLength = HeapLength;
 				List->HeapCount++;
-				ExitLockArea(&Process->LockTable.DescFreeHeapAllocateLock);
+				__BitRelease(&Process->ControlMutex0, PROCESS_MUTEX0_ALLOCATE_FREE_HEAP_DESCRIPTOR);
 				return Descriptor;
 			}
 		}
@@ -165,12 +166,12 @@ PFREE_HEAP_DESCRIPTOR KERNELAPI AllocateFreeHeapDescriptor(
 			Descriptor->HeapLength = HeapLength;
 			List->HeapCount++;
 			List->SearchMax++;
-			ExitLockArea(&Process->LockTable.DescFreeHeapAllocateLock);
+			__BitRelease(&Process->ControlMutex0, PROCESS_MUTEX0_ALLOCATE_FREE_HEAP_DESCRIPTOR);
 			return Descriptor;
 		}
 		List = List->Next;
 	}
-	ExitLockArea(&Process->LockTable.DescFreeHeapAllocateLock);
+	__BitRelease(&Process->ControlMutex0, PROCESS_MUTEX0_ALLOCATE_FREE_HEAP_DESCRIPTOR);
 	return NULL;
 }
 

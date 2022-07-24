@@ -81,36 +81,35 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 		CpuManagementTable[i] = kpalloc(CPU_MGMT_NUM_PAGES);
 		if (!CpuManagementTable[i]) SET_SOD_MEMORY_MANAGEMENT;
 		ZeroMemory(CpuManagementTable[i], sizeof(*CpuManagementTable[i]));
-
-
+		RFTHREAD_WAITING_QUEUE WaitingQueue = malloc(sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES);
+		if(WaitingQueue)
 
 		if(i == CurrentProcessor){
 			CpuManagementTable[i]->Initialized = TRUE;
 		}
-		CpuManagementTable[i]->CpuId = i;
-		for (UINT64 c = 0; c < 7; c++) {
-			CpuManagementTable[i]->CurrentList[c] = Pmgrt.LpInitialPriorityClasses[c];
+		CpuManagementTable[i]->ProcessorId = i;
+		for (UINT64 c = 0; c < NUM_PRIORITY_CLASSES; c++) {
+			CpuManagementTable[i]->ThreadQueues[c] = WaitingQueue + c;
 		}
-		CpuManagementTable[i]->TaskSchedulerData.cr3 = KeGlobalCR3;
+		// CpuManagementTable[i]->TaskSchedulerData.cr3 = KeGlobalCR3;
 		
 
-		CpuManagementTable[i]->IdleThread = CreateThread(IdleProcess, 0x1000, IdleThread, 0, NULL, 0);
-		CpuManagementTable[i]->InterruptsThread = CreateThread(SystemInterruptsProcess, 0x10000, NULL, 0, NULL, 0);
-		if (!CpuManagementTable[i]->IdleThread || !CpuManagementTable[i]->InterruptsThread) SET_SOD_PROCESS_MANAGEMENT;
-		SetThreadPriority(CpuManagementTable[i]->InterruptsThread, THREAD_PRIORITY_TIME_CRITICAL);
+		CpuManagementTable[i]->SystemIdleThread = CreateThread(IdleProcess, 0x1000, IdleThread, 0, NULL);
+		CpuManagementTable[i]->SystemInterruptsThread = CreateThread(SystemInterruptsProcess, 0x10000, NULL, 0, NULL);
+		if (!CpuManagementTable[i]->SystemIdleThread || !CpuManagementTable[i]->SystemInterruptsThread) SET_SOD_PROCESS_MANAGEMENT;
+		SetThreadPriority(CpuManagementTable[i]->SystemInterruptsThread, THREAD_PRIORITY_TIME_CRITICAL);
 		// Setup Idle Thread
-		HTHREAD hIdleThread = CpuManagementTable[i]->IdleThread;
-		CpuManagementTable[i]->Thread = hIdleThread;
-		hIdleThread->State |= THS_IDLE;
-		hIdleThread->UniqueCpu = i; // Make thread only runnable on this cpu
-		hIdleThread->PreemptionPriority = 0; // Make Thread Always runnable
+		HTHREAD hIdleThread = CpuManagementTable[i]->SystemIdleThread;
+		CpuManagementTable[i]->CurrentThread = hIdleThread;
+		hIdleThread->State |= THS_IDLE | THS_MANUAL;
+		hIdleThread->ProcessorId = i; // Make thread only runnable on this cpu
 		hIdleThread->RunAfter = 0;
-		hIdleThread->TimeSlice = 0;
+		hIdleThread->TimeBurst = 2; // 3 clocks
 
 		// Setup Interrupts Thread
-		HTHREAD InterruptsThread = CpuManagementTable[i]->InterruptsThread;
+		HTHREAD InterruptsThread = CpuManagementTable[i]->SystemInterruptsThread;
 		InterruptsThread->State |= THS_MANUAL;
-		InterruptsThread->UniqueCpu = i;
+		InterruptsThread->ProcessorId = i;
 		InterruptsThread->Registers.rflags = 0; // Interrupts disabled
 	}
 	// Pmgrt.NumProcessors = CpuCount;
@@ -228,8 +227,8 @@ void SendProcessorInterrupt(UINT ApicId, char InterruptNumber) {
 
 void IpiSend(UINT ApicId, UINT Command) {
 	if (CpuManagementTable[ApicId] && CpuManagementTable[ApicId]->Initialized) {
-		__SpinLockSyncBitTestAndSet(&CpuManagementTable[ApicId]->CommandControl, 0); // Unsetted by processor
-		CpuManagementTable[ApicId]->Command = Command;
+		__SpinLockSyncBitTestAndSet(&CpuManagementTable[ApicId]->IpiCommandControl, 0); // Unsetted by processor
+		CpuManagementTable[ApicId]->IpiCommand = Command;
 		SendProcessorInterrupt(ApicId, IPI_INTVEC);
 	}
 }
@@ -263,6 +262,7 @@ void LapicTimerSetupTSCDeadlineMode() {
 	while (1);
 }
 
+static UINT64 CpuBusSpeed = 0;
 
 void SetupLocalApicTimer(){
 	
@@ -275,28 +275,47 @@ void SetupLocalApicTimer(){
 	// else {
 		// Setup LAPIC TIMER Periodic Mode
 		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_DIVISOR) = 0b11; // divide by 16
+		
+		if(!CpuBusSpeed) {
+			// Find CPU BUS SPEED
+			// Processor Info of the current Processor
+			SMBIOS_PROCESSOR_INFORMATION_STRUCTURE* ProcessorInformation = NULL;
+			UINT SmNum = SmbiosGetStructuresCount();
+			
+			for(UINT i = 0;i<SmNum;i++) {
+				SMBIOS_STRUCTURE_HEADER* Sm = SmbiosGetStructure(i);
+				if(!Sm) SOD(SOD_INITIALIZATION, "Cannot retreive CPU Information and Bus Speed");
+				if(Sm->Type == SMBIOS_PROCESSOR_INFORMATION) {
+					ProcessorInformation = (void*)Sm;
+					CpuBusSpeed = ProcessorInformation->ExternalClock * 1000000;
+					break;
+				}
+			}
+			if(!ProcessorInformation) SOD(SOD_INITIALIZATION, "Cannot retreive CPU Information and Bus Speed");
+			_RT_SystemDebugPrint(L"EXTERNAL_BUS_SPEED : %d", CpuBusSpeed);
+			if(!CpuBusSpeed) {
+				// We will assum a 100MHz Bus Frequency
+				CpuBusSpeed = 100000000;
+			}
 
-		// CPU BUS SPEED = TIMER_DIVISOR * TIMER_CLOCKS_PER_SECOND
+		}
 
-		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_LVT) = INT_APIC_TIMER /*Interrupt Vector : 0x40*/ | (LAPIC_TIMER_ONESHOT_MODE); 
+		UINT64 InitialCount = ((CpuBusSpeed) / 0x10 /*Divisor*/) / 0x800 /*Target clocks per second*/;
+
+		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_LVT) = INT_APIC_TIMER /*Interrupt Vector : 0x40*/ | (LAPIC_TIMER_PERIODIC_MODE); 
 		if(!ApicTimerBaseQuantum){
 			TimerIncrementerCpuId = GetCurrentProcessorId();
 			MapPhysicalPages(kproc->PageMap, &ApicTimerClockCounter, &ApicTimerClockCounter, 1, PM_MAP | PM_CACHE_DISABLE);
-			PitWait(2); // Wait until pit clock counter resets (Wait 1/50 Seconds)
-			*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_INITIAL_COUNT) = 0xFFFFFFFF;
-			PitWait(5); // Wait 0.1 Seconds
-			UINT32 ClocksInOneTenthOfSeconds = 0xFFFFFFFF - *(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_CURRENT_COUNT);
+			UINT32 ClocksInOneTenthOfSeconds = (CpuBusSpeed / 0x10) / 10;
 			// must be at least 5000 clocks per second
 
 			TimerClocksPerSecond = ClocksInOneTenthOfSeconds * 10;
-			if(TimerClocksPerSecond < 5000) _RT_SystemDebugPrint(L"APIC TIMER TOO SLOW : %d HZ (MUST HAVE AT LEAST 5000 * 16(DIVIDER) CLOCKS/S)", TimerClocksPerSecond);
 			
 			ApicTimerBaseQuantum = TimerClocksPerSecond / 0x800; // set to 2048 Clocks/s
 			ApicTimerClockQuantum = ApicTimerBaseQuantum;
 		}
-
-		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_INITIAL_COUNT) = ApicTimerBaseQuantum;
-	// }
+		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_INITIAL_COUNT) = InitialCount;
+	
 }
 
 
@@ -334,12 +353,12 @@ void EnableApic() {
 	*(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_TASK_PRIORITY) = 0;
 
 	*(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_SPURIOUS_INTERRUPT_VECTOR) = INT_APIC_SPURIOUS | 0x100 ; // Bit 12 (do not broadcast EOI), bit 8 : APIC Enable
-	*(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_LVT_THERMAL_SENSOR) = INT_TSR;
-	*(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_PERFORMANCE_MONITORING_COUNTERS) = INT_PMCR;
-	*(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_LVT_LINT0) = INT_LINT0;
-	*(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_LVT_LINT1) = INT_LINT1;
+	// *(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_LVT_THERMAL_SENSOR) = INT_TSR;
+	// *(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_PERFORMANCE_MONITORING_COUNTERS) = INT_PMCR;
+	// *(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_LVT_LINT0) = INT_LINT0;
+	// *(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_LVT_LINT1) = INT_LINT1;
 	*(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_LVT_ERR) = INT_LVT_ERROR;
-	*(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_LVT_CMCI) = INT_CMCI;
+	// *(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_LVT_CMCI) = INT_CMCI;
 
 	
 
@@ -350,3 +369,59 @@ void SetLocalApicBase(void* _Lapic) {
 	UINT32 edx = (UINT64)_Lapic >> 32;
 	__WriteMsr(IA32_APIC_BASE_MSR, eax, edx);
 }
+
+typedef struct {
+	UINT64 NumReadyThreads[7];
+	RFTHREAD* ThreadQueues[7];
+	RFTHREAD CurrentThread;
+	RFTHREAD SelectedThread;
+	UINT64 TotalClocks;
+	UINT64 ReadyOnClock[7];
+	UINT64 HighestPriority[7];
+	UINT64 TotalThreads[7];
+} TMP;
+
+// Example of task scheduler
+
+// RFTHREAD FindNextThread(TMP* Cpm) {
+// 	UINT Priority = Cpm->CurrentThread->ThreadPriority;
+// 	// Classify by priority class
+// 	// Preemption
+// 	Cpm->SelectedThread = Cpm->CurrentThread; // Threads must compare with the priority of this thread
+// 	for(UINT i = 6;i>=0;i--) {
+// 		if(i == Priority) {
+// 			if(Cpm->CurrentThread->RemainingClocks) DoNotPreemptThread(); // Thread has got cpu time
+// 		}
+		
+// 		// Otherwise switch thread (or preempt it)
+// 		if(Cpm->NumReadyThreads[i]) {
+// 			RFTHREAD* _Thread = Cpm->ThreadQueues[i];
+// 			for(UINT i = 0;i<Cpm->TotalThreads[i];i++, _Thread++) {
+// 				RFTHREAD Thread = *_Thread;
+// 				if(Thread->ReadyTime >= Cpm->TotalClocks) {
+// 					if(Thread->ThreadPriority == Cpm->HighestPriority[i]) DispatchThread();
+// 					else if(Thread->ThreadPriority > Cpm->SelectedThread->ThreadPriority) 
+// 						Cpm->SelectedThread = Thread;
+// 				}
+// 			}
+// 			DispatchThread(); // Selected thread
+// 		} else if(Cpm->ReadyOnClock[i] >= Cpm->TotalClocks) {
+// 			// Perform a full search on ready threads
+// 			RFTHREAD* _Thread = Cpm->ThreadQueues[i];
+
+// 			for(UINT i = 0;i<Cpm->TotalThreads[i];i++, _Thread++) {
+// 				RFTHREAD Thread = *_Thread;
+
+// 				if(Thread->ReadyTime >= Cpm->TotalClocks) Cpm->NumReadyThreads[i]++;
+// 				if(Thread->ThreadPriority > Cpm->SelectedThread->ThreadPriority) Cpm->SelectedThread = Thread;
+// 			}
+// 		}
+// 	}
+// 	RunIdleThread(); // No ready threads where found
+// }
+
+// void DispatchThread(RFTHREAD Thread) {
+// 	// Thread is still ready
+// 	LoadThreadRegisters();
+
+// }

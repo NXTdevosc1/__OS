@@ -50,7 +50,6 @@ global __stmxcsr
 
 global __Schedule
 
-extern SkipTaskSchedule
 
 
 [BITS 64]
@@ -60,16 +59,6 @@ section .text
 __Schedule:
 	int 0x9F
 	ret
-	push rcx
-	mov rcx, rsp
-	add rcx, 0x10
-	push 0x10
-	push rcx
-	pushf
-	push 0x08
-	push qword [rcx - 8]
-
-	jmp SkipTaskSchedule
 
 __ldmxcsr:
 	push rcx

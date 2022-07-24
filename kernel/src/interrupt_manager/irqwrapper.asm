@@ -73,7 +73,7 @@ IRQControlWrapper%1:
     
     
     ; INT Schedule does the APIC_EOI For us
-    jmp SkipTaskSchedule
+    ; jmp SkipTaskSchedule ; TODO : after task switching finish
 align 0x10
 .InterruptsThreadEntry: ; New code is being executed on last registers are discarded
     ; PARAMETERS : rdx = Previous Thread, rdi = Interrupt Stack

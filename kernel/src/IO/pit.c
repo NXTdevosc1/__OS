@@ -31,11 +31,12 @@ void PitEnable(){
     OutPortB(PIT_COMMAND, 0b00110100); // Select count register at channel 0
 
     // Set a 100HZ Frequency
-    UINT16 Divisor = 11930;
+    // UINT16 Divisor = 11930;
+    UINT16 Divisor = 0xFFFF;
     OutPortB(PIT_CHANNEL0, Divisor); // Count Low
     OutPortB(PIT_CHANNEL0, Divisor >> 8); // Count High
     
-    if(KeControlIrq(PitInterruptHandler, 0 /*IRQ will be redirected if there is a redirection entry, probably IRQ 2*/, IRQ_DELIVERY_NORMAL, IRQ_CONTROL_USE_BASIC_INTERRUPT_WRAPPER) != KERNEL_SOK) SET_SOD_INITIALIZATION;
+    // if(KeControlIrq(PitInterruptHandler, 0 /*IRQ will be redirected if there is a redirection entry, probably IRQ 2*/, IRQ_DELIVERY_NORMAL, IRQ_CONTROL_USE_BASIC_INTERRUPT_WRAPPER) != KERNEL_SOK) SET_SOD_INITIALIZATION;
     UINT32 Flags = 0;
     UINT32 IRQ = 0; // Pit is the first interrupt to be set by kernel on CPU 0
     // GP_clear_screen(0);

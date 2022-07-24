@@ -56,7 +56,6 @@ static inline int KERNELAPI SetProcess(
             Process->PageMap = kproc->PageMap;
         }
         Process->Handles = CreateHandleTable();
-        Process->ThreadHandles = CreateHandleTable();
         Process->FileHandles = CreateHandleTable();
         switch (Subsystem) {
             case SUBSYSTEM_CONSOLE:
@@ -122,25 +121,25 @@ RFPROCESS KERNELAPI CreateProcess(RFPROCESS ParentProcess, LPWSTR ProcessName, U
     return &current->processes[0];
 }
 
-BOOL KERNELAPI SuspendThread(HTHREAD Thread) {
+BOOL KERNELAPI SuspendThread(RFTHREAD Thread) {
     if (!Thread) return FALSE;
     Thread->State &= ~(THS_ALIVE);
     //Pmgrt.TargetSuspensionThread = Thread;
     //IpiBroadcast(IPI_THREAD_SUSPEND, TRUE);
     return TRUE;
 }
-BOOL KERNELAPI ResumeThread(HTHREAD Thread) {
+BOOL KERNELAPI ResumeThread(RFTHREAD Thread) {
     if (!Thread) return FALSE;
     Thread->State |= THS_ALIVE;
     return TRUE;
 }
 
-BOOL SetThreadProcessor(HTHREAD Thread, UINT ProcessorId) {
+BOOL SetThreadProcessor(RFTHREAD Thread, UINT ProcessorId) {
     if (!Thread || ProcessorId >= Pmgrt.NumProcessors || !CpuManagementTable[ProcessorId]->Initialized)
         return FALSE;
 
     //SuspendThread(Thread);
-    Thread->UniqueCpu = ProcessorId;
+    Thread->ProcessorId = ProcessorId;
     //ResumeThread(Thread);
     return TRUE;
 }
@@ -175,112 +174,84 @@ BOOL KERNELAPI SetProcessName(RFPROCESS Process, LPWSTR ProcessName) {
     return TRUE;
 }
 
-static inline void KERNELAPI AllocateThreadPriorityPtr(HTHREAD Thread, HTPTRLIST list, UINT16 Index){
-    if(Thread->PriorityClassList){
-        Thread->PriorityClassList->threads[Thread->PriorityClassIndex] = NULL;
-        Thread->PriorityClassList->Count--;
 
-        /*if (Thread->PriorityClassList->IndexMin == Thread->PriorityClassIndex) Thread->PriorityClassList->IndexMin++;
-        if (Thread->PriorityClassList->IndexMax == Thread->PriorityClassIndex - 1) Thread->PriorityClassList->IndexMax--;*/
+KERNELSTATUS KERNELAPI SetThreadPriority(RFTHREAD Thread, int Priority){
+#ifdef ___KERNEL_DEBUG___
+DebugWrite("SetThreadPriority()");
+#endif
+    if(!Thread || Priority < THREAD_PRIORITY_MIN || Priority > THREAD_PRIORITY_MAX)
+        return KERNEL_SERR_INVALID_PARAMETER;
 
+    Priority -= THREAD_PRIORITY_MIN;
+    __SpinLockSyncBitTestAndSet(&Thread->ThreadControlMutex, THREAD_MUTEX_CHANGE_PRIORITY);
+    RFTHREAD_WAITING_QUEUE PreviousWaitingQueue = Thread->WaitingQueue;
+    UINT PreviousWaitingQueueIndex = Thread->ThreadWaitingQueueIndex;
 
-    }
-    list->threads[Index] = Thread;
-    Thread->PriorityClassList = list;
-    Thread->PriorityClassIndex = Index;
-    Thread->PriorityClassList->Count++;
-    if (!(Thread->State & THS_REGISTRED))
-    {
-        Pmgrt.PriorityClassThreadCount[Thread->Process->PriorityClass - PRIORITY_CLASS_MIN]++;
-        Thread->State |= THS_REGISTRED;
-    }
-
-}
-HRESULT KERNELAPI SetThreadPriority(HTHREAD Thread, int Priority){
-    if(!Thread || Priority < THREAD_PRIORITY_MIN || Priority > THREAD_PRIORITY_MAX || !Thread->Process->LpPriorityClass)
-        return -1;
-
-    RFPROCESS Process = Thread->Process;
-    HTPTRLIST PtrList = Process->LpPriorityClass;
-    BOOL _scheduler_state = Pmgrt.SchedulerEnable;
+    RFTHREAD_WAITING_QUEUE WaitingQueue = CpuManagementTable[Thread->ProcessorId]->ThreadQueues[Priority];
     Thread->ThreadPriority = Priority;
-    Thread->PreemptionPriority = GlobalThreadPreemptionPriorities[Priority - THREAD_PRIORITY_MIN];
-    Thread->RunAfter = Thread->PreemptionPriority;
-    Thread->ThreadPriorityIndex = Priority - THREAD_PRIORITY_MIN;
-    Pmgrt.SchedulerEnable = FALSE;
-    for (;;) {
-        if (PtrList->Count == PENTRIES_PER_LIST) goto NextList;
-        else if (PtrList->IndexMin > 0) {
-            AllocateThreadPriorityPtr(Thread, PtrList, PtrList->IndexMin - 1);
-            if (PtrList->Index == PtrList->IndexMin)
-                PtrList->Index--;
-
-
-            PtrList->IndexMin--;
-            Pmgrt.SchedulerEnable = _scheduler_state;
-            return SUCCESS;
-        }
-        else if(PtrList->IndexMax < PENTRIES_PER_LIST){
-            AllocateThreadPriorityPtr(Thread, PtrList, PtrList->IndexMax);
-            PtrList->IndexMax++;
-            Pmgrt.SchedulerEnable = _scheduler_state;
-            return SUCCESS;
-        } else {
-            for (UINT16 i = 0; i < PENTRIES_PER_LIST; i++) {
-                if(!PtrList->threads[i]){
-                    AllocateThreadPriorityPtr(Thread, PtrList, i);
-                    Pmgrt.SchedulerEnable = _scheduler_state;
-
-                    return SUCCESS;
+// Allocate thread in the waiting queue
+    for(;;) {
+        if(WaitingQueue->NumThreads < NUM_THREADS_PER_WAITING_QUEUE) {
+            __SpinLockSyncBitTestAndSet(&WaitingQueue->Mutex, 0);
+            if(WaitingQueue->NumThreads == NUM_THREADS_PER_WAITING_QUEUE) {
+                __BitRelease(&WaitingQueue->Mutex, 0);
+            } else {
+                RFTHREAD* _th = WaitingQueue->Threads;
+                for(UINT i = 0;i<NUM_THREADS_PER_WAITING_QUEUE;i++, _th++) {
+                    if(!(*_th)) {
+                        *_th = Thread;
+                        Thread->ThreadWaitingQueueIndex = i;
+                        Thread->WaitingQueue = WaitingQueue;
+                        WaitingQueue->NumThreads++;
+                        __BitRelease(&WaitingQueue->Mutex, 0);
+                        goto R0;
+                    }
                 }
             }
+            __BitRelease(&WaitingQueue->Mutex, 0);
         }
-        NextList:
-        if(!PtrList->Next) break;
-        PtrList = PtrList->Next;
+        if(!WaitingQueue->NextQueue) {
+            WaitingQueue->NextQueue = malloc(sizeof(THREAD_WAITING_QUEUE));
+            SZeroMemory(WaitingQueue->NextQueue);
+        }
+        WaitingQueue = WaitingQueue->NextQueue;
     }
-
-    PtrList->Next = kmalloc(sizeof(*PtrList));
-    if(!PtrList->Next) SET_SOD_PROCESS_MANAGEMENT;
-    PtrList = PtrList->Next;
-    SZeroMemory(PtrList);
-    AllocateThreadPriorityPtr(Thread, PtrList, 0);
-    PtrList->IndexMax++;
-    Pmgrt.SchedulerEnable = _scheduler_state;
-    return SUCCESS;
+R0:
+// Remove thread from previous waiting queue
+// No spinlock needed
+    if(PreviousWaitingQueue) {
+        __SyncDecrement32(&PreviousWaitingQueue->NumThreads);
+        PreviousWaitingQueue->Threads[PreviousWaitingQueueIndex] = NULL;
+    }
+    __BitRelease(&Thread->ThreadControlMutex, THREAD_MUTEX_CHANGE_PRIORITY);
+    return KERNEL_SOK;
 }
-HRESULT KERNELAPI SetPriorityClass(RFPROCESS Process, int PriorityClass) {
-    if (!Process || PriorityClass < PRIORITY_CLASS_MIN || PriorityClass > PRIORITY_CLASS_MAX) return -1;
-
-    UINT64* LastListCount = NULL;
-    if (Process->PriorityClass)
-        LastListCount = &Pmgrt.PriorityClassThreadCount[Process->PriorityClass - PRIORITY_CLASS_MIN];
-
-
+KERNELSTATUS KERNELAPI SetPriorityClass(RFPROCESS Process, int PriorityClass) {
+    if(PriorityClass < PRIORITY_CLASS_MIN || PriorityClass > PRIORITY_CLASS_MAX) return KERNEL_SERR_INVALID_PARAMETER;
+#ifdef ___KERNEL_DEBUG___
+    DebugWrite("SetPriorityClass()");
+#endif
+    PriorityClass -= PRIORITY_CLASS_MIN;
+    __SpinLockSyncBitTestAndSet(&Process->ControlMutex0, PROCESS_MUTEX0_CREATE_THREAD);
     Process->PriorityClass = PriorityClass;
-    Process->LpPriorityClass = Pmgrt.LpInitialPriorityClasses[PriorityClass - PRIORITY_CLASS_MIN];
-
-    UINT64* NewListCount = &Pmgrt.PriorityClassThreadCount[Process->PriorityClass - PRIORITY_CLASS_MIN];
-    HANDLE_ITERATION_STRUCTURE Iteration = { 0 };
-    HANDLE Handle = NULL;
-    if (!StartHandleIteration(Process->ThreadHandles, &Iteration))  SET_SOD_PROCESS_MANAGEMENT;
-    while ((Handle = GetNextHandle(&Iteration))) {
-        if (Handle->DataType == HANDLE_THREAD) {
-            HTHREAD thread = Handle->Data;
-            if (thread->ThreadPriority && LastListCount) {
-                *LastListCount -= 1;
+    UINT RemainingThreads = Process->NumThreads;
+    PROCESS_THREAD_LIST* ThreadList = &Process->Threads;
+    while(RemainingThreads) {
+        RFTHREAD* _th = ThreadList->Threads;
+        for(UINT i = 0;i<THREADS_PER_PROCESS_THREAD_LIST;i++, _th++) {
+            if(*_th) {
+                if(KERNEL_ERROR(SetThreadPriority(*_th, (*_th)->ThreadPriority + THREAD_PRIORITY_MIN))) SET_SOD_PROCESS_MANAGEMENT;
+                RemainingThreads--;
             }
-            thread->State &= ~(THS_REGISTRED);
-            SetThreadPriority(thread, thread->ThreadPriority);
         }
+        ThreadList = ThreadList->Next;
     }
+    __BitRelease(&Process->ControlMutex0, PROCESS_MUTEX0_CREATE_THREAD);
 
-    EndHandleIteration(&Iteration);
-
-    return SUCCESS;
+    return KERNEL_SOK;
 }
 
-static inline void KERNELAPI SetupThreadRegisters(HTHREAD thread) {
+static inline void KERNELAPI SetupThreadRegisters(RFTHREAD thread) {
     RFPROCESS process = thread->Process;
     if (process->OperatingMode == KERNELMODE_PROCESS) {
         thread->Registers.cs = CS_KERNEL;
@@ -314,10 +285,10 @@ static inline void KERNELAPI SetupThreadRegisters(HTHREAD thread) {
 #endif //  ___KERNEL_DEBUG___
 }
 
-static inline HTHREAD KERNELAPI AllocateThread(RFPROCESS Process, UINT64* LpThreadId) {
-    HTHREADLIST ThreadList = &Pmgrt.ThreadList;
+static inline RFTHREAD KERNELAPI AllocateThread(RFPROCESS Process, UINT64* LpThreadId) {
+    RFTHREADLIST ThreadList = &Pmgrt.ThreadList;
     UINT64 ListIndex = 0;
-    HTHREAD thread = NULL;
+    RFTHREAD thread = NULL;
     for (;; ListIndex++) {
         for (UINT16 i = 0; i < PENTRIES_PER_LIST; i++) {
             thread = &ThreadList->threads[i];
@@ -344,37 +315,24 @@ static inline HTHREAD KERNELAPI AllocateThread(RFPROCESS Process, UINT64* LpThre
 
 
 
-HTHREAD KERNELAPI CreateThread(RFPROCESS Process, UINT64 StackSize, THREAD_START_ROUTINE StartAddress, UINT64 Flags, UINT64* LpThreadId, UINT8 NumParameters, ...){ // parameters
+RFTHREAD KERNELAPI CreateThread(RFPROCESS Process, UINT64 StackSize, THREAD_START_ROUTINE StartAddress, UINT64 Flags, UINT64* ThreadId){ // parameters
     if(!Process || !Process->Set || !Process->PriorityClass) return NULL;
+
+    __SpinLockSyncBitTestAndSet(&Process->ControlMutex0, PROCESS_MUTEX0_CREATE_THREAD);
 
     if (!StackSize) StackSize = THREAD_DEFAULT_STACK_SIZE;
 
-    if (StackSize % 0x1000) StackSize += 0x1000 - (StackSize % 0x1000);
+    if (StackSize & 0xFFF) {
+        StackSize += 0x1000;
+        StackSize &= ~0xFFF;
+    }
 
-    HTHREAD Thread = AllocateThread(Process, LpThreadId);
+    RFTHREAD Thread = AllocateThread(Process, ThreadId);
     Thread->Process = Process;
     UINT64 ThreadProcessor = Pmgrt.NextThreadProcessor;
-    
-     #ifdef  ___KERNEL_DEBUG___
-	DebugWrite("Specifiying Thread Processor.");
-#endif //  ___KERNEL_DEBUG___
-    // for(;;){
-    //     if(!Pmgrt.NumProcessors) break;
-    //     for (UINT64 i = ThreadProcessor; i < Pmgrt.NumProcessors; i++) {
-    //         if(!CpuManagementTable[i]) continue;
-    //         if (CpuManagementTable[i]->Initialized) {
-    //             ThreadProcessor = i;
-    //             goto ExitProcessorChoiceLoop;
-    //         }
-    //     }
-    //     // if(!ThreadProcessor) break; // System Not Initialized Yet
-    //     ThreadProcessor = 0;
-    // }
 
-    ExitProcessorChoiceLoop:
     
-    
-    Thread->UniqueCpu = ThreadProcessor;
+    Thread->ProcessorId = ThreadProcessor;
     if (ThreadProcessor + 1 >= Pmgrt.NumProcessors) Pmgrt.NextThreadProcessor = 0;
     else Pmgrt.NextThreadProcessor = ThreadProcessor + 1;
 
@@ -409,59 +367,35 @@ HTHREAD KERNELAPI CreateThread(RFPROCESS Process, UINT64 StackSize, THREAD_START
 
     Process->StackSize += StackSize;
     ThreadWrapperInit(Thread, StartAddress);
-    if (!Process->NumThreads) { // Setup Subsystem & Parameters are meaningless
-        switch (Process->Subsystem) {
-        case SUBSYSTEM_GUI:
-        {
-            SetThreadPriority(Thread, THREAD_PRIORITY_ABOVE_NORMAL);
-
-            break;
-        }
-        case SUBSYSTEM_CONSOLE:
-        {
-            SetThreadPriority(Thread, THREAD_PRIORITY_NORMAL);
-
-            break;
-        }
-        case SUBSYSTEM_NATIVE:
-        {
-            SetThreadPriority(Thread, THREAD_PRIORITY_BELOW_NORMAL);
-
-            break;
-        }
-        default: {
-            SetThreadPriority(Thread, THREAD_PRIORITY_BELOW_NORMAL);
-
-            break;
-        }
-        }
-    }
-    else {
-        // Pass parameters to the thread's start function
-        SetThreadPriority(Thread, THREAD_PRIORITY_NORMAL);
-
-    }
+    
 
     
-    if (!OpenHandle(Process->ThreadHandles, Thread, 0, HANDLE_THREAD, Thread, NULL)) SET_SOD_PROCESS_MANAGEMENT;
-    
+    // Linking the thread to the process
+    PROCESS_THREAD_LIST* ThreadList = &Process->Threads;
+    for(;;) {
+        RFTHREAD* _th = ThreadList->Threads;
+        for(UINT i = 0;i<THREADS_PER_PROCESS_THREAD_LIST;i++, _th++) {
+            if(!(*_th)) {
+                *_th = Thread;
+                goto R0;
+            }
+        }
+        if(!ThreadList->Next) {
+            ThreadList->Next = malloc(sizeof(PROCESS_THREAD_LIST));
+            SZeroMemory(ThreadList->Next);
+        }
+        ThreadList = ThreadList->Next;
+    }
+R0:
     if(!(Flags & THREAD_CREATE_SUSPEND)){
         ResumeThread(Thread);
     }
-    ReducePriorityCountDown--;
-    if (!ReducePriorityCountDown) {
-        GlobalThreadPreemptionPriorities[PRIORITY_CLASS_INDEX_IDLE] += 5;
-        GlobalThreadPreemptionPriorities[PRIORITY_CLASS_INDEX_LOW] += 5;
-        GlobalThreadPreemptionPriorities[PRIORITY_CLASS_INDEX_BELOW_NORMAL] += 3;
-        GlobalThreadPreemptionPriorities[PRIORITY_CLASS_INDEX_NORMAL] += 3;
-        GlobalThreadPreemptionPriorities[PRIORITY_CLASS_INDEX_ABOVE_NORMAL] += 2;
-        GlobalThreadPreemptionPriorities[PRIORITY_CLASS_INDEX_HIGH] += 1;
-        //Realtime Does not increments. GlobalThreadPreemptionPriorities[PRIORITY_CLASS_INDEX_REALTIME] += 1;
 
-        ReducePriorityCountDown = ReducePriorityAfter;
-    }
 
-    Thread->TimeSlice = 0; // run at 3 clocks per thread switch
+    Thread->TimeBurst = 0;
+
+    __BitRelease(&Process->ControlMutex0, PROCESS_MUTEX0_CREATE_THREAD);
+
 
     return Thread;
 
@@ -477,7 +411,7 @@ int KERNELAPI TerminateCurrentThread(int exit_code){
 int KERNELAPI TerminateProcess(RFPROCESS process, int ExitCode){
     return 0;
 }
-int KERNELAPI TerminateThread(HTHREAD thread, int ExitCode){
+int KERNELAPI TerminateThread(RFTHREAD thread, int ExitCode){
     if (!thread) return -1;
 
     return 0;
@@ -521,18 +455,18 @@ RFPROCESS KERNELAPI GetCurrentProcess(){
     if (!Pmgrt.SystemInitialized) return kproc;
     // *(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_INITIAL_COUNT) = ApicTimerBaseQuantum / 3;
     // __cli();
-    RFPROCESS Process = ((HTHREAD)(CpuManagementTable[GetCurrentProcessorId()]->Thread))->Process;
+    RFPROCESS Process = ((RFTHREAD)(CpuManagementTable[GetCurrentProcessorId()]->CurrentThread))->Process;
     // __sti();
     return Process;
 }
 
 
-HTHREAD KERNELAPI GetCurrentThread(){
+RFTHREAD KERNELAPI GetCurrentThread(){
     if (!Pmgrt.SystemInitialized) return kproc->StartupThread;
 
     // *(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_INITIAL_COUNT) = ApicTimerBaseQuantum / 3;
     // __cli();
-    HTHREAD Thread = CpuManagementTable[GetCurrentProcessorId()]->Thread;
+    RFTHREAD Thread = CpuManagementTable[GetCurrentProcessorId()]->CurrentThread;
     // __sti();
     return Thread;
 }
@@ -545,59 +479,63 @@ UINT64 KERNELAPI GetCurrentThreadId(){
 }
 
 
-HTHREAD KERNELAPI GetProcessorIdleThread(UINT64 ProcessorId) {
+RFTHREAD KERNELAPI GetProcessorIdleThread(UINT64 ProcessorId) {
     if (ProcessorId >= Pmgrt.NumProcessors || !CpuManagementTable[ProcessorId]->Initialized) return NULL;
-    HTHREAD Thread = CpuManagementTable[ProcessorId]->IdleThread;
+    RFTHREAD Thread = CpuManagementTable[ProcessorId]->SystemIdleThread;
     return Thread;
 }
 // Roundability (Division size) for e.g (0.00 = 100 of Roundability, 0.0 = 10)
 #define CALCULATE_ROUNDED_PERCENT(Slice, Source, Roundability) ((double)(((UINT64)Source * (UINT64)Roundability) / (UINT64)Slice) / (double)Roundability)
 
-double KERNELAPI GetThreadCpuTime(HTHREAD Thread) {
-    #ifdef ___KERNEL_DEBUG___
-        DebugWrite("GetThreadCpuTime()");
-    #endif
-    while (Pmgrt.CpuTimeCalculation);
-    // Check to avoid Divided by 0 exceptions and SIMD Floating Point Exceptions
-    if (!Thread->CpuTime || !Pmgrt.EstimatedCpuTime) return 0;
+double KERNELAPI GetThreadCpuTime(RFTHREAD Thread) {
+    // #ifdef ___KERNEL_DEBUG___
+    //     DebugWrite("GetThreadCpuTime()");
+    // #endif
+    // while (Pmgrt.CpuTimeCalculation);
+    // // Check to avoid Divided by 0 exceptions and SIMD Floating Point Exceptions
+    // if (!Thread->CpuTime || !Pmgrt.EstimatedCpuTime) return 0;
 
-    return CALCULATE_ROUNDED_PERCENT(Thread->CpuTime, Pmgrt.EstimatedCpuTime, 1000);
+    // return CALCULATE_ROUNDED_PERCENT(Thread->CpuTime, Pmgrt.EstimatedCpuTime, 1000);
+    return 0;
 }
 
 double KERNELAPI GetIdleCpuTime() {
-    #ifdef ___KERNEL_DEBUG___
-        DebugWrite("GetIdleCpuTime()");
-    #endif
-    while (Pmgrt.CpuTimeCalculation);
-    // Check to avoid Divided by 0 exceptions and SIMD Floating Point Exceptions
-    if (!Pmgrt.EstimatedIdleCpuTime) return 0;
-    if (!Pmgrt.EstimatedCpuTime) return 100;
+    // #ifdef ___KERNEL_DEBUG___
+    //     DebugWrite("GetIdleCpuTime()");
+    // #endif
+    // while (Pmgrt.CpuTimeCalculation);
+    // // Check to avoid Divided by 0 exceptions and SIMD Floating Point Exceptions
+    // if (!Pmgrt.EstimatedIdleCpuTime) return 0;
+    // if (!Pmgrt.EstimatedCpuTime) return 100;
 
-    return CALCULATE_ROUNDED_PERCENT(Pmgrt.EstimatedIdleCpuTime, Pmgrt.EstimatedCpuTime, 1000);
+    // return CALCULATE_ROUNDED_PERCENT(Pmgrt.EstimatedIdleCpuTime, Pmgrt.EstimatedCpuTime, 1000);
+    return 0;
 }
 double KERNELAPI GetTotalCpuTime() {
-    #ifdef ___KERNEL_DEBUG___
-        DebugWrite("GetTotalCpuTime()");
-    #endif
-    while (Pmgrt.CpuTimeCalculation);
-    // Check to avoid Divided by 0 exceptions and SIMD Floating Point Exceptions
-    if (!Pmgrt.EstimatedIdleCpuTime) return 100;
-    if (!Pmgrt.EstimatedCpuTime) return 0;
+    // #ifdef ___KERNEL_DEBUG___
+    //     DebugWrite("GetTotalCpuTime()");
+    // #endif
+    // while (Pmgrt.CpuTimeCalculation);
+    // // Check to avoid Divided by 0 exceptions and SIMD Floating Point Exceptions
+    // if (!Pmgrt.EstimatedIdleCpuTime) return 100;
+    // if (!Pmgrt.EstimatedCpuTime) return 0;
 
-    return 100 - CALCULATE_ROUNDED_PERCENT(Pmgrt.EstimatedIdleCpuTime, Pmgrt.EstimatedCpuTime, 1000);
+    // return 100 - CALCULATE_ROUNDED_PERCENT(Pmgrt.EstimatedIdleCpuTime, Pmgrt.EstimatedCpuTime, 1000);
+    return 0;
 }
 double KERNELAPI GetProcessorIdleTime(UINT64 ProcessorId) {
 
-    HTHREAD ProcessorIdleThread = GetProcessorIdleThread(ProcessorId);
+    RFTHREAD ProcessorIdleThread = GetProcessorIdleThread(ProcessorId);
     if (!ProcessorIdleThread) return 0;
     return GetThreadCpuTime(ProcessorIdleThread);
 }
 double KERNELAPI GetProcessorTotalTime(UINT64 ProcessorId){
-    if (ProcessorId >= Pmgrt.NumProcessors || !CpuManagementTable[ProcessorId]->Initialized) return 0;
-    while (Pmgrt.CpuTimeCalculation);
-    // Check to avoid Divided by 0 exceptions and SIMD Floating Point Exceptions
-    if (!((HTHREAD)CpuManagementTable[ProcessorId]->IdleThread)->CpuTime || !Pmgrt.EstimatedCpuTime) return 0;
-    return CALCULATE_ROUNDED_PERCENT(((HTHREAD)CpuManagementTable[ProcessorId]->IdleThread)->CpuTime, CpuManagementTable[ProcessorId]->EstimatedCpuTime, 1000);
+    // if (ProcessorId >= Pmgrt.NumProcessors || !CpuManagementTable[ProcessorId]->Initialized) return 0;
+    // while (Pmgrt.CpuTimeCalculation);
+    // // Check to avoid Divided by 0 exceptions and SIMD Floating Point Exceptions
+    // if (!((RFTHREAD)CpuManagementTable[ProcessorId]->IdleThread)->CpuTime || !Pmgrt.EstimatedCpuTime) return 0;
+    // return CALCULATE_ROUNDED_PERCENT(((RFTHREAD)CpuManagementTable[ProcessorId]->IdleThread)->CpuTime, CpuManagementTable[ProcessorId]->EstimatedCpuTime, 1000);
+    return 0;
 }
 
 void KERNELAPI TaskSchedulerEnable() {
@@ -613,7 +551,7 @@ BOOL KERNELAPI IoWait() {
     __Schedule();
     return TRUE;
 }
-BOOL KERNELAPI IoFinish(HTHREAD Thread) {
+BOOL KERNELAPI IoFinish(RFTHREAD Thread) {
     if (!Thread) return FALSE;
     Thread->State |= THS_IOPIN; // set IO_PIN Flag to remove IO_WAIT By task scheduler
     return TRUE;

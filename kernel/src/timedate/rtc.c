@@ -21,7 +21,7 @@ void RtcUpdate();
 HTHREAD RtcClientThread = NULL;
 BOOL Updating = FALSE;
 void RtcClient(){
-	SetThreadPriority(RtcClientThread, THREAD_PRIORITY_TIME_CRITICAL);
+	SetThreadPriority(RtcClientThread, THREAD_PRIORITY_HIGH);
 	MSG Message = {0};
 	MSG_HEADER Header = {0};
 	while(IpcGetMessage(RtcClientThread->Client, &Message)){
@@ -115,24 +115,23 @@ KERNELSTATUS RtcSetTimeAndDate(RTC_TIME_DATE* TimeDate){
 
 void RtcInit(){
 	// Enable RTC
-	RtcClientThread = CreateThread(kproc, 0x2000, RtcClient, 0, 0, 0);
+	RtcClientThread = CreateThread(kproc, 0x2000, RtcClient, 0, 0);
 	if(!RtcClientThread) SET_SOD_INITIALIZATION;
 
-	if(KeControlIrq(RtcInterruptHandler, 8, IRQ_DELIVERY_NORMAL, 0) != KERNEL_SOK) SET_SOD_INITIALIZATION;
+	// if(KeControlIrq(RtcInterruptHandler, 8, IRQ_DELIVERY_NORMAL, 0) != KERNEL_SOK) SET_SOD_INITIALIZATION;
 
-	unsigned char prev = 0;
+	// unsigned char prev = 0;
 	// Set Frequency
-	prev = CmosRead(0x8A);
-	CmosWrite(0x8A, (prev & 0xF0) | RTCDivider);
+	// prev = CmosRead(0x8A);
+	// CmosWrite(0x8A, (prev & 0xF0) | RTCDivider);
 
 	// Get Hour & Byte Format
 	unsigned char StatusRegisterB = CmosRead(0x8B);
 	if(StatusRegisterB & 2) RtcTimeDate.HourFormat = 1; // 24 Hour format
 	if(StatusRegisterB & 4) RtcTimeDate.ByteFormat = 1; // Binary (Decimal) Mode
 	// Enable the timer
-	prev = CmosRead(0x8B);
-	CmosWrite(0x8B, prev | 0x40);
-	__sti();
+	// prev = CmosRead(0x8B);
+	// CmosWrite(0x8B, prev | 0x40);
 }
 
 BOOL isRtcUpdating(){

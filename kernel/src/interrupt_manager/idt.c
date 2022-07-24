@@ -39,6 +39,10 @@ void KERNELAPI RegisterInterruptServiceRoutine(INTERRUPT_SERVICE_ROUTINE Handler
 
 #define MSI_TEST_IRQ 0x60
 
+extern void SchedulerEntrySSE();
+extern void SchedulerEntryAVX();
+extern void SchedulerEntryAVX512();
+
 void GlobalInterruptDescriptorInitialize()
 {
 
@@ -91,8 +95,12 @@ void GlobalInterruptDescriptorInitialize()
 	
 	// IRQ
 
-	SetInterruptGate(ScheduleTask,INT_APIC_TIMER,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
-	SetInterruptGate(SkipTaskSchedule,INT_SCHEDULE,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
+	// Determine which function to use depending on extension support :
+	// (SSE, AVX, AVX512)
+	SetInterruptGate(SchedulerEntrySSE,INT_APIC_TIMER,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
+	
+	
+	// SetInterruptGate(SkipTaskSchedule,INT_SCHEDULE,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
 
 	SetInterruptGate(ApicSpuriousInt, INT_APIC_SPURIOUS, 0, 3, IDT_INTERRUPT_GATE, 0x08);
 	RegisterInterruptServiceRoutine(ApicThermalSensorInt, INT_TSR);
@@ -172,6 +180,7 @@ UINT64 gIRQ_MGR_MUTEX = 0;
 KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT DeliveryMode, UINT Flags){
 	if(!Handler || DeliveryMode > 3) return KERNEL_SERR_INVALID_PARAMETER;
 	__SpinLockSyncBitTestAndSet(&gIRQ_MGR_MUTEX, 0);
+	UINT64 _rflags = __getRFLAGS();
 	__cli();
 	if(gIRQ_MGR_ProcessorSwitch == Pmgrt.NumProcessors) gIRQ_MGR_ProcessorSwitch = 0;
 	UINT NumIoApics = GetNumIoApics();
@@ -187,9 +196,9 @@ KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT 
 					// _RT_SystemDebugPrint(L"ACTIVE_LOW");
 					Flags |= IRQ_CONTROL_LOW_ACTIVE;
 				}
-				if(MULTIBIT_TEST(RedirectedIrqFlags, ISO_EDGE_TRIGGERED)) {
+				if(!MULTIBIT_TEST(RedirectedIrqFlags, ISO_EDGE_TRIGGERED)) {
 					// _RT_SystemDebugPrint(L"EDGE_TRIGGERED");
-					Flags |= IRQ_CONTROL_EDGE_TRIGGERED;
+					Flags |= IRQ_CONTROL_LEVEL_SENSITIVE;
 				}
 			}
 			IrqNumber = RedirectedIrq;
@@ -197,7 +206,8 @@ KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT 
 	}
 	if(IrqNumber > 24 * NumIoApics) {
 		__BitRelease(&gIRQ_MGR_MUTEX, 0);
-		__sti();
+		// Restore RFLAGS
+		__setRFLAGS(_rflags);
 		return KERNEL_SERR_OUT_OF_RANGE;
 	}
 	// just as pre-check
@@ -212,12 +222,13 @@ KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT 
 			) {
 				if(CpuManagementTable[x]->IrqControlTable[i].Process != Process) {
 					__BitRelease(&gIRQ_MGR_MUTEX, 0);
-					__sti();
+					__setRFLAGS(_rflags);
 					return KERNEL_SERR_IRQ_CONTROLLED_BY_ANOTHER_PROCESS;
 				}
 				CpuManagementTable[x]->IrqControlTable[i].Flags = Flags;
 				__BitRelease(&gIRQ_MGR_MUTEX, 0);
-				__sti();
+				__setRFLAGS(_rflags);
+
 				return KERNEL_SWR_IRQ_ALREADY_SET;
 			}
 		}
@@ -244,7 +255,7 @@ KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT 
 
 	if(!_redirentryfound) {
 		__BitRelease(&gIRQ_MGR_MUTEX, 0);
-		__sti();
+		__setRFLAGS(_rflags);
 		return KERNEL_SERR_OUT_OF_RANGE;
 	}
 
@@ -287,9 +298,9 @@ KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT 
 	}else {
 		RedirectionTable.InterruptInputPinPolarity = 0;
 	}
-	if(Flags & IRQ_CONTROL_EDGE_TRIGGERED){
-		RedirectionTable.TriggerMode = 1;
-	}else RedirectionTable.TriggerMode = 0;
+	if(!(Flags & IRQ_CONTROL_LEVEL_SENSITIVE)){
+		RedirectionTable.TriggerMode = 0;
+	}else RedirectionTable.TriggerMode = 1;
 
 	if(Flags & IRQ_CONTROL_USE_BASIC_INTERRUPT_WRAPPER) {
 		// _RT_SystemDebugPrint(L"USE_BASIC_WRAPPER : IV (%d)", (UINT64)IrqControlDescriptor->InterruptVector);
@@ -304,7 +315,7 @@ KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT 
 
 	gIRQ_MGR_ProcessorSwitch++;
 	__BitRelease(&gIRQ_MGR_MUTEX, 0);
-	__sti();
+	__setRFLAGS(_rflags);
 	return KERNEL_SOK;
 }
 KERNELSTATUS KERNELAPI KeReleaseIrq(UINT IrqNumber){
@@ -321,11 +332,11 @@ IRQ_CONTROL_DESCRIPTOR* KERNELAPI RegisterIrq(UINT32 IrqSource, void* Handler, U
 			if(!CpuMt->Present) {
 				CpuMt->Flags = Flags;
 				CpuMt->InterruptVector = c + 0x20;
-				// SetInterruptGate(gIRQCtrlWrapPtr[c], CpuMt->InterruptVector, 0, 3, IDT_INTERRUPT_GATE, 0x08);
+				SetInterruptGate(gIRQCtrlWrapPtr[c], CpuMt->InterruptVector, 0, 3, IDT_INTERRUPT_GATE, 0x08);
 				CpuMt->PhysicalIrqNumber = IrqSource;
 				CpuMt->Process = GetCurrentProcess();
 				CpuMt->VirtualIoApicId = IoApicId;
-				CpuMt->LapicId = CpuManagementTable[i]->CpuId;
+				CpuMt->LapicId = CpuManagementTable[i]->ProcessorId;
 				CpuMt->Handler = Handler;
 				CpuMt->Present = 1;
 				gIRQ_MGR_ProcessorSwitch = c + 1;

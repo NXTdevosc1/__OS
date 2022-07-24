@@ -1,0 +1,35 @@
+
+UINT64 NumReadyThreads[NUM_PRIORITY_CLASSES] // on each priority class
+LPVOID ThreadQueues[NUM_PRIORITY_CLASSES]
+RFTHREAD SelectedThread; // Highest priority thread found on this scheduling queue
+UINT64 TotalClocks // Total Clocks of the timer
+UINT64 ReadyOnClock[NUM_PRIORITY_CLASS] // The most ready thread will be on this clock
+UINT64 HighestPriority[NUM_PRIORITY_CLASS] // Highest priority between all present threads 
+(including non-ready threads)
+
+UINT128 InterruptTime; // The record HPET Time at the interrupt (to prevent recalculation on each asleep thread)
+
+Work:
+	
+STEP 1:
+
+- Examine arranged NumThreads of the same or highest priority
+{
+	where i = Current Priority; i++
+	if NumThreads then : {
+		for i = 0; i<NumThreads, i++, thread++
+			if thread.Priority > Current Priority && thread.ReadyOnClock >= TotalClocks:
+				if(thread.Priority == HighestPriority) DispatchThread
+				else SelectedThread = thread;
+		
+		// There must be a selected thread otherwise we wan't a pagefault (this will signal a bug or a forgot-to-set value)
+		DispatchThread
+	}
+}
+- if no ready thread is found then search lower priority threads
+- if no thread is ready then run idle thread
+{
+	mov [SelectedThread], [CPM /*Cpu Management Table*/ + IdleThread]
+	DispatchThread
+	
+}

@@ -108,7 +108,7 @@ KERNELSTATUS Pe64LoadUserApplication(LPWSTR path){
 
     Process->ImageHandle = image;
 
-    HTHREAD MainThread = CreateThread(Process, image->ThirdHeader.StackReserve, (THREAD_START_ROUTINE)(ImageBase + image->OptionnalHeader.EntryPointAddr), THREAD_CREATE_SUSPEND, NULL, 0);
+    HTHREAD MainThread = CreateThread(Process, image->ThirdHeader.StackReserve, (THREAD_START_ROUTINE)(ImageBase + image->OptionnalHeader.EntryPointAddr), THREAD_CREATE_SUSPEND, NULL);
 
     if (!MainThread) SET_SOD_PROCESS_MANAGEMENT;
 

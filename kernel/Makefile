@@ -41,10 +41,10 @@ all:
 	@ make img
 
 build_iso:
-	mkdir -p iso/$(OSNAME)
-	mkdir -p iso/$(OSNAME)/System
-	mkdir -p iso/$(OSNAME)/Fonts
-	mkdir -p iso/$(OSNAME)/Icons
+	# mkdir -p iso/$(OSNAME)
+	# mkdir -p iso/$(OSNAME)/System
+	# mkdir -p iso/$(OSNAME)/Fonts
+	# mkdir -p iso/$(OSNAME)/Icons
 	cp $(KNAME) iso/$(KPATH)
 	cp bin/zap-light16.psf iso/$(OSNAME)/Fonts/zap-light16.psf
 	cp ../UEFI/edk2/Build/MdeModule/DEBUG_GCC5/X64/EfiBoot/bootx64/OUTPUT/EfiBoot.efi iso/efi/boot/bootx64.efi

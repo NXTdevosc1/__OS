@@ -15,7 +15,7 @@ void INTH_IPI(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFrame) {
 		Pmgrt.BroadCastNumProcessors++;
 	}
 	else {
-		Command = CpuManagementTable[ProcessorId]->Command;
+		Command = CpuManagementTable[ProcessorId]->IpiCommand;
 	}
 
 	switch (Command)
@@ -27,11 +27,11 @@ void INTH_IPI(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFrame) {
 	}
 	case IPI_THREAD_SUSPEND:
 	{
-		if (CpuManagementTable[ProcessorId]->Thread == Pmgrt.TargetSuspensionThread) {
-			CpuManagementTable[ProcessorId]->TaskSchedulerData.RemainingCpuTime = 0;
-			__sti();
-			__hlt(); // Wait until next task switch
-		}
+		// if (CpuManagementTable[ProcessorId]->Thread == Pmgrt.TargetSuspensionThread) {
+		// 	CpuManagementTable[ProcessorId]->TaskSchedulerData.RemainingCpuTime = 0;
+		// 	__sti();
+		// 	__hlt(); // Wait until next task switch
+		// }
 		break;
 	}
 	default:
@@ -40,8 +40,8 @@ void INTH_IPI(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFrame) {
 	
 
 	if(!BroadCast) {
-		CpuManagementTable[ProcessorId]->Command = 0;
-		__BitRelease(&CpuManagementTable[ProcessorId]->CommandControl, 0);
+		CpuManagementTable[ProcessorId]->IpiCommand = 0;
+		__BitRelease(&CpuManagementTable[ProcessorId]->IpiCommandControl, 0);
 	}
 	__sti();
 }

@@ -26,7 +26,7 @@ typedef struct {
     UINT8 Reserved2[0xF0-0x28];
     UINT64 MainCounterValue;
     UINT64 Reserved3;
-    UINT64 Timer0ConfiguartionAndCapability;
+    UINT64 Timer0ConfigurationAndCapability;
     UINT64 Timer0ComparatorValue;
     UINT64 Timer0FsbInterruptRoute;
     UINT64 Reserved4;
@@ -57,9 +57,27 @@ typedef struct {
     #define HPET_VENDORID 16
     #define HPET_COUNTER_CLICK_PERIOD 32
 // General Configuration
-#define HPET_ENABLE 0
-#define HPET_LEGACY_REPLACEMENT_ROUTE_ENABLE 1
+#define HPET_ENABLE 1
+#define HPET_LEGACY_REPLACEMENT_ROUTE_ENABLE 2
 
+// Timer(n) Config & Cap (Bit Offsets)
+#define TIMER_INT_TYPE 1
+#define TIMER_INT_ENABLE 2
+#define TIMER_TYPE_CONFIG 3
+#define TIMER_PERIODIC_INT_CAPABILITY 4
+#define TIMER_SIZE 5 // 0 = 32 BITS / 1 = 64 BITS
+#define TIMER_VALUE_SET 6
+#define TIMER_32BIT_MODE_ENABLE 8
+#define TIMER_INTERRUPT_ROUTE 9 // 5 Bits
+#define TIMER_FSB_INTERRUPT_ENABLE 14
+#define TIMER_FSB_DELIVERY_CAPABILITY 15
+#define TIMER_INTERRUPT_ROUTING_CAPABILILTY 32
 #endif
 
 void HpetInitialize(ACPI_HPET* Hpet);
+// Return value : HPET Presence 1 = Present
+BOOL HpetConfigure();
+
+
+UINT64 GetHighPrecisionTimeSinceBoot();
+UINT64 GetHighPerformaceTimerFrequency();

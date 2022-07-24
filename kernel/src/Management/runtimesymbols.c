@@ -47,7 +47,11 @@ KERNELSTATUS KERNELAPI _RT_SystemDebugPrint(LPWSTR Format, ...){
     if(!Format) return KERNEL_SERR_INVALID_PARAMETER;
     UINT8 Len = wstrlen(Format);
     if(!Len) return KERNEL_SERR_INVALID_PARAMETER;
-    __SpinLockSyncBitTestAndSet(&__DEBUGPRINT_MUTEX, 0);
+    RFPROCESS Process = GetCurrentProcess();
+    if(Process != SystemInterruptsProcess) // May set a permanent spinlock on system interrupts
+        __SpinLockSyncBitTestAndSet(&__DEBUGPRINT_MUTEX, 0);
+
+    
     UINT   StackOff = 0;
     UINT8   FormatIndex = 0;
     // Calculate Result Length
@@ -129,7 +133,6 @@ KERNELSTATUS KERNELAPI _RT_SystemDebugPrint(LPWSTR Format, ...){
 
     // Format string
 
-    RFPROCESS Process = GetCurrentProcess();
     UINT8 PNAME_LEN = wstrlen(Process->ProcessName);
     Len = wstrlen(_DEBUGPRINT_FORMATTED);
 
@@ -154,7 +157,9 @@ KERNELSTATUS KERNELAPI _RT_SystemDebugPrint(LPWSTR Format, ...){
     }
     GP_draw_rect(5, YOFF + (8 - 1), 10, 2, 0xffffff);
     YOFF+=16;
-    __BitRelease(&__DEBUGPRINT_MUTEX, 0);
+    if(Process != SystemInterruptsProcess)
+        __BitRelease(&__DEBUGPRINT_MUTEX, 0);
+
     return KERNEL_SOK;
 }
 

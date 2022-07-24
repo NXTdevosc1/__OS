@@ -48,6 +48,8 @@
 
 #include <CPU/regs.h>
 
+#pragma pack(push, 1)
+
 enum SUBSYSTEMS {
     SUBSYSTEM_UNKNOWN = 0,
     SUBSYSTEM_NATIVE = 1,
@@ -94,7 +96,6 @@ enum THREAD_PRIORITY{
 
 
 
-#pragma pack(push, 1)
 typedef struct _THREAD_PRIORITY_PTR_LIST {
     UINT32 Index;
     UINT32 IndexMin;
@@ -117,7 +118,6 @@ typedef struct __TASK_SCHEDULER_DATA_TABLE{
     UINT64 reserved;
 } _TSDT;
 
-#pragma pack(pop)
 
 enum THREAD_CREATION_FLAGS {
     THREAD_CREATE_SUSPEND = 1,
@@ -149,15 +149,30 @@ enum PROCESS_TOKEN_PRIVILEGES{
     TPPR_REGISTER_DRIVER = 0x40000
 };
 
-#pragma pack(push, 1)
-typedef struct _THREAD_CONTROL_BLOCK THREAD, * HTHREAD;
+typedef struct _THREAD_CONTROL_BLOCK THREAD, * RFTHREAD;
 
-typedef struct _PROCESS_LOCK_TABLE {
-    CRITICAL_LOCK DescFreeHeapAllocateLock;
-    CRITICAL_LOCK DescHeapAllocateLock;
-    CRITICAL_LOCK MemoryAllocateLock;
-    CRITICAL_LOCK MemoryFreeLock;
-} PROCESS_LOCK_TABLE;
+
+
+typedef struct _THREAD_WAITING_QUEUE THREAD_WAITING_QUEUE, *RFTHREAD_WAITING_QUEUE;
+
+#define THREADS_PER_PROCESS_THREAD_LIST 20
+
+typedef struct _PROCESS_THREAD_LIST PROCESS_THREAD_LIST;
+
+typedef struct _PROCESS_THREAD_LIST {
+    RFTHREAD Threads[THREADS_PER_PROCESS_THREAD_LIST];
+    PROCESS_THREAD_LIST* Next;
+} PROCESS_THREAD_LIST;
+
+typedef enum _PROCESS_CONTROL_MUTEX0_BITS {
+    // This also groups CHANGE_PRIORITY class
+    // because in order to change priority
+    // kernel must reset thread priority for all threads
+    // and creating new threads may miss that
+    PROCESS_MUTEX0_CREATE_THREAD = 0,
+    PROCESS_MUTEX0_ALLOCATE_FREE_HEAP_DESCRIPTOR = 1
+
+} PROCESS_CONTROL_MUTEX0_BITS;
 
 typedef struct _PROCESS_CONTROL_BLOCK{
     BOOL Set;
@@ -167,7 +182,6 @@ typedef struct _PROCESS_CONTROL_BLOCK{
     struct _PROCESS_CONTROL_BLOCK* ParentProcess;
     UINT16 OperatingMode;
     UINT32 PriorityClass;
-    HTPTRLIST LpPriorityClass;
     UINT8 Subsystem;
     UINT64 TokenPrivileges;
     MEMORY_MANAGEMENT_TABLE MemoryManagementTable;
@@ -177,53 +191,53 @@ typedef struct _PROCESS_CONTROL_BLOCK{
     UINT64 SchedulerCpuTime; // The cpu time that the task scheduler incerements
     LPVOID ImageHandle;
     LPVOID DllBase;
-    HTHREAD StartupThread;
+    RFTHREAD StartupThread;
     HANDLE_TABLE* Handles;
-    HANDLE_TABLE* ThreadHandles;
     HANDLE_TABLE* FileHandles;
-    PROCESS_LOCK_TABLE LockTable;
+    PROCESS_THREAD_LIST Threads;
+    UINT64 ControlMutex0;
 } PROCESS, *RFPROCESS;
-#pragma pack(push, 1)
+
+// Bit offsets of the mutexes
+typedef enum _THREAD_CONTROL_MUTEX_BITS {
+    THREAD_MUTEX_CHANGE_PROCESSOR = 0,
+    THREAD_MUTEX_CHANGE_PRIORITY = 1
+} THREAD_CONTROL_MUTEX_BITS;
+
 typedef struct _THREAD_CONTROL_BLOCK{
     UINT64       State;
     UINT64      ThreadId;
     RFPROCESS    Process;
     UINT32      ProcessorId; // the cpu that taked control of the thread
     UINT32      ThreadPriority; // Thread Priority Index, Thread Priority Set = Thread Priority - THREAD_PRIORITY_MIN
-    UINT32      PreemptionPriority; // The Initial value to arrange threads by priorities
-    UINT32      TimeSlice; // Clock Base Count (Set and decremented in RemainingClocks)
-    UINT32      PriorityClassIndex;
-    HTPTRLIST   PriorityClassList;
-    UINT64      Reserved;
-    LPVOID      InstructionPtr;
+    UINT32      TimeBurst; // Clock Base Count (Set and decremented in RemainingClocks)
+    UINT32      ThreadWaitingQueueIndex;
+    RFTHREAD_WAITING_QUEUE WaitingQueue;
+    UINT32      SchedulingQuantum; // Added to current num clocks on each preemption
+    UINT64      ReadyAt[2]; // The clock number on which the thread will be ready to run
+    UINT64      ThreadControlMutex;
     INT64       ExitCode;
     struct CPU_REGISTERS_X86_64 Registers;
     LPVOID      Stack;
-    UINT        RunAfter; // Set to Preemption Priority and gets substracted after each read until the value is 0, The thread becomes ready to run
     UINT64      CpuTime;
-    UINT64      SchedulerCpuTime; // The cpu time that the task scheduler increments
     LPVOID      VirtualStackPtr;
     LPVOID      Client;
-    UINT64      UniqueCpu; // Specifies the only CPU to run thread in, can specify multiple cpus also
-    UINT64      ControlBit; // used by locking bus atomic operation to enter the thread
-    UINT64      ThreadPriorityIndex;
     UINT        RemoveIoWaitAfter;
     UINT        AttemptRemoveIoWait; // increments until = RemoveIoWaitAfter (IOWAIT) Flag gets removed
     UINT        RemainingClocks; // Remaining Cpu Time Clocks
-    UINT64      SleepUntil;
-} THREAD, *HTHREAD, *RFTHREAD;
-#pragma pack(pop)
+    UINT64      SleepUntil[2];
+    UINT64      LastCalculationTime[2]; // Second on which the scheduler have set cpu time
+} THREAD, *RFTHREAD;
 typedef struct _THREAD_LIST{
     THREAD threads[PENTRIES_PER_LIST];
     struct _THREAD_LIST* Next;
-} THREADLIST, *HTHREADLIST;
+} THREADLIST, *RFTHREADLIST;
 
 typedef struct _PROCESS_LIST{
     INT16 LastUnset;
     PROCESS processes[PENTRIES_PER_LIST];
     struct _PROCESS_LIST* Next;
 } PLIST, *HPLIST;
-#pragma pack(pop)
 enum PRIORITY_CLASS_LIST_INDEX {
     PRIORITY_CLASS_INDEX_IDLE = 0,
     PRIORITY_CLASS_INDEX_LOW = 1,
@@ -236,33 +250,21 @@ enum PRIORITY_CLASS_LIST_INDEX {
 };
 
 
-#pragma pack(push, 1)
 
 typedef struct __PROCESS_MANAGER_TABLE {
     BOOL SchedulerEnable;
     BOOL CpuTimeCalculation; // Set when calculating cpu time <illegal for scheduller to increment cpu time>
     UINT64 NumProcessors;
-    UINT64 IdleCpuTime;
-    UINT64 SchedulerCpuTime; // Scheduler Cpu Time
-    _TSDT TaskSchedulerData;
-    UINT64 PriorityClassThreadCount[PRIORITY_CLASS_INDEX_COUNT];
-    HTPTRLIST PriorityClasses[PRIORITY_CLASS_INDEX_COUNT];
-    HTPTRLIST LpInitialPriorityClasses[PRIORITY_CLASS_INDEX_COUNT];
-
-    THPTRLIST InitialPriorityClasses[PRIORITY_CLASS_INDEX_COUNT];
     THREADLIST ThreadList;
     PLIST ProcessList;
-    UINT64 SystemInitialized;
-    UINT64 EstimatedCpuTime; // Calculated Cpu Time
-    UINT64 EstimatedIdleCpuTime;
+    BOOL SystemInitialized;
     UINT64 NextThreadProcessor; // Used by create thread to chose the threads start processor
     BOOL BroadCastIpi;
     UINT BroadCastIpiCommand;
     UINT64 BroadCastNumProcessors; // Number of processors received the broadcast
-    HTHREAD TargetSuspensionThread; // Used by thread suspend IPI
+    RFTHREAD TargetSuspensionThread; // Used by thread suspend IPI
 } PROCESSMGRTABLE, *HPMGRT;
 
-#pragma pack(pop)
 
 typedef struct _CPU_PERFORMANCE_DESCRIPTOR{
     UINT ThreadTimeCounter[PRIORITY_CLASS_INDEX_COUNT];
@@ -314,3 +316,5 @@ static CPU_PERFORMANCE_DESCRIPTOR CpuPerformanceDescriptors[10] = {
     }
     ,{0},{0},{0},{0},{0},{0}
 };
+
+#pragma pack(pop)

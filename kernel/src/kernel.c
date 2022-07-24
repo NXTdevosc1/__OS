@@ -37,6 +37,7 @@
 #include <sys/drv.h>
 #include <sys/bootconfig.h>
 #include <IO/pci.h>
+#include <acpi/hpet.h>
 uint8_t set = 0;
 
 
@@ -76,217 +77,9 @@ __declspec(allocate(_FIMPORT)) FILE_IMPORT_ENTRY FileImportTable[] = {
 	// {FILE_IMPORT_DRIVER, 0, NULL, L"eodx.sys", 0, L"OS\\System\\eodx.sys"},
 	{0}, // End of table
 };
-
-void MSABI CpuTimeThread() {
-	
-	HTHREAD Thread = GetCurrentThread();
-	double ThreadCpuTime = 0;
-	double IdleCpuTime = 0;
-	double SystemCpuTime = 0;
-	
-	UINT64 NumProcessors = AcpiGetNumProcessors();
-	
-	UINT64 TotalCpuTimeReset = 1000;
-	UINT64 LocalCpuTimeReset = 500;
-	UINT64 ResetCount = 0;
-
-	UINT BASEX = 400;
-
-	UINT64 StartupQuantum = ApicTimerBaseQuantum;
-
-	RTC_TIME_DATE RtcTimeDate = {0};
-
-	// GP_draw_sf_text("Thread CPU Time (%) :", 0xffffff, BASEX, 400);
-	// GP_draw_sf_text("Idle CPU Time (%) :", 0xffffff, BASEX, 420);
-	// GP_draw_sf_text("Total CPU Time (%) :", 0xffffff, BASEX, 440);
-	GP_draw_sf_text("CS/S:", 0xffffff, BASEX, 460);
-	GP_draw_sf_text("Timer CS/S:", 0xffffff, BASEX, 480);
-
-	UINT64 TimerProcessorContextSwitchRate = 0;
-
-	// GP_draw_sf_text("Current Physical Processor :", 0xffffff, BASEX, 480);
-	// GP_draw_sf_text("Current System Processor Id :", 0xffffff, BASEX, 500);
-
-	SetThreadPriority(Thread, THREAD_PRIORITY_BELOW_NORMAL);
-	int seconds = 0;
-
-	char TextOut[100] = {0};
-	for (;;) {
-		RtcGetTimeAndDate(&RtcTimeDate);
-		if (RtcTimeDate.Second != seconds) {
-			seconds = RtcTimeDate.Second;
-			//__hlt(); // make sure to get enough cpu time
-			itoa(Pmgrt.EstimatedCpuTime, TextOut, RADIX_DECIMAL);
-			GP_draw_sf_text(TextOut, 0, BASEX + 50, 460);
-
-			itoa(TimerProcessorContextSwitchRate, TextOut, RADIX_DECIMAL);
-			GP_draw_sf_text(TextOut, 0, BASEX + 120, 480);
-
-			Pmgrt.CpuTimeCalculation = TRUE;
-			Pmgrt.EstimatedCpuTime = Pmgrt.SchedulerCpuTime;
-			Pmgrt.SchedulerCpuTime = 0;
-
-
-
-			Pmgrt.EstimatedIdleCpuTime = Pmgrt.IdleCpuTime;
-			Pmgrt.IdleCpuTime = 0;
-			// GP_draw_sf_text(to_stringu64(ResetCount), 0, 450, 460);
-			for (UINT64 i = 0; i < NumProcessors; i++) {
-				CpuManagementTable[i]->EstimatedCpuTime = CpuManagementTable[i]->SchedulerCpuTime;
-				CpuManagementTable[i]->SchedulerCpuTime = 0;
-			}
-
-			if(CpuManagementTable[TimerIncrementerCpuId]->EstimatedCpuTime != 0){
-				// Avoid divide exception
-				TimerProcessorContextSwitchRate = CpuManagementTable[TimerIncrementerCpuId]->EstimatedCpuTime;
-			}
-
-			// ApicTimerBaseQuantum = TimerClocksPerSecond / TimerProcessorContextSwitchRate;
-
-			itoa(Pmgrt.EstimatedCpuTime, TextOut, RADIX_DECIMAL);
-			GP_draw_sf_text(TextOut, 0xffffff, BASEX + 50, 460);
-			itoa(TimerProcessorContextSwitchRate, TextOut, RADIX_DECIMAL);
-			GP_draw_sf_text(TextOut, 0xffffff, BASEX + 120, 480);
-
-			for (UINT64 i = 0; i < 7; i++) {
-				HTPTRLIST List = Pmgrt.LpInitialPriorityClasses[i];
-				for (;;) {
-					for (UINT64 i = 0; i < PENTRIES_PER_LIST; i++) {
-						if (List->threads[i]) {
-							HTHREAD th = List->threads[i];
-							th->CpuTime = th->SchedulerCpuTime;
-							th->SchedulerCpuTime = 0;
-						}
-					}
-					if (!List->Next) break;
-					List = List->Next;
-				}
-			}
-			Pmgrt.CpuTimeCalculation = FALSE;
-
-			ResetCount++;
-
-
-			// GP_draw_rect(BASEX + 120, 480, 140, 40, 0);
-			// GP_draw_sf_text(to_hstring32(GetCurrentProcessorId()), 0xffffff, BASEX + 250, 480);
-			// GP_draw_sf_text(to_hstring32(GetCurrentThread()->UniqueCpu), 0xffffff, BASEX + 250, 500);
-
-
-		// 	ThreadCpuTime = GetThreadCpuTime(Thread);
-		// IdleCpuTime = GetIdleCpuTime();
-		// SystemCpuTime = GetTotalCpuTime();
-		// 	GP_draw_rect(BASEX + 250, 400, 120, 60, 0);
-
-		// GP_draw_sf_text(strdbl(ThreadCpuTime, 3), 0xffffffff, BASEX + 250, 400);
-
-		// GP_draw_sf_text(strdbl(IdleCpuTime, 3), 0xffffffff, BASEX + 250, 420);
-		// GP_draw_sf_text(strdbl(SystemCpuTime, 3), 0xffffffff, BASEX + 250, 440);
-		}
-		
-		
-
-		
-
-		
-	}
-}
-
-
-void TaskOne() {
-
-	HTHREAD Thread = GetCurrentThread();
-	float CpuTime = 0;
-	UINT64 TestBOOL = 0;
-	RFSERVER KernelServer = IpcServerConnect(IPC_MAKEADDRESS(0, 0, 0, 1), Thread->Client, NULL);
-	if (!KernelServer) SOD(0, "Failed to connect to Kernel Server");
-	MSG Message = { 0 };
-
-	for (UINT64 i = 0;; i++) {
-		Message.Message = i;
-		IpcSendToServer(Thread->Client, KernelServer, TRUE, &Message);
-		// if (!KeCreateProcess(NULL, L"Test", L"dsadasd", SUBSYSTEM_CONSOLE, 0, NULL))
-		// 	SET_SOD_INITIALIZATION;
-	}
-		
-	for (;;) {
-		for (UINT64 i = 0; i < 100; i++) {
-			GP_draw_rect(800, 200 + i - 1, 0x30, 0x30, 0);
-			GP_draw_rect(800, 200 + i, 0x30, 0x30, 0xff);
-			GP_draw_rect(200, 720, 0x80, 0x30, 0);
-			//GP_draw_sf_text(to_hstring32(GetCurrentProcessorId()), 0xffffff, 200, 720);
-			GP_draw_sf_text(to_hstring32(GetCurrentThread()->ProcessorId), 0xffffff, 200, 740);
-			/*__SpinLockSyncBitTestAndSet(&TestBOOL, 0);
-			__BitRelease(&TestBOOL, 0);*/
-			//for (UINT64 i = 0; i < 0x200; i++);
-		}
-	/*	GP_draw_sf_text(strdbl(CpuTime, 2), 0, 800, 40);
-		GP_draw_sf_text("%", 0xffffff, 880, 40);
-
-	
-
-		CpuTime = GetThreadCpuTime(Thread);
-		GP_draw_sf_text(strdbl(CpuTime, 2), 0xffffffff, 800, 40);*/
-
-		for (UINT64 i = 100; i > 0; i--) {
-			GP_draw_rect(800, 200 + i + 1, 0x30, 0x30, 0);
-			GP_draw_rect(800, 200 + i, 0x30, 0x30, 0xff);
-
-			GP_draw_rect(200, 720, 0x80, 0x30, 0);
-
-			//GP_draw_sf_text(to_hstring32(GetCurrentProcessorId()), 0xffffff, 200, 720);
-			GP_draw_sf_text(to_hstring32(GetCurrentThread()->ProcessorId), 0xffffff, 200, 740);
-			/*__SpinLockSyncBitTestAndSet(&TestBOOL, 0);
-			__BitRelease(&TestBOOL, 0);*/
-
-			//for (UINT64 i = 0; i < 0x200; i++);
-
-		}
-	}
-
-}
-
 void KERNELAPI IdleThread() {
-	for (;;) {
+	for(;;) {
 		__hlt();
-	}
-}
-
-
-void KERNELAPI AnotherThread(){
-	HTHREAD Thread = GetCurrentThread();
-	//SetThreadPriority(Thread, THREAD_PRIORITY_IDLE);
-
-	MSG Msg = { 0 };
-	UINT64 cc = 0;
-
-		UINT64 Lparam = 0;
-
-		RFSERVER KernelServer = IpcServerConnect(IPC_MAKEADDRESS(0, 0, 0, 1), Thread->Client, NULL);
-		if (!KernelServer) SOD(0, "Failed to connect to Kernel Server");
-		MSG Message = { 0 };
-		
-		for (UINT64 i = 0x7FFFF000000;;i++) {
-			// GP_draw_rect(1500, 20, 200, 20, 0);
-
-			// GP_draw_sf_text(to_hstring64(Msg.Message), 0xffffff, 1500, 20);
-			Message.Message = i;
-
-			IpcSendToServer(Thread->Client, KernelServer, TRUE, &Message);
-		}
-		
-		for (UINT64 i = 0x9000000000;; i++) {
-			IpcSendToServer(Thread->Client, KernelServer, FALSE, &Message);
-		}
-		
-
-	for(;;){
-		for(uint64_t i = 0;i<10000000;i++);
-		GP_draw_sf_text("Fin a si khalid... thread #3", 0xffffff,300,40);
-		for(uint64_t i = 0;i<10000000;i++);
-		GP_draw_sf_text("Fin a si khalid... thread #3", 0,300,40);
-		GP_draw_rect(300, 60, 120, 20, 0);
-		GP_draw_sf_text(to_hstring64(GetCurrentThread()->ProcessorId), 0xffffff,300,60);
-
 	}
 }
 
@@ -302,7 +95,9 @@ extern void _start() {
 	}
 	
 	EnableExtendedStates();
-	
+
+
+	Pmgrt.NumProcessors = 1;
 
 	if (!InitializeRuntimeSymbols()) SET_SOD_INITIALIZATION;
 	kproc = CreateProcess(NULL,KernelProcessName, SUBSYSTEM_NATIVE, KERNELMODE_PROCESS);
@@ -349,46 +144,19 @@ extern void _start() {
 
 	
 
-	
-
-	// Creating Kernel Threads
-	Pmgrt.PriorityClasses[PRIORITY_CLASS_INDEX_IDLE] = &Pmgrt.InitialPriorityClasses[PRIORITY_CLASS_INDEX_IDLE];
-	Pmgrt.PriorityClasses[PRIORITY_CLASS_INDEX_LOW] = &Pmgrt.InitialPriorityClasses[PRIORITY_CLASS_INDEX_LOW];
-	Pmgrt.PriorityClasses[PRIORITY_CLASS_INDEX_BELOW_NORMAL] = &Pmgrt.InitialPriorityClasses[PRIORITY_CLASS_INDEX_BELOW_NORMAL];
-	Pmgrt.PriorityClasses[PRIORITY_CLASS_INDEX_NORMAL] = &Pmgrt.InitialPriorityClasses[PRIORITY_CLASS_INDEX_NORMAL];
-	Pmgrt.PriorityClasses[PRIORITY_CLASS_INDEX_ABOVE_NORMAL] = &Pmgrt.InitialPriorityClasses[PRIORITY_CLASS_INDEX_ABOVE_NORMAL];
-	Pmgrt.PriorityClasses[PRIORITY_CLASS_INDEX_HIGH] = &Pmgrt.InitialPriorityClasses[PRIORITY_CLASS_INDEX_HIGH];
-	Pmgrt.PriorityClasses[PRIORITY_CLASS_INDEX_REALTIME] = &Pmgrt.InitialPriorityClasses[PRIORITY_CLASS_INDEX_REALTIME];
-
-	Pmgrt.LpInitialPriorityClasses[PRIORITY_CLASS_INDEX_IDLE] = &Pmgrt.InitialPriorityClasses[PRIORITY_CLASS_INDEX_IDLE];
-	Pmgrt.LpInitialPriorityClasses[PRIORITY_CLASS_INDEX_LOW] = &Pmgrt.InitialPriorityClasses[PRIORITY_CLASS_INDEX_LOW];
-	Pmgrt.LpInitialPriorityClasses[PRIORITY_CLASS_INDEX_BELOW_NORMAL] = &Pmgrt.InitialPriorityClasses[PRIORITY_CLASS_INDEX_BELOW_NORMAL];
-	Pmgrt.LpInitialPriorityClasses[PRIORITY_CLASS_INDEX_NORMAL] = &Pmgrt.InitialPriorityClasses[PRIORITY_CLASS_INDEX_NORMAL];
-	Pmgrt.LpInitialPriorityClasses[PRIORITY_CLASS_INDEX_ABOVE_NORMAL] = &Pmgrt.InitialPriorityClasses[PRIORITY_CLASS_INDEX_ABOVE_NORMAL];
-	Pmgrt.LpInitialPriorityClasses[PRIORITY_CLASS_INDEX_HIGH] = &Pmgrt.InitialPriorityClasses[PRIORITY_CLASS_INDEX_HIGH];
-	Pmgrt.LpInitialPriorityClasses[PRIORITY_CLASS_INDEX_REALTIME] = &Pmgrt.InitialPriorityClasses[PRIORITY_CLASS_INDEX_REALTIME];
-	
 #ifdef ___KERNEL_DEBUG___
 			DebugWrite("CR3 Set & Descriptor tables initialized");
 		#endif
 	kproc->Handles = CreateHandleTable();
-	kproc->ThreadHandles = CreateHandleTable();
 	kproc->FileHandles = CreateHandleTable();
 
+	if (!kproc->Handles || !kproc->FileHandles) SET_SOD_INITIALIZATION;
 
-	if (!kproc->Handles || !kproc->ThreadHandles || !kproc->FileHandles) SET_SOD_INITIALIZATION;
-
-	SetPriorityClass(kproc, PRIORITY_CLASS_REALTIME);
 	
-	HTHREAD KernelThread = CreateThread(kproc, 0, NULL, 0, NULL, 0);
-	if (!KernelThread) SET_SOD_INITIALIZATION;
 
-	SetThreadPriority(KernelThread, THREAD_PRIORITY_TIME_CRITICAL);
+	IdleProcess = CreateProcess(kproc, L"System Idle Process.", 0, KERNELMODE_PROCESS);
 
-	RFPROCESS IdleProcessAndTimer = CreateProcess(kproc, L"System Virtual Idle Process And Timer.", 0, KERNELMODE_PROCESS);
-
-	if (!IdleProcessAndTimer) SET_SOD_PROCESS_MANAGEMENT;
-	IdleProcess = IdleProcessAndTimer;
+	if (!IdleProcess) SET_SOD_PROCESS_MANAGEMENT;
 
 	SystemInterruptsProcess = CreateProcess(kproc, L"System Interrupts.", 0, KERNELMODE_PROCESS);
 
@@ -464,13 +232,9 @@ extern void _start() {
 	
 	
 
-	if(!IsOemLogoDrawn())
-		DrawOsLogo();
+	// if(!IsOemLogoDrawn())
+	// 	DrawOsLogo();
 		
-	// if(!GetPcieCompatibility()){
- 	// 		SOD(SOD_PECSAM,"EFI PCI CONFIGURATION SPACE NOT PRESENT");
-	// }
-
 
 	#ifdef ___KERNEL_DEBUG___
 			DebugWrite("System Tables Successfully Initialized.");
@@ -480,18 +244,21 @@ extern void _start() {
 
 	UINT32 NumProcessors = AcpiGetNumProcessors();
 	CpuSetupManagementTable(NumProcessors);
-	KernelThread->UniqueCpu = GetCurrentProcessorId(); // Only Bootstrap Processor can run kernel
 
-	CpuManagementTable[KernelThread->UniqueCpu]->Initialized = TRUE;
-	CpuManagementTable[KernelThread->UniqueCpu]->Thread = KernelThread;
-	CpuManagementTable[KernelThread->UniqueCpu]->CpuBuffer = CpuBuffer;
-	CpuManagementTable[KernelThread->UniqueCpu]->CpuBufferSize = CpuBufferSize;
-
-
+	SetPriorityClass(kproc, PRIORITY_CLASS_REALTIME);
 	
+	HTHREAD KernelThread = CreateThread(kproc, 0, NULL, 0, NULL);
+	if (!KernelThread) SET_SOD_INITIALIZATION;
+
+	SetThreadPriority(KernelThread, THREAD_PRIORITY_TIME_CRITICAL);
 	
-	HTHREAD SystemTimerThread = CreateThread(IdleProcessAndTimer, 0x8000, CpuTimeThread, 0, 0, 0);
-	if (!SystemTimerThread) SET_SOD_INITIALIZATION;
+	KernelThread->ProcessorId = GetCurrentProcessorId(); // Only Bootstrap Processor can run kernel
+
+	CpuManagementTable[KernelThread->ProcessorId]->Initialized = TRUE;
+	CpuManagementTable[KernelThread->ProcessorId]->CurrentThread = KernelThread;
+	CpuManagementTable[KernelThread->ProcessorId]->CpuBuffer = CpuBuffer;
+	CpuManagementTable[KernelThread->ProcessorId]->CpuBufferSize = CpuBufferSize;
+	
 #ifdef ___KERNEL_DEBUG___
 			DebugWrite("Initializing Features...");
 		#endif
@@ -522,14 +289,15 @@ __setCR3((UINT64)kproc->PageMap);
 	}
 
 	
+
+	HpetConfigure();
+	// PitDisable();
 	__sti();
-	PitEnable();
+	// PitEnable();
 
 	SetupLocalApicTimer();
 	__cli();
-	PitDisable();
 
-	
 
 
 	// TaskSchedulerDisable();
@@ -539,7 +307,7 @@ __setCR3((UINT64)kproc->PageMap);
 		UINT64 SmpCodeSize = (UINT64)&SMP_TRAMPOLINE_END - (UINT64)SMP_TRAMPOLINE;
 		memcpy(SMP_BOOT_ADDR, SMP_TRAMPOLINE, SmpCodeSize);
 		for (UINT64 i = 0; i < NumProcessors; i++) {
-			if (i == KernelThread->UniqueCpu) continue; // the bootstrap processor
+			if (i == KernelThread->ProcessorId) continue; // the bootstrap processor
 			if(KERNEL_ERROR(InitializeApicCpu(i)))
 			{
 				SOD(SOD_PROCESSOR_INITIALIZATION, "PROCESSOR INITIALIZATION");
@@ -576,7 +344,7 @@ __setCR3((UINT64)kproc->PageMap);
 	
 
 	// Setting Up ACPI SCI_INT
-	if(KeControlIrq(AcpiSystemControlInterruptHandler, AcpiGetFadt()->SCI_Interrupt, IRQ_DELIVERY_NORMAL, 0) != KERNEL_SOK) SET_SOD_INITIALIZATION;
+	// if(KeControlIrq(AcpiSystemControlInterruptHandler, AcpiGetFadt()->SCI_Interrupt, IRQ_DELIVERY_NORMAL, IRQ_CONTROL_DISABLE_OVERRIDE_FLAGS | IRQ_CONTROL_LOW_ACTIVE | IRQ_CONTROL_LEVEL_SENSITIVE) != KERNEL_SOK) SET_SOD_INITIALIZATION;
 	init_ps2_keyboard();
 	init_ps2_mouse();
 	RtcInit();
@@ -597,6 +365,8 @@ __setCR3((UINT64)kproc->PageMap);
 	// Check Specified drivers
 	UINT64 NumKexDrivers = 0;
 	UINT64 Num3rdPartyDrivers = 0;
+
+	
 
 	for(UINT64 i = 0;i<DriverTable->TotalDrivers;i++){
 		if(DriverTable->Drivers[i].Present){

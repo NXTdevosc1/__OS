@@ -10,6 +10,7 @@
 #include <Management/runtimesymbols.h>
 #include <Management/debug.h>
 #include <acpi/aml.h>
+#include <acpi/hpet.h>
 
 #define ACPI_EXTENDED_RSDP_DESCRIPTOR_SIZE 16
 
@@ -198,10 +199,10 @@ void AcpiInit(void* RsdpAddress){
 				AcpiDrawOEMLogo(AcpiSdtHeader);
 				OemLogoDrawn = TRUE;
 			}else if(memcmp(AcpiSdtHeader->Signature, "HPET", 4)){
-				_RT_SystemDebugPrint(L"High Precision Event Timer (HPET) Found.");
+				HpetInitialize((ACPI_HPET*)AcpiSdtHeader);
 			}else if(memcmp(AcpiSdtHeader->Signature, "SSDT", 4)) {
 				// _RT_SystemDebugPrint(L"SSDT Found.");
-				AcpiReadDsdt((RFACPI_DSDT)AcpiSdtHeader);
+				// AcpiReadDsdt((RFACPI_DSDT)AcpiSdtHeader);
 			}
 		}
 	if(!RequiredFadtTable){

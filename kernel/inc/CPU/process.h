@@ -26,44 +26,44 @@ RFPROCESS KERNELAPI GetProcessById(UINT64 ProcessId);
 BOOL KERNELAPI SetProcessName(RFPROCESS Process, LPWSTR ProcessName);
 
 
-HTHREAD KERNELAPI CreateThread(RFPROCESS Process, UINT64 StackSize, THREAD_START_ROUTINE StartAddress, UINT64 Flags, UINT64* LpThreadId, UINT8 NumParameters, ...); // parameters
-HRESULT KERNELAPI SetThreadPriority(HTHREAD Thread, int Priority);
-HRESULT KERNELAPI SetPriorityClass(RFPROCESS Process, int PriorityClass);
+RFTHREAD KERNELAPI CreateThread(RFPROCESS Process, UINT64 StackSize, THREAD_START_ROUTINE StartAddress, UINT64 Flags, UINT64* ThreadId); // parameters
+KERNELSTATUS KERNELAPI SetThreadPriority(RFTHREAD Thread, int Priority);
+KERNELSTATUS KERNELAPI SetPriorityClass(RFPROCESS Process, int PriorityClass);
 
 
 int KERNELAPI TerminateCurrentProcess(int ExitCode);
 int KERNELAPI TerminateCurrentThread(int ExitCode);
 int KERNELAPI TerminateProcess(RFPROCESS process, int ExitCode);
-int KERNELAPI TerminateThread(HTHREAD thread, int ExitCode);
+int KERNELAPI TerminateThread(RFTHREAD thread, int ExitCode);
 
 RFPROCESS KERNELAPI GetCurrentProcess();
-HTHREAD KERNELAPI GetCurrentThread();
-HTHREAD KERNELAPI GetProcessorIdleThread(UINT64 ProcessorId);
+RFTHREAD KERNELAPI GetCurrentThread();
+RFTHREAD KERNELAPI GetProcessorIdleThread(UINT64 ProcessorId);
 
 UINT64 KERNELAPI GetCurrentProcessId();
 UINT64 KERNELAPI GetCurrentThreadId();
 
-BOOL KERNELAPI SuspendThread(HTHREAD Thread);
-BOOL KERNELAPI ResumeThread(HTHREAD Thread);
+BOOL KERNELAPI SuspendThread(RFTHREAD Thread);
+BOOL KERNELAPI ResumeThread(RFTHREAD Thread);
 
 extern PROCESSMGRTABLE Pmgrt;
 extern void ScheduleTask();
 extern void SkipTaskSchedule();
 
 
-double KERNELAPI GetThreadCpuTime(HTHREAD Thread);
+double KERNELAPI GetThreadCpuTime(RFTHREAD Thread);
 double KERNELAPI GetIdleCpuTime();
 double KERNELAPI GetTotalCpuTime();
 double KERNELAPI GetProcessorIdleTime(UINT64 ProcessorId);
 double KERNELAPI GetProcessorTotalTime(UINT64 ProcessorId);
 
-BOOL SetThreadProcessor(HTHREAD Thread, UINT ProcessorId);
+BOOL SetThreadProcessor(RFTHREAD Thread, UINT ProcessorId);
 
 
 void KERNELAPI TaskSchedulerEnable();
 void KERNELAPI TaskSchedulerDisable();
 
 BOOL KERNELAPI IoWait();
-BOOL KERNELAPI IoFinish(HTHREAD Thread);
+BOOL KERNELAPI IoFinish(RFTHREAD Thread);
 
 BOOL isValidProcess(RFPROCESS Process);

@@ -24,6 +24,6 @@ void AcpiFadt(UINT RsdpRevision, ACPI_FADT* Fadt) {
             // 	_RT_SystemDebugPrint(L"ACPI PM Timer (Current Count : %x) Supported. ADDR_SPACE: %x, BITWIDTH: %d, BITOFF: %d, ACCESS_SIZE : %x, ADDR : %x", AcpiReadTimer() ,(UINT64)Fadt->X_PMTimerBlock.AddressSpace, (UINT64)Fadt->X_PMTimerBlock.BitWidth, (UINT64)Fadt->X_PMTimerBlock.BitOffset, (UINT64)Fadt->X_PMTimerBlock.AccessSize, (UINT64)Fadt->X_PMTimerBlock.Address);
             // }
         }
-        AcpiReadDsdt(Dsdt);
-        while(1) __hlt();
+        // AcpiReadDsdt(Dsdt);
+        // while(1) __hlt();
 }

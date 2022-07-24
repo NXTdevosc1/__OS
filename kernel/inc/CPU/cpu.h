@@ -196,34 +196,48 @@ BOOL __CPU_MGMT_TBL_SETUP__;
 
 #define NUM_IRQS_PER_PROCESSOR 0xE0 // IRQs 0-24 (IOAPIC), 24-0xE0 MSI/MSI-X/System Interrupts/User mode interrupts
 
+typedef struct _THREAD_CONTROL_BLOCK THREAD, *RFTHREAD;
+
+#define NUM_PRIORITY_CLASSES 7
+
+// Num threads must be 64 byte aligned
+// for SSE/AVX/AVX512 Optimizations
+#define NUM_THREADS_PER_WAITING_QUEUE 0x200
+
+
+typedef struct _THREAD_WAITING_QUEUE THREAD_WAITING_QUEUE, *RFTHREAD_WAITING_QUEUE;
+
+typedef struct _THREAD_WAITING_QUEUE {
+    RFTHREAD Threads[NUM_THREADS_PER_WAITING_QUEUE];
+    RFTHREAD_WAITING_QUEUE NextQueue;
+    UINT NumThreads;
+    BOOL Mutex;
+} THREAD_WAITING_QUEUE, *RFTHREAD_WAITING_QUEUE;
+
 typedef struct _CPU_MANAGEMENT_TABLE {
+    // Task Scheduler Specific
     BOOL Initialized;
-    UINT32 CpuId;
-    LPVOID Thread;
-    UINT64 PreemptionState;
-    UINT64 SchedulerCpuTime;
-    UINT64 EstimatedCpuTime;
-    UINT64 ThreadIndex[7]; // Index for each priority class list
-    LPVOID CurrentList[7];
-    LPVOID IdleThread;
-    struct {
-        UINT64 ProcessingRegister0;
-        UINT64 ProcessingRegister1;
-        UINT64 rip;
-        UINT64 cs;
-        UINT64 ss;
-        UINT64 rflags;
-        UINT64 rsp;
-        UINT64 cr3;
-        UINT64 RemainingCpuTime;
-    } TaskSchedulerData;
+    UINT32 ProcessorId;
+    UINT64 TotalThreads[NUM_PRIORITY_CLASSES];
+    UINT64 NumReadyThreads[NUM_PRIORITY_CLASSES];
+    RFTHREAD_WAITING_QUEUE ThreadQueues[NUM_PRIORITY_CLASSES];
+    RFTHREAD CurrentThread;
+    RFTHREAD SelectedThread;
+    UINT64 TotalClocks[2]; // 128-bit value
+    UINT64 ReadyOnClock[NUM_PRIORITY_CLASSES];
+    UINT64 HighestPriorityThread[NUM_PRIORITY_CLASSES];
+    RFTHREAD SystemIdleThread;
+    RFTHREAD SystemInterruptsThread;
+    RFTHREAD ForceNextThread;
+    UINT64 CurrentCpuTime;
+    UINT64 EstimatedCpuTime; // Set to estimated cpu time on each second by scheduler
+    // System (Kernel) Specific
+    IRQ_CONTROL_DESCRIPTOR IrqControlTable[NUM_IRQS_PER_PROCESSOR];
+    UINT IpiCommand;
+    BOOL IpiCommandControl;
     void* CpuBuffer;
     UINT64 CpuBufferSize;
-    UINT   Command;
-    BOOL   CommandControl;
-    LPVOID NextThread; // might be 0, probably next execution thread (for optimization or used when entring SystemInterruptsProcess)
-    LPVOID InterruptsThread;
-    IRQ_CONTROL_DESCRIPTOR IrqControlTable[NUM_IRQS_PER_PROCESSOR];
+    
 } CPU_MANAGEMENT_TABLE;
 
 CPU_MANAGEMENT_TABLE** CpuManagementTable;

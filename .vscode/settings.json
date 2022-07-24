@@ -2,6 +2,7 @@
     "files.associations": {
         "device.h": "c",
         "runtimesymbols.h": "c",
-        "amlobjects.h": "c"
+        "amlobjects.h": "c",
+        "utility.h": "c"
     }
 }
