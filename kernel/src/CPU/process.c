@@ -319,7 +319,7 @@ static inline RFTHREAD KERNELAPI AllocateThread(RFPROCESS Process, UINT64* LpThr
 
 
 RFTHREAD KERNELAPI CreateThread(RFPROCESS Process, UINT64 StackSize, THREAD_START_ROUTINE StartAddress, UINT64 Flags, UINT64* ThreadId){ // parameters
-    if(!Process || !Process->Set || !Process->PriorityClass) return NULL;
+    if(!Process || !Process->Set) return NULL;
 
     __SpinLockSyncBitTestAndSet(&Process->ControlMutex0, PROCESS_MUTEX0_CREATE_THREAD);
 

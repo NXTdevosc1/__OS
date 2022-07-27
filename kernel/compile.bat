@@ -8,7 +8,7 @@ FOR /R "src" %%S IN (*.asm) DO (
 )
 
 set srcfiles=src/*.c src/smbios/*.c src/acpi/*.c src/acpi/aml/*.c src/CPU/*.c src/dsk/*.c src/input/*.c src/interrupt_manager/*.c src/IO/*.c src/ipc/*.c src/lib/*.c src/loaders/*.c src/Management/*.c src/sys/*.c src/sysentry/*.c src/typography/*.c src/utils/*.c src/timedate/*.c
-set COMPILE=cl /DEFAULTLIB:no /KERNEL /nologo /Od
+set COMPILE=cl /DEFAULTLIB:no /nologo /KERNEL
 set CFLAGS=/GS- /Ilib /I../libc/drv/inc /I../UEFI/gnu-efi/inc /I../UEFI/gnu-efi/inc/x86_64 /Iinc /Ilib
 
 set OUT=/Fo:x86_64

@@ -80,4 +80,4 @@ BOOL HpetConfigure();
 
 
 UINT64 GetHighPrecisionTimeSinceBoot();
-UINT64 GetHighPerformaceTimerFrequency();
+UINT64 GetHighPerformanceTimerFrequency();

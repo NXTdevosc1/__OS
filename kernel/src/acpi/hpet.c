@@ -38,7 +38,7 @@ void HpetInterruptHandler(RFDRIVER_OBJECT Device, RFINTERRUPT_INFORMATION Interr
 UINT64 GetHighPrecisionTimeSinceBoot() {
     return HpetNumClocks * HpetFrequency + Regs->MainCounterValue;
 }
-UINT64 GetHighPerformaceTimerFrequency() {
+UINT64 GetHighPerformanceTimerFrequency() {
     return HpetFrequency;
 }
 

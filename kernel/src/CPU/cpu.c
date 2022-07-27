@@ -15,6 +15,7 @@
 #include <smbios/smbios.h>
 #include <cmos.h>
 #include <IO/pit.h>
+#include <acpi/hpet.h>
 CPU_MANAGEMENT_TABLE** CpuManagementTable = NULL;
 KERNELSTATUS CpuBootStatus = 0;
 
@@ -83,7 +84,6 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 		ZeroMemory(CpuManagementTable[i], sizeof(*CpuManagementTable[i]));
 		RFTHREAD_WAITING_QUEUE WaitingQueue = ExtendedMemoryAlloc(kproc->StartupThread, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES, 0x1000, NULL, 0);
 		ZeroMemory(WaitingQueue, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES);
-
 		if(i == CurrentProcessor){
 			CpuManagementTable[i]->Initialized = TRUE;
 		}
@@ -323,21 +323,15 @@ void SetupLocalApicTimer(){
 // Base Quantum = Timer Update Rate / s
 void KERNELAPI Sleep(UINT64 Milliseconds){
 	HTHREAD Thread = GetCurrentThread();
-	Thread->SleepUntil[0] = ApicTimerClockCounter + (Milliseconds * (TimerClocksPerSecond / MILLISECONDS_PER_SECOND));
+	Thread->SleepUntil[0] = GetHighPrecisionTimeSinceBoot() + GetHighPerformanceTimerFrequency() / MILLISECONDS_PER_SECOND * Milliseconds;
 	Thread->State |= THS_SLEEP;
-	// thread may be schedulled on this instruction...
-	while(Thread->State & THS_SLEEP) __Schedule();
+	__Schedule();
 }
 
 
 
 void KERNELAPI MicroSleep(UINT64 Microseconds){
-	if(ApicTimerBaseQuantum < MICROSECONDS_PER_SECOND) Sleep(Microseconds * MICROSECONDS_PER_MILLISECOND);
-	HTHREAD Thread = GetCurrentThread();
-	Thread->SleepUntil[0] = ApicTimerClockCounter + (Microseconds * (TimerClocksPerSecond / MICROSECONDS_PER_SECOND));
-	Thread->State |= THS_SLEEP;
-	// thread may be schedulled on this instruction...
-	while(Thread->State & THS_SLEEP) __Schedule();
+	
 }
 
 

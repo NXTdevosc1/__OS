@@ -219,19 +219,25 @@ typedef struct _CPU_MANAGEMENT_TABLE {
     BOOL Initialized;
     UINT32 ProcessorId;
     UINT64 TotalThreads[NUM_PRIORITY_CLASSES];
+    UINT64 Reserved0;
     UINT64 NumReadyThreads[NUM_PRIORITY_CLASSES];
+    UINT64 Reserved1;
     RFTHREAD_WAITING_QUEUE ThreadQueues[NUM_PRIORITY_CLASSES];
+    UINT64 Reserved2;
     RFTHREAD CurrentThread;
     RFTHREAD SelectedThread;
     UINT64 TotalClocks[2]; // 128-bit value
-    UINT64 ReadyOnClock[NUM_PRIORITY_CLASSES];
+    UINT64 ReadyOnClock[NUM_PRIORITY_CLASSES * 2];
+    UINT64 Reserved3[2];
     UINT64 HighestPriorityThread[NUM_PRIORITY_CLASSES];
+    UINT64 Reserved4;
     RFTHREAD SystemIdleThread;
     RFTHREAD SystemInterruptsThread;
     RFTHREAD ForceNextThread;
     UINT64 CurrentCpuTime;
     UINT64 EstimatedCpuTime; // Set to estimated cpu time on each second by scheduler
     // System (Kernel) Specific
+    UINT64 HighPrecisionTime;
     IRQ_CONTROL_DESCRIPTOR IrqControlTable[NUM_IRQS_PER_PROCESSOR];
     UINT IpiCommand;
     BOOL IpiCommandControl;

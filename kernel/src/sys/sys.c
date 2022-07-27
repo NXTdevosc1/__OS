@@ -16,7 +16,7 @@
 #define THROW_INVALID_SYSCONFIG SOD(SOD_SYSTEM_LOADING, "Invalid system config file, please reinstall operating system.")
 #define CANNOT_FIND_SYSCONFIG SOD(SOD_SYSTEM_LOADING, "Cannot find system config file, please reinstall operating system.")
 
-void* SystemSpaceBase = NULL; // Set to a higher value when 57 Bit Paging Supported
+void* SystemSpaceBase = (void*)((UINT64)1 << 46); // Set to a higher value when 57 Bit Paging Supported
 void* LocalApicPhysicalAddress = NULL;
 
 void SysLoad(){
@@ -104,15 +104,14 @@ void SysLoad(){
 }
 
 void ConfigureSystemSpace(){
-
     UINT32 edx = 0, ebx = 0, ecx = 0;
     UINT VirtualAddressWidth = 48;
     UINT PhysicalAddressWidth = 0;
     // Check 57 Bit Paging Support
     CPUID_INFO CpuInfo = {0};
     __cpuidex(&CpuInfo, 7, 0);
-    if(CpuInfo.ecx & 1 << 16){
-        VirtualAddressWidth = 57;
+    if((CpuInfo.ecx & 1 << 16)){
+        // VirtualAddressWidth = 57;
     }
     // Check Max Physical Address Bits
     
@@ -121,12 +120,18 @@ void ConfigureSystemSpace(){
     PhysicalAddressWidth = CpuInfo.eax & 0xff;
     
     // If Max Physical Address Bits - Virtual Address Bits < 2 Then throw an error
-    if(VirtualAddressWidth - PhysicalAddressWidth < 2) SOD(0, "INCORRECT/INSUFFICIENT VIRTUAL ADDRESS SPACE. (VIRTADDRWIDTH - PHYSADDRWIDTH < 2)");
 
-    // on 48 bit paging processors, physical address is up to 46 bits
     // on 57 bit paging processors, physical address is up to 52 bits
     
-    SystemSpaceBase = (void*)((UINT64)1 << PhysicalAddressWidth);
+    if(VirtualAddressWidth == 57) {
+        SystemSpaceBase = (void*)0xFF00000000000000;
+        SOD(0, "57-BIT PML5 Support");
+    } else if(VirtualAddressWidth == 48) {
+        SystemSpaceBase = (void*)0xFFFF800000000000;
+    } else SOD(0, "Unknown Virtual Address width");
+    // on 48 bit paging processors, physical address is up to 46 bits
+    
+    
     for (UINT64 i = 0; i < Pmgrt.NumProcessors; i++) {
         MapPhysicalPages(kproc->PageMap, (void*)CpuManagementTable[i], (void*)CpuManagementTable[i], CPU_MGMT_NUM_PAGES, PM_MAP | PM_CACHE_DISABLE);
     }
@@ -137,7 +142,6 @@ BOOL InitSystemSpace(RFPROCESS Process) {
     if (!Process) return FALSE;
     // LAPIC Does not need caching because its embedded in the processor chip which means that access to it is fast
     MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE_LAPIC), LocalApicPhysicalAddress, 1, PM_MAP | PM_CACHE_DISABLE);
-    
     // Other processors will write to this, so ready or incrementing (Scheduler Cpu Time) will have a false value
     
     MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE_PMGRT), (void*)&Pmgrt, 0x10, PM_MAP | PM_CACHE_DISABLE);

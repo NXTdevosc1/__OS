@@ -30,7 +30,7 @@ section .text
 		mov cr8, rax ; Set Task Priority Register to 0
 		push rax
 		popfq
-
+		
 		; Enable SSE (Required)
 		mov rax, cr0
 		and rax, ~(1<<2) ; Clear emulation bit
