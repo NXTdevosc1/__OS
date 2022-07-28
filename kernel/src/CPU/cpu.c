@@ -331,7 +331,10 @@ void KERNELAPI Sleep(UINT64 Milliseconds){
 
 
 void KERNELAPI MicroSleep(UINT64 Microseconds){
-	
+	HTHREAD Thread = GetCurrentThread();
+	Thread->SleepUntil[0] = GetHighPrecisionTimeSinceBoot() + GetHighPerformanceTimerFrequency() / MICROSECONDS_PER_SECOND * Microseconds;
+	Thread->State |= THS_SLEEP;
+	__Schedule();
 }
 
 

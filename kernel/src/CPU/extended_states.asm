@@ -19,6 +19,8 @@ EnableExtendedStates:
     or rax, (3 << 9) ; OFXSR | OSXMMEXCPT
     mov cr4, rax
 
+    fninit
+
     mov eax, 1
     cpuid
     ; XSAVE

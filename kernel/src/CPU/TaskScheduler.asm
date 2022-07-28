@@ -57,18 +57,27 @@ SchedulerEntrySSE:
 	jmp $
 
 .SSEFindNextTask: ; Rbx = (IN : Current) (OUT : Selected) Thread
+	mov r11d, [rbx + TH_THREAD_PRIORITY]
+	cmp qword [rbx + TH_REMAINING_CLOCKS], 0
+	jne .J0
+	xor rbx, rbx
+	xor r11d, r11d
+.J0:
 	lea rcx, [rax + CPM_NUM_READY_THREADS] ; XMM0
 	lea rdx, [rax + CPM_THREAD_QUEUES] ; XMM1
 	lea r8, [rax + CPM_READY_ON_CLOCK] ; XMM2
 	lea r9, [rax + CPM_HIGHEST_PRIORITY_THREAD] ; XMM3
-	mov r11d, [rbx + TH_THREAD_PRIORITY]
 
 	movdqu xmm4, [rax + CPM_TOTAL_CLOCKS]
 
-xor r15, r15 ; Highest priority index
 mov r14, [rax + CPM_HIGH_PRECISION_TIME] ; Used to check Sleep State
-.A0L0:
 
+; MM0 : Total Threads
+; MM1 : Remaining Threads in Search Function
+xor r15, r15 ; Priority index
+.A0L0:
+	movq mm0, [rax + CPM_TOTAL_THREADS]
+	
 	; Load XMM0-XMM3 With values
 	movdqu xmm0, [rcx] ; Num Ready Threads
 	movdqu xmm1, [rdx] ; Thread Queues
@@ -79,9 +88,9 @@ mov r14, [rax + CPM_HIGH_PRECISION_TIME] ; Used to check Sleep State
 	test rdi, rdi
 	jnz SSEHighestPriorityThreadScan
 	; test Ready On Clock
-	movdqu xmm2, [r8]
-	
-	cmpps xmm2, xmm4, 0
+	; movdqu xmm2, [r8]
+	movq rdi, xmm4
+	cmp [r8], rdi
 	jae SSEFullScan ; Queue have not ready threads
 
 .A0L0A1:
@@ -138,15 +147,35 @@ mov r14, [rax + CPM_HIGH_PRECISION_TIME] ; Used to check Sleep State
 	jmp .R0
 
 SSEHighestPriorityThreadScan:
-	mov rax, 0xFFAF
-	hlt
+	jmp SSEFullScan
+	movq r10, xmm1
+	xor rsi, rsi
+	movq rdi, xmm2
+.loop:
+	test rsi, 0x200
+	jz .J0
+	mov r10, [r10] ; Next queue
+	test r10, r10
+	jz .Exit
+	xor rsi, rsi
+.J0:
+
+.Exit:
 	jmp $
+
+; TODO : 128-BIT Compare XMM2
 
 SSEFullScan:
 	; Full scan on ready threads (ReadyOnClock)
 	movq r10, xmm1
+	movq rdi, xmm2
 	xor rsi, rsi ; Counter to next queue
-
+	
+	movq r13, mm0
+	movq xmm8, r13
+	
+	mov r13, 1
+	movq xmm9, r13 ; Substraction value
 .loop:
 	test rsi, 0x200
 	jz .__E0
@@ -155,12 +184,22 @@ SSEFullScan:
 	jz .Exit
 	xor rsi, rsi
 .__E0:
-	mov r12, [r10]
+	movq r13, xmm8
+	test r13, r13
+	jz .Exit
+
+	movdqu xmm10, [r10]
+
+	movq r12, xmm10
 
 	test r12, r12
 	jz .__E1
+	psubq xmm8, xmm9
+	cmp [r12 + TH_READY_AT], rdi
+	jb .__E1
+	inc qword [rcx] ; Num Ready Threads
 	cmp [r12 + TH_THREAD_PRIORITY], r11d
-	jbe .__E1
+	jb .__E1
 	mov r13, [r12] ; State
 	test r13, THS_MANUAL | THS_IDLE
 	jnz .__E1
@@ -170,12 +209,46 @@ SSEFullScan:
 	test r13, THS_IOWAIT
 	jnz .IOWAIT
 .__E2:
+	
 	mov rbx, r12
-	mov r11, [rbx + TH_THREAD_PRIORITY]
+	mov r11d, [rbx + TH_THREAD_PRIORITY]
 .__E1:
+	psrldq xmm10, 8
+	inc rsi
+	add r10, 8
+.SSESecondRead:
+	; No need for rsi check because it's aligned
+	movq r13, xmm8
+	test r13, r13
+	jz .Exit
+
+	movq r12, xmm10
+
+	test r12, r12
+	jz .E1
+	psubq xmm8, xmm9
+	cmp [r12 + TH_READY_AT], rdi
+	jb .E1
+	inc qword [rcx] ; Num Ready Threads
+	cmp [r12 + TH_THREAD_PRIORITY], r11d
+	jb .E1
+	mov r13, [r12] ; State
+	test r13, THS_MANUAL | THS_IDLE
+	jnz .E1
+	test r13, THS_SLEEP
+	jnz .SLEEP2
+.E3:
+	test r13, THS_IOWAIT
+	jnz .IOWAIT2
+.E2:
+	
+	mov rbx, r12
+	mov r11d, [rbx + TH_THREAD_PRIORITY]
+.E1:
 	inc rsi
 	add r10, 8
 	jmp .loop
+
 .IOWAIT:
 	test r13, THS_IOPIN
 	jz .__E1
@@ -187,6 +260,18 @@ SSEFullScan:
 	ja .__E3
 	and qword [r10], ~(THS_SLEEP)
 	jmp .__E1
+.IOWAIT2:
+	test r13, THS_IOPIN
+	jz .E1
+	and qword [r12], ~(THS_IOWAIT | THS_IOPIN)
+	jmp .E2
+.SLEEP2:
+	
+	cmp r14, [r10 + TH_SLEEP_UNTIL]
+	ja .E3
+	and qword [r10], ~(THS_SLEEP)
+	jmp .E1
+
 .Exit:
 	mov rax, 0xFAEFAE
 	jmp $

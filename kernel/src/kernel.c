@@ -288,7 +288,26 @@ __setCR3((UINT64)kproc->PageMap);
 		SOD(SOD_INITIALIZATION, "INVALID_BOOT_CONFIGURATION");
 	}
 
-	
+	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
+
+
+
+
 
 	HpetConfigure();
 	// PitDisable();

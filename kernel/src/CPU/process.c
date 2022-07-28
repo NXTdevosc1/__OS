@@ -187,8 +187,12 @@ DebugWrite(to_hstring64((UINT64)Thread));
     __SpinLockSyncBitTestAndSet(&Thread->ThreadControlMutex, THREAD_MUTEX_CHANGE_PRIORITY);
     RFTHREAD_WAITING_QUEUE PreviousWaitingQueue = Thread->WaitingQueue;
     UINT PreviousWaitingQueueIndex = Thread->ThreadWaitingQueueIndex;
+    if(PreviousWaitingQueue) {
+        CpuManagementTable[Thread->ProcessorId]->TotalThreads[Thread->Process->PriorityClass]--;
+        CpuManagementTable[Thread->ProcessorId]->NumReadyThreads[Thread->Process->PriorityClass]--;
+    }
 
-    RFTHREAD_WAITING_QUEUE WaitingQueue = CpuManagementTable[Thread->ProcessorId]->ThreadQueues[Priority];
+    RFTHREAD_WAITING_QUEUE WaitingQueue = CpuManagementTable[Thread->ProcessorId]->ThreadQueues[Thread->Process->PriorityClass];
     Thread->ThreadPriority = Priority;
 
 
@@ -206,6 +210,9 @@ DebugWrite(to_hstring64((UINT64)Thread));
                         Thread->ThreadWaitingQueueIndex = i;
                         Thread->WaitingQueue = WaitingQueue;
                         WaitingQueue->NumThreads++;
+                        CpuManagementTable[Thread->ProcessorId]->TotalThreads[Thread->Process->PriorityClass]++;
+                        CpuManagementTable[Thread->ProcessorId]->NumReadyThreads[Thread->Process->PriorityClass]++;
+
                         __BitRelease(&WaitingQueue->Mutex, 0);
                         goto R0;
                     }
@@ -396,6 +403,8 @@ R0:
 
 
     Thread->TimeBurst = 0;
+
+    SetThreadPriority(Thread, THREAD_PRIORITY_BELOW_NORMAL);
 
     __BitRelease(&Process->ControlMutex0, PROCESS_MUTEX0_CREATE_THREAD);
 
