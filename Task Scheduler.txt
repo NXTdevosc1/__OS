@@ -36,14 +36,16 @@ STEP 1:
 
 ; Perform double operation with xmm0-xmm3
 
-; XMM0 : NUM_READY_THREADS
-; XMM1 : THREAD_QUEUES
-; XMM2 : READY_ON_CLOCK 128 BIT Per value
-; XMM3 : HIGHEST_PRIORITY_THREAD
+; XMM0 : NUM_READY_THREADS [RCX]
+; XMM1 : THREAD_QUEUES [RDX]
+; XMM2 : READY_ON_CLOCK 128 BIT Per value [R8]
+; XMM3 : HIGHEST_PRIORITY_THREAD [R9]
 ; XMM4 : Total Clocks
+; XMM15 [MM6]:MM0 : Total Threads [R13]
+; MM5 : Thread Priority Class
 ; R15 = Index
 ; rbx : Selected Thread
-
+;
 ; A0L0 : Test if there is higher priority runnable threads
 ; A0R0 : Test if the thread is runnable (if there is no higher priority runnable threads)
 ; A0L1 : If not then search for lower priority runnable threads

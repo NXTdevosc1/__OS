@@ -246,7 +246,6 @@ extern void _start() {
 	CpuSetupManagementTable(NumProcessors);
 
 	SetPriorityClass(kproc, PRIORITY_CLASS_REALTIME);
-	
 	HTHREAD KernelThread = CreateThread(kproc, 0, NULL, 0, NULL);
 	if (!KernelThread) SET_SOD_INITIALIZATION;
 

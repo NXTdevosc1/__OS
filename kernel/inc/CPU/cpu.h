@@ -218,12 +218,12 @@ typedef struct _CPU_MANAGEMENT_TABLE {
     // Task Scheduler Specific
     BOOL Initialized;
     UINT32 ProcessorId;
+    UINT64 Reserved5; // For alignment
     UINT64 TotalThreads[NUM_PRIORITY_CLASSES];
     UINT64 Reserved0;
     UINT64 NumReadyThreads[NUM_PRIORITY_CLASSES];
     UINT64 Reserved1;
     RFTHREAD_WAITING_QUEUE ThreadQueues[NUM_PRIORITY_CLASSES];
-    UINT64 Reserved2;
     RFTHREAD CurrentThread;
     RFTHREAD SelectedThread;
     UINT64 TotalClocks[2]; // 128-bit value
