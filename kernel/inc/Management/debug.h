@@ -1,6 +1,6 @@
 #pragma once
 #include <krnltypes.h>
-#define ___KERNEL_DEBUG___// Temporarely set
+// #define ___KERNEL_DEBUG___// Temporarely set
 
 
 #define DEBUG_MAX_LOG_LENGTH 150

@@ -50,7 +50,14 @@ IRQControlWrapper%1:
 	push rbx
     push rcx
 	mov rax, [rel SystemSpaceBase]
-
+    mov dword [rax + 0xB0], 0
+    pop rcx
+    pop rbx
+    pop rax
+    iretq
+    ; mov 
+    mov rax, 0xCAFE
+    jmp $
 	mov ebx, [rax + APIC_ID]
 	shr ebx, 24
 	shl rbx, CPU_MGMT_SHIFT ; Multiply by 1000
@@ -69,8 +76,6 @@ IRQControlWrapper%1:
 	pop rcx
     pop rbx
 	pop rax
-
-    
     
     ; INT Schedule does the APIC_EOI For us
     ; jmp SkipTaskSchedule ; TODO : after task switching finish

@@ -45,6 +45,8 @@ void SOD(unsigned int code, char* message){
 		}
 	}
 #endif
+	_RT_SystemDebugPrint(L"CURRENT_THREAD : %x , Scheduler Clocks : %x : %x", CpuManagementTable[0]->CurrentThread, CpuManagementTable[0]->TotalClocks[0], CpuManagementTable[0]->TotalClocks[1]);
+	_RT_SystemDebugPrint(L"IDLE_THREAD : %x , SYSTEM_INTERRUPTS_THREAD : %x", CpuManagementTable[0]->SystemIdleThread, CpuManagementTable[0]->SystemInterruptsThread);
 	while(1){
 		__hlt();
 	}

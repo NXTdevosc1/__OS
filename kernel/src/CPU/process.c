@@ -15,14 +15,14 @@
 __declspec(align(0x1000)) PROCESSMGRTABLE Pmgrt = { 0 };
 
 __declspec(align(0x1000)) UINT64 GlobalThreadPreemptionPriorities[] = {
-    25, //	Idle
-    20, //	Low
-    12, //	BelowNormal
-    8 ,//	Normal
-    4 ,//	AboveNormal
-    3 ,//	High
-    1 ,  //	TimeCritical
-    0, // Idle Process (Balanced on heavy load)
+    // Classified from TIME_CRITICAL to IDLE
+    3,
+    4,
+    5,
+    6,
+    10,
+    15,
+    25
 };
 
 
@@ -194,7 +194,7 @@ DebugWrite(to_hstring64((UINT64)Thread));
 
     RFTHREAD_WAITING_QUEUE WaitingQueue = CpuManagementTable[Thread->ProcessorId]->ThreadQueues[Thread->Process->PriorityClass];
     Thread->ThreadPriority = Priority;
-
+    Thread->SchedulingQuantum = GlobalThreadPreemptionPriorities[Priority];
 
 // Allocate thread in the waiting queue
     for(;;) {

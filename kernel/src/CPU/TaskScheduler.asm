@@ -18,14 +18,17 @@ SchedulerEntrySSE:
 	push rbx
 	push rax
 
+	mov rbx, Pmgrt
+	cmp dword [rbx], 0
+	je .SchedulerNotEnabled
+
 	mov rax, [rel SystemSpaceBase]
 	mov ebx, [rax + APIC_ID]
 	shr ebx, 24
 	shl rbx, CPU_MGMT_SHIFT
 	lea rax, [rbx + SYSTEM_SPACE_CPUMGMT + rax]
 
-	cmp dword [rax], 0
-	je .Exit
+
 	mov rbx, [rax + CPM_CURRENT_THREAD]
 	
 	; SAVE Schedule Registers
@@ -53,11 +56,54 @@ SchedulerEntrySSE:
 	addps xmm4, xmm7
 	movdqa [rax + CPM_TOTAL_CLOCKS], xmm4
 .Exit:
-	
-	mov r8, 0xFAFA
-	hlt
-	jmp $
+; Send APIC EOI
+	mov rax, [rel SystemSpaceBase]
+	mov dword [rax + 0xB0], 0
+; Load registers
+	mov rax, [rbx + _RAX]
+	mov rdi, [rbx + _RDI]
+	mov rsi, [rbx + _RSI]
+	mov r8, [rbx + _R8]
+	mov r9, [rbx + _R9]
+	mov r10, [rbx + _R10]
+	mov r11, [rbx + _R11]
+	mov r12, [rbx + _R12]
+	mov r13, [rbx + _R13]
+	mov r14, [rbx + _R14]
+	mov r15, [rbx + _R15]
 
+	
+
+	mov rcx, [rbx + _DS]
+	mov ds, cx
+	shr rcx, 16
+	mov edx, ecx
+	and edx, 0xFFFF
+	push rdx ; Stack Segment
+	shr rcx, 16
+	mov gs, cx
+	shr rcx, 16
+	mov fs, cx
+
+	push qword [rbx + _RSP]
+	push qword [rbx + _RFLAGS]
+	push qword [rbx + _CS]
+	push qword [rbx + _RIP]
+
+	mov rcx, [rbx + _XSAVE]
+	fxrstor [rcx]
+
+	mov rdx, [rbx + _RDX]
+	mov rcx, [rbx + _RCX]
+	mov rbp, [rbx + _RBP]
+	mov rbx, [rbx + _RBX]
+	iretq
+.SchedulerNotEnabled:
+	pop rax
+	pop rbx
+	pop rcx
+	pop rdx
+	iretq
 
 
 
@@ -72,14 +118,28 @@ SchedulerEntrySSE:
 	; Set last priority class to -1 to never compare with another threads (if a ready thread is found then it will be run)
 	mov rcx, 0xFFFFFFFFFFFFFFFF
 	movq mm5, rcx
+
+	mov r10, [rbx + TH_PROCESS]
+	mov r10d, [r10 + PROCESS_PRIORITY_CLASS]
+	shl r10, 3
+	dec qword [rax + CPM_NUM_READY_THREADS + r10]
+
 	mov ecx, [rbx + TH_SCHEDULING_QUANTUM]
 	movdqa xmm0, xmm4 ; Copy Current Clocks
 	movq xmm1, rcx
 	addps xmm0, xmm1
 	movdqu [rbx + TH_READY_AT], xmm0
+
+	cmp qword [rax + CPM_NUM_READY_THREADS], 0
+	jne .J4
+	; Set Ready On Clocks
+	shl r10, 1
+	movdqa [rax + CPM_READY_ON_CLOCK + r10], xmm0
+.J4:
 	mov ecx, [rbx + TH_TIME_BURST]
 	mov [rbx + TH_REMAINING_CLOCKS], ecx
 	; Set Ready At to Current Time + Thread Quantum
+	pxor mm4, mm4
 	jmp .J2
 .J1:
 	; Otherwise the thread can be preempted
@@ -152,9 +212,8 @@ xor rbx, rbx
 	jmp .A0L0E0
 .A0L0A1:
 	; test Ready On Clock
-	; movdqu xmm2, [r8]
-	movq rdi, xmm4
-	cmp [r8], rdi
+	movdqa xmm2, [r8]
+	comisd xmm2, xmm4 ; Cmp Ready On Clock, Current Clock Number
 	jb .A0L0E0 ; Queue have not ready threads
 	call SSEFullScan
 	; Partial scan on the highest priority ready thread (ReadyThreads > 0)
@@ -172,8 +231,26 @@ xor rbx, rbx
 
 
 .SSEFindNextTaskEXIT:
-	mov rax, 0xDEADCAFE
-	jmp $
+	test rbx, rbx
+	jz .SetIdleThread
+
+	movq rcx, mm4
+	cmp rcx, rbx
+	jne .J3
+	dec dword [rbx + TH_REMAINING_CLOCKS]
+	jmp .R1
+.J3:
+	mov ecx, [rbx + TH_SCHEDULING_QUANTUM]
+	movdqa xmm0, xmm4 ; Copy Current Clocks
+	movq xmm1, rcx
+	addps xmm0, xmm1
+	movdqu [rbx + TH_READY_AT], xmm0
+	mov ecx, [rbx + TH_TIME_BURST]
+	mov [rbx + TH_REMAINING_CLOCKS], ecx
+	jmp .R1
+.SetIdleThread:
+	mov rbx, [rax + CPM_SYSTEM_IDLE_THREAD]
+	jmp .R1
 
 ; ______________________________________________________________________
 
@@ -201,7 +278,7 @@ xor rbx, rbx
 	; Segment Registers
 	mov [rbx + _DS], ds
 	mov cx, [rsp + 0x40]
-	mov [rbx + _SS], ax
+	mov [rbx + _SS], cx
 	mov [rbx + _GS], gs
 	mov [rbx + _FS], fs
 	mov [rbx + _ES], es

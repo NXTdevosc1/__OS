@@ -227,7 +227,7 @@ typedef struct _CPU_MANAGEMENT_TABLE {
     RFTHREAD CurrentThread;
     RFTHREAD SelectedThread;
     UINT64 TotalClocks[2]; // 128-bit value
-    UINT64 ReadyOnClock[NUM_PRIORITY_CLASSES * 2];
+    UINT64 ReadyOnClock[NUM_PRIORITY_CLASSES * 2]; // 128 Bit
     UINT64 Reserved3[2];
     UINT64 HighestPriorityThread[NUM_PRIORITY_CLASSES];
     UINT64 Reserved4;

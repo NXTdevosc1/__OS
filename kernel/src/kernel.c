@@ -287,36 +287,13 @@ __setCR3((UINT64)kproc->PageMap);
 		SOD(SOD_INITIALIZATION, "INVALID_BOOT_CONFIGURATION");
 	}
 
-	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-	CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
-
-
-
 
 
 	HpetConfigure();
-	// PitDisable();
-	__sti();
-	// PitEnable();
 
 	SetupLocalApicTimer();
-	__cli();
 
-
+	
 
 	// TaskSchedulerDisable();
 
@@ -366,8 +343,9 @@ CreateThread(kproc, 0x1000, IdleThread, 0, NULL);
 	init_ps2_keyboard();
 	init_ps2_mouse();
 	RtcInit();
-
-	
+	__sti();
+	for(UINT i = 0;i<0x10000;i++);
+	SOD(0, "S");
 	
 
 	// Check Driver Table
