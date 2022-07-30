@@ -159,9 +159,13 @@ void INTH_GENERAL_PROTECTION_FAULT(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAM
 	while(1);
 
 }
+extern void SchedulerEntrySSE();
+
 void INTH_PAGE_FAULT(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFrame){
 	__cli();
 	__setCR3(KeGlobalCR3);
+	_RT_SystemDebugPrint(L"TSCH : %x , INSTRUCTION : %x", SchedulerEntrySSE, InterruptFrame->IntStack.InstructionPointer);
+	while(1);
 	SOD(CPU_INTERRUPT_PAGE_FAULT,"PAGE FAULT");
 	__hlt();
 	while(1);

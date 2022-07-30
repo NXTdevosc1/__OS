@@ -35,18 +35,20 @@ SchedulerEntrySSE:
 	jmp .SSESaveRegisters
 .R0:
 	; Calculate high precision time (As GetHighPrecisionTimeSinceBoot())
-	mov r8, rbx
-	mov rbx, rax
-	xor rdx, rdx
+
+
+
 	mov rdi, HpetNumClocks
-	mov rcx, [rdi]
+	movdqu xmm0, [rdi]
 	mov rdi, HpetFrequency
-	mov rax, [rdi]
-	mul rcx
+	movdqu xmm1, [rdi]
+	mulps xmm0, xmm1
 	mov rdi, HpetMainCounterAddress
-	add rax, [rdi]
-	mov rax, rbx
-	mov rbx, r8
+	mov rdi, [rdi]
+	movq xmm1, rdi
+	addps xmm0, xmm1
+	movdqa [rax + CPM_HIGH_PRECISION_TIME], xmm0
+
 
 	jmp .SSEFindNextTask ; RBX = New Task
 .R1:
@@ -56,12 +58,8 @@ SchedulerEntrySSE:
 	addps xmm4, xmm7
 	movdqa [rax + CPM_TOTAL_CLOCKS], xmm4
 .Exit:
-; Send APIC EOI
-	mov rax, [rel SystemSpaceBase]
-	mov dword [rax + 0xB0], 0
+
 ; Load registers
-	mov rax, [rbx + _RAX]
-	mov rdi, [rbx + _RDI]
 	mov rsi, [rbx + _RSI]
 	mov r8, [rbx + _R8]
 	mov r9, [rbx + _R9]
@@ -74,11 +72,13 @@ SchedulerEntrySSE:
 
 	
 
+	sub rsp, 0x20
+
 	mov rcx, [rbx + _DS]
 	mov ds, cx
 	shr rcx, 16
-	mov edx, ecx
-	and edx, 0xFFFF
+	mov rdx, rcx
+	and rdx, 0xFFFF
 	push rdx ; Stack Segment
 	shr rcx, 16
 	mov gs, cx
@@ -89,14 +89,49 @@ SchedulerEntrySSE:
 	push qword [rbx + _RFLAGS]
 	push qword [rbx + _CS]
 	push qword [rbx + _RIP]
+	cmp qword [rsp], 0x10
+	je .l
+	mov rdi, [rbx + _RIP]
+	mov rax, 0xcafe
+	jmp $
+.l:
+	; Calculate Interrupt latency (Only for debugging and optimizing purpose & maybe removed later)
+	
+	mov rdi, HpetNumClocks
+	movdqu xmm0, [rdi]
+	mov rdi, HpetFrequency
+	movdqu xmm1, [rdi]
+	mulps xmm0, xmm1
+	mov rdi, HpetMainCounterAddress
+	mov rdi, [rdi]
+	movq xmm1, rdi
+	addps xmm0, xmm1
+	
+	movdqa xmm1, [rax + CPM_HIGH_PRECISION_TIME]
+	subps xmm0, xmm1
+	movdqa [rax + CPM_LAST_THREAD_SWITCH_LATENCY], xmm0
+
 
 	mov rcx, [rbx + _XSAVE]
 	fxrstor [rcx]
 
+
+
+	mov rdi, [rbx + _RDI]
+	mov rbp, [rbx + _RBP]
 	mov rdx, [rbx + _RDX]
 	mov rcx, [rbx + _RCX]
-	mov rbp, [rbx + _RBP]
+	
+	; Send APIC EOI
+	mov rax, [rel SystemSpaceBase]
+	mov dword [rax + 0xB0], 0
+	
+	mov rax, [rbx + _RAX]
 	mov rbx, [rbx + _RBX]
+	
+	
+
+
 	iretq
 .SchedulerNotEnabled:
 	pop rax

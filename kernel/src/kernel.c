@@ -344,7 +344,7 @@ __setCR3((UINT64)kproc->PageMap);
 	init_ps2_mouse();
 	RtcInit();
 	__sti();
-	for(UINT i = 0;i<0x10000;i++);
+	for(UINT i = 0;i<0x1000000;i++);
 	SOD(0, "S");
 	
 

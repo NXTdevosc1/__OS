@@ -17,8 +17,11 @@ RFDEVICE_OBJECT HpetDevice = NULL;
 
 static HPET_REGISTERS* Regs = NULL;
 extern UINT64 HpetFrequency = 0;
+UINT64 HpetFrequencyHigh = 0;
 
 extern UINT64 HpetNumClocks = 0;
+UINT64 HpetNumClocksHigh = 0;
+
 extern UINT64 HpetTotalClockTime = 0; // Num Clocks * Frequency
 extern UINT64 HpetMainCounterAddress = 0; // Used on task scheduler
 // BOOL LegacyReplacementRoute = 

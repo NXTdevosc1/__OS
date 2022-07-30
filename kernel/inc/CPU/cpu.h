@@ -237,7 +237,9 @@ typedef struct _CPU_MANAGEMENT_TABLE {
     UINT64 CurrentCpuTime;
     UINT64 EstimatedCpuTime; // Set to estimated cpu time on each second by scheduler
     // System (Kernel) Specific
-    UINT64 HighPrecisionTime;
+    UINT64 Reserved6;
+    UINT64 HighPrecisionTime[2];
+    UINT64 LastThreadSwitchLatency[2];
     IRQ_CONTROL_DESCRIPTOR IrqControlTable[NUM_IRQS_PER_PROCESSOR];
     UINT IpiCommand;
     BOOL IpiCommandControl;
