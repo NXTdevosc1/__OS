@@ -344,9 +344,6 @@ __setCR3((UINT64)kproc->PageMap);
 	init_ps2_mouse();
 	RtcInit();
 	__sti();
-	for(UINT i = 0;i<0x1000000;i++);
-	SOD(0, "S");
-	
 
 	// Check Driver Table
 
@@ -383,7 +380,12 @@ __setCR3((UINT64)kproc->PageMap);
 
 
 
+	
 		
+	for(UINT i = 0;i<0x1000000;i++) {
+		_RT_SystemDebugPrint(L"Context Switches : %x:%x , Time : %x , Timer last calculated time : %x:%x", CpuManagementTable[0]->TotalClocks[0], CpuManagementTable[0]->TotalClocks[1], GetHighPrecisionTimeSinceBoot(), CpuManagementTable[0]->HighPrecisionTime[0], CpuManagementTable[0]->HighPrecisionTime[1]);
+		for(int c = 0;c<0x1000;c++);
+	}
 
 	MSG_OBJECT Message = { 0 };
 	

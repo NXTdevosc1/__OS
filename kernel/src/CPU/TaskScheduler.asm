@@ -89,12 +89,6 @@ SchedulerEntrySSE:
 	push qword [rbx + _RFLAGS]
 	push qword [rbx + _CS]
 	push qword [rbx + _RIP]
-	cmp qword [rsp], 0x10
-	je .l
-	mov rdi, [rbx + _RIP]
-	mov rax, 0xcafe
-	jmp $
-.l:
 	; Calculate Interrupt latency (Only for debugging and optimizing purpose & maybe removed later)
 	
 	mov rdi, HpetNumClocks
@@ -223,7 +217,6 @@ xor rbx, rbx
 	
 	add rcx, 0x10
 	add rdx, 0x10
-	add r8, 0x10
 	add r9, 0x10
 	add r13, 0x10
 	movq mm6, r13 ; R13 is changeable by functions (MM6 Preserves R13 Value)
@@ -275,11 +268,6 @@ xor rbx, rbx
 	dec dword [rbx + TH_REMAINING_CLOCKS]
 	jmp .R1
 .J3:
-	mov ecx, [rbx + TH_SCHEDULING_QUANTUM]
-	movdqa xmm0, xmm4 ; Copy Current Clocks
-	movq xmm1, rcx
-	addps xmm0, xmm1
-	movdqu [rbx + TH_READY_AT], xmm0
 	mov ecx, [rbx + TH_TIME_BURST]
 	mov [rbx + TH_REMAINING_CLOCKS], ecx
 	jmp .R1

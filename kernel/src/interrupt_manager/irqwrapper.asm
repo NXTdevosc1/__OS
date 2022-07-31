@@ -6,19 +6,11 @@ global gIRQCtrlWrapPtr
 extern SystemSpaceBase
 extern InterruptUnsupported
 
+
+
 NUM_IRQS_PER_PROCESSOR equ 24
 SIZE_BITSHIFT_IRQ_CTRLTBL equ 7 ; 128 Bytes
 
-SYSTEM_SPACE_CPUMGMT equ 0x200000
-CPM_NEXT_THREAD		equ 0x100
-CPM_INTERRUPTS_THREAD equ 0x108
-CPM_IRQ_CONTROL_TABLE equ 0x110
-
-TH_REGISTERS equ 0x4C
-TH_RIP equ TH_REGISTERS + 0x40
-
-APIC_ID		equ 0x20
-APIC_EOI equ 0xB0
 
 IRQ_DEVICE_DRIVER equ 0x29
 IRQ_INTERRUPT_INFORMATION equ 0x31
@@ -33,49 +25,31 @@ INTINF_INT_STACK equ 0x18
 
 extern SkipTaskSchedule
 
-CPM_THREAD equ 0x08
-TH_RDX equ TH_REGISTERS + 0x18
-TH_RDI equ TH_REGISTERS + 0x20
+%include "src/CPU/schedulerdefs.asm"
 
-CPU_MGMT_SHIFT equ 15
+
 
 section .text
 
 %macro DeclareIRQControlWrapper 1
 align 0x10
+
+extern SchedulerEntrySSE
+extern SchedulerEntrySSE.SSESaveRegisters
+
 IRQControlWrapper%1:
 ; Entering System Interrupts Process
     cli
-    push rax
-	push rbx
+    push rdx
     push rcx
-	mov rax, [rel SystemSpaceBase]
-    mov dword [rax + 0xB0], 0
-    pop rcx
-    pop rbx
-    pop rax
-    iretq
-    ; mov 
-    mov rax, 0xCAFE
+    push rbx
+    push rax
+    mov rax, [rel SystemSpaceBase]
+    mov ebx, [rax + APIC_ID]
+    shr ebx, 24
+    shl rbx, CPU_MGMT_SHIFT
+    lea rax, [rax + SYSTEM_SPACE_CPUMGMT + rbx]
     jmp $
-	mov ebx, [rax + APIC_ID]
-	shr ebx, 24
-	shl rbx, CPU_MGMT_SHIFT ; Multiply by 1000
-	lea rax, [rax + SYSTEM_SPACE_CPUMGMT + rbx]
-	mov rbx, [rax + CPM_INTERRUPTS_THREAD]
-    mov [rax + CPM_NEXT_THREAD], rbx
-    mov rcx, .InterruptsThreadEntry
-	mov [rbx + TH_RIP], rcx ; Interrupt Handler Wrapper
-	mov rcx, [rax + CPM_THREAD]
-    mov [rbx + TH_RDX], rcx
-    lea rcx, [rsp + 0x18] ; INT_STACK
-    mov [rbx + TH_RDI], rcx
-    
-
-
-	pop rcx
-    pop rbx
-	pop rax
     
     ; INT Schedule does the APIC_EOI For us
     ; jmp SkipTaskSchedule ; TODO : after task switching finish
