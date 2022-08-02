@@ -57,14 +57,21 @@ BOOT_MANAGER_MAGIC1 equ 0xFB7E
 
 BOOT_AREA_SIZE equ 0x100 ; 256 Sectors
 
-_boot:
-	cld
+
 	cli
-	; Reset segment registers
+	cld
+	or dl, 0x80
 	xor ax, ax
 	mov es, ax
 	mov ds, ax
 	mov ss, ax
+	mov gs, ax
+	mov fs, ax
+	jmp 0:_boot
+
+_boot:
+	; Reset segment registers
+	
 
 	mov sp, 0x8000
 	mov bp, sp

@@ -104,13 +104,14 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 		hIdleThread->State |= THS_IDLE | THS_MANUAL;
 		hIdleThread->ProcessorId = i; // Make thread only runnable on this cpu
 		hIdleThread->SchedulingQuantum = 0;
-		hIdleThread->TimeBurst = 2; // 3 clocks
+		hIdleThread->TimeBurst = 0; // 3 clocks
 
 		// Setup Interrupts Thread
 		HTHREAD InterruptsThread = CpuManagementTable[i]->SystemInterruptsThread;
 		InterruptsThread->State |= THS_MANUAL;
 		InterruptsThread->ProcessorId = i;
 		InterruptsThread->Registers.rflags = 0; // Interrupts disabled
+		InterruptsThread->TimeBurst = 0;
 	}
 	// Pmgrt.NumProcessors = CpuCount;
 	__CPU_MGMT_TBL_SETUP__ = TRUE;
@@ -301,7 +302,6 @@ void SetupLocalApicTimer(){
 
 		UINT64 InitialCount = ((CpuBusSpeed) / 0x10 /*Divisor*/) / 0x800 /*Target clocks per second*/;
 
-		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_LVT) = INT_APIC_TIMER /*Interrupt Vector : 0x40*/ | (LAPIC_TIMER_PERIODIC_MODE); 
 		if(!ApicTimerBaseQuantum){
 			TimerIncrementerCpuId = GetCurrentProcessorId();
 			MapPhysicalPages(kproc->PageMap, &ApicTimerClockCounter, &ApicTimerClockCounter, 1, PM_MAP | PM_CACHE_DISABLE);
@@ -313,7 +313,8 @@ void SetupLocalApicTimer(){
 			ApicTimerBaseQuantum = TimerClocksPerSecond / 0x800; // set to 2048 Clocks/s
 			ApicTimerClockQuantum = ApicTimerBaseQuantum;
 		}
-		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_INITIAL_COUNT) = InitialCount;
+		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_LVT) = INT_APIC_TIMER | (LAPIC_TIMER_PERIODIC_MODE); 
+		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_INITIAL_COUNT) = 0x1000;
 	
 }
 
@@ -325,6 +326,7 @@ void KERNELAPI Sleep(UINT64 Milliseconds){
 	HTHREAD Thread = GetCurrentThread();
 	Thread->SleepUntil[0] = GetHighPrecisionTimeSinceBoot() + GetHighPerformanceTimerFrequency() / MILLISECONDS_PER_SECOND * Milliseconds;
 	Thread->State |= THS_SLEEP;
+	Thread->RemainingClocks = 0; // Reset remaining clocks to force scheduler to not re-run this thread
 	__Schedule();
 }
 
@@ -334,6 +336,8 @@ void KERNELAPI MicroSleep(UINT64 Microseconds){
 	HTHREAD Thread = GetCurrentThread();
 	Thread->SleepUntil[0] = GetHighPrecisionTimeSinceBoot() + GetHighPerformanceTimerFrequency() / MICROSECONDS_PER_SECOND * Microseconds;
 	Thread->State |= THS_SLEEP;
+	Thread->RemainingClocks = 0;
+
 	__Schedule();
 }
 
@@ -365,59 +369,3 @@ void SetLocalApicBase(void* _Lapic) {
 	UINT32 edx = (UINT64)_Lapic >> 32;
 	__WriteMsr(IA32_APIC_BASE_MSR, eax, edx);
 }
-
-typedef struct {
-	UINT64 NumReadyThreads[7];
-	RFTHREAD* ThreadQueues[7];
-	RFTHREAD CurrentThread;
-	RFTHREAD SelectedThread;
-	UINT64 TotalClocks;
-	UINT64 ReadyOnClock[7];
-	UINT64 HighestPriority[7];
-	UINT64 TotalThreads[7];
-} TMP;
-
-// Example of task scheduler
-
-// RFTHREAD FindNextThread(TMP* Cpm) {
-// 	UINT Priority = Cpm->CurrentThread->ThreadPriority;
-// 	// Classify by priority class
-// 	// Preemption
-// 	Cpm->SelectedThread = Cpm->CurrentThread; // Threads must compare with the priority of this thread
-// 	for(UINT i = 6;i>=0;i--) {
-// 		if(i == Priority) {
-// 			if(Cpm->CurrentThread->RemainingClocks) DoNotPreemptThread(); // Thread has got cpu time
-// 		}
-		
-// 		// Otherwise switch thread (or preempt it)
-// 		if(Cpm->NumReadyThreads[i]) {
-// 			RFTHREAD* _Thread = Cpm->ThreadQueues[i];
-// 			for(UINT i = 0;i<Cpm->TotalThreads[i];i++, _Thread++) {
-// 				RFTHREAD Thread = *_Thread;
-// 				if(Thread->ReadyTime >= Cpm->TotalClocks) {
-// 					if(Thread->ThreadPriority == Cpm->HighestPriority[i]) DispatchThread();
-// 					else if(Thread->ThreadPriority > Cpm->SelectedThread->ThreadPriority) 
-// 						Cpm->SelectedThread = Thread;
-// 				}
-// 			}
-// 			DispatchThread(); // Selected thread
-// 		} else if(Cpm->ReadyOnClock[i] >= Cpm->TotalClocks) {
-// 			// Perform a full search on ready threads
-// 			RFTHREAD* _Thread = Cpm->ThreadQueues[i];
-
-// 			for(UINT i = 0;i<Cpm->TotalThreads[i];i++, _Thread++) {
-// 				RFTHREAD Thread = *_Thread;
-
-// 				if(Thread->ReadyTime >= Cpm->TotalClocks) Cpm->NumReadyThreads[i]++;
-// 				if(Thread->ThreadPriority > Cpm->SelectedThread->ThreadPriority) Cpm->SelectedThread = Thread;
-// 			}
-// 		}
-// 	}
-// 	RunIdleThread(); // No ready threads where found
-// }
-
-// void DispatchThread(RFTHREAD Thread) {
-// 	// Thread is still ready
-// 	LoadThreadRegisters();
-
-// }

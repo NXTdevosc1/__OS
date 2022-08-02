@@ -42,6 +42,7 @@ STEP 1:
 ; XMM3 : HIGHEST_PRIORITY_THREAD [R9]
 ; XMM4 : Total Clocks
 ; XMM15 [MM6]:MM0 : Total Threads [R13]
+; XMM13 : High Precision Time
 ; MM5 : Thread Priority Class
 ; R15 = Index
 ; rbx : Selected Thread

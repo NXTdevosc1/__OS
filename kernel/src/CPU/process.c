@@ -402,9 +402,9 @@ R0:
     }
 
 
-    Thread->TimeBurst = 0;
+    Thread->TimeBurst = 8;
 
-    SetThreadPriority(Thread, THREAD_PRIORITY_BELOW_NORMAL);
+    // SetThreadPriority(Thread, THREAD_PRIORITY_BELOW_NORMAL);
 
     __BitRelease(&Process->ControlMutex0, PROCESS_MUTEX0_CREATE_THREAD);
 
@@ -465,21 +465,13 @@ int KERNELAPI TerminateThread(RFTHREAD thread, int ExitCode){
 
 RFPROCESS KERNELAPI GetCurrentProcess(){
     if (!Pmgrt.SystemInitialized) return kproc;
-    // *(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_INITIAL_COUNT) = ApicTimerBaseQuantum / 3;
-    // __cli();
-    RFPROCESS Process = ((RFTHREAD)(CpuManagementTable[GetCurrentProcessorId()]->CurrentThread))->Process;
-    // __sti();
-    return Process;
+    return GetCurrentThread()->Process;
 }
 
 
 RFTHREAD KERNELAPI GetCurrentThread(){
     if (!Pmgrt.SystemInitialized) return kproc->StartupThread;
-
-    // *(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_INITIAL_COUNT) = ApicTimerBaseQuantum / 3;
-    // __cli();
-    RFTHREAD Thread = CpuManagementTable[GetCurrentProcessorId()]->CurrentThread;
-    // __sti();
+    RFTHREAD Thread = CpuManagementTable[*(UINT32*)((char*)SystemSpaceBase + CPU_LAPIC_ID)]->CurrentThread;
     return Thread;
 }
 

@@ -57,7 +57,7 @@ global __Schedule
 section .text
 
 __Schedule:
-	int 0x9F
+	int 0x40
 	ret
 
 __ldmxcsr:
