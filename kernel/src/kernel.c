@@ -73,7 +73,7 @@ __declspec(allocate(_FIMPORT)) FILE_IMPORT_ENTRY FileImportTable[] = {
 	// {FILE_IMPORT_DRIVER, 0, NULL, L"usb.sys", 0, L"OS\\System\\usb.sys"},
 	{FILE_IMPORT_DEVICE_DRIVER, 0, NULL, L"ehci.sys", 0, L"OS\\System\\ehci.sys"},
 	{FILE_IMPORT_DEVICE_DRIVER, 0, NULL, L"ahci.sys", 0, L"OS\\System\\ahci.sys"},
-	{FILE_IMPORT_DEVICE_DRIVER, 0, NULL, L"xhci.sys", 0, L"OS\\System\\xhci.sys"},
+	// {FILE_IMPORT_DEVICE_DRIVER, 0, NULL, L"xhci.sys", 0, L"OS\\System\\xhci.sys"},
 	// {FILE_IMPORT_DRIVER, 0, NULL, L"eodx.sys", 0, L"OS\\System\\eodx.sys"},
 	{0}, // End of table
 };
@@ -83,10 +83,17 @@ void KERNELAPI IdleThread() {
 	}
 }
 
+void th() {
+	for(;;) {
+		_RT_SystemDebugPrint(L"TH_RUNNING");
+	}
+}
+
 LPWSTR KernelProcessName = L"System Kernel.";
 
 extern void _start() {
 	__cli();
+	EnableExtendedStates();
 	
 	for(unsigned int i = 0;FileImportTable[i].Type != FILE_IMPORT_ENDOFTABLE;i++){
 		if(FileImportTable[i].BaseName){
@@ -94,7 +101,6 @@ extern void _start() {
 		}
 	}
 	
-	EnableExtendedStates();
 
 
 	Pmgrt.NumProcessors = 1;
@@ -249,7 +255,7 @@ extern void _start() {
 	HTHREAD KernelThread = CreateThread(kproc, 0, NULL, 0, NULL);
 	if (!KernelThread) SET_SOD_INITIALIZATION;
 
-	SetThreadPriority(KernelThread, THREAD_PRIORITY_TIME_CRITICAL);
+	SetThreadPriority(KernelThread, THREAD_PRIORITY_BELOW_NORMAL);
 	
 	KernelThread->ProcessorId = GetCurrentProcessorId(); // Only Bootstrap Processor can run kernel
 
@@ -295,7 +301,18 @@ __setCR3((UINT64)kproc->PageMap);
 
 	SetupLocalApicTimer();
 
-	
+	__sti();
+	// CreateThread(kproc, 4096, th, 0, 0);
+	UINT64 LastCs = 0;
+	for(;;) {
+		_RT_SystemDebugPrint(L"CS/S : %x, CS_LATENCY : %x", CpuManagementTable[0]->TotalClocks[0] - LastCs, CpuManagementTable[0]->LastThreadSwitchLatency[0]);
+		LastCs = CpuManagementTable[0]->TotalClocks[0];
+		// _RT_SystemDebugPrint(L"Context Switches : %x:%x , Time : %x , CS Latency : %x, OF : %x", CpuManagementTable[0]->TotalClocks[0], CpuManagementTable[0]->TotalClocks[1], CpuManagementTable[0]->HighPrecisionTime[0], (CpuManagementTable[0]->LastThreadSwitchLatency[0] * GetHighPerformanceTimerFrequency()) / 1000000, (UINT64)((UINT64)CpuManagementTable[0]->LastThreadSwitchLatency - (UINT64)CpuManagementTable[0]));
+		// for(int c = 0;c<0x100000;c++);
+		Sleep(1000);
+	}
+
+	while(1);
 
 	
 	// TaskSchedulerDisable();
@@ -346,14 +363,8 @@ __setCR3((UINT64)kproc->PageMap);
 	init_ps2_mouse();
 	RtcInit();
 	
-	__sti();
 
-	for(;;) {
-		_RT_SystemDebugPrint(L"Context Switches : %x:%x , Time : %x , Timer last calculated time : %x:%x", CpuManagementTable[0]->TotalClocks[0], CpuManagementTable[0]->TotalClocks[1], GetHighPrecisionTimeSinceBoot(), CpuManagementTable[0]->HighPrecisionTime[0], CpuManagementTable[0]->HighPrecisionTime[1]);
-		// for(int c = 0;c<0x1000;c++);
-		// Sleep(1000);
-	}
-
+	
 	// Check Driver Table
 
 	RFDRIVER_TABLE DriverTable = FileImportTable[FIMPORT_DRVTBL].LoadedFileBuffer;

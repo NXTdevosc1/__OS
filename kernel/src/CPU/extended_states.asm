@@ -3,6 +3,12 @@ cpu_table_ptr equ 0x2300
 
 section .text
 
+FPUCTL_37F dq 0x37F
+FPUCTL_37E dq 0x37E
+FPUCTL_37A dq 0x37A
+
+_MXCSR_MASK dq 0x1F80
+
 EnableExtendedStates:
     push rax
     push rbx
@@ -12,14 +18,34 @@ EnableExtendedStates:
 
     ; Enable SSE
     mov rax, cr0
-    and eax, ~(4) ; Clear Emulation
-    or eax, 2
+    and rax, ~(3 << 2) ; Clear Emulation & Task Switched
+    or rax, 2
     mov cr0, rax
     mov rax, cr4
     or rax, (3 << 9) ; OFXSR | OSXMMEXCPT
     mov cr4, rax
 
-    fninit
+    FNINIT
+    push 0
+    FNSTSW [rsp]
+    pop rax
+    test rax, rax
+    jnz .NoFpu
+
+    ; Load MXCSR
+    sub rsp, 0x200
+    fxsave [rsp]
+    mov eax, [rsp + 28] ; MXCSR_MASK
+    or eax, eax
+    jnz ._A
+    mov eax, 0xFFBF
+._A:
+    sub rsp, 8
+    and eax, 0x1F80
+    mov [rsp], rax
+    ldmxcsr [rsp]
+
+    add rsp, 0x208
 
     mov eax, 1
     cpuid
@@ -75,3 +101,8 @@ EnableExtendedStates:
     pop rbx
     pop rax
     ret
+.NoFpu:
+    cli
+    mov rax, 0xbadcafe
+    hlt
+    jmp .NoFpu

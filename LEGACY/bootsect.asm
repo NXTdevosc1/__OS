@@ -46,18 +46,6 @@
 
 MBR_PARTITION_ADDRESS equ 0x7DCE
 
-jmp _boot
-BootDrive db 0
-
-BOOT_PARTITION_BASE_ADDRESS equ 0x9000
-
-BOOT_MANAGER_OFFSET equ 0x200
-
-BOOT_MANAGER_MAGIC1 equ 0xFB7E
-
-BOOT_AREA_SIZE equ 0x100 ; 256 Sectors
-
-
 	cli
 	cld
 	or dl, 0x80
@@ -69,6 +57,18 @@ BOOT_AREA_SIZE equ 0x100 ; 256 Sectors
 	mov fs, ax
 	jmp 0:_boot
 
+BootDrive db 0
+
+BOOT_PARTITION_BASE_ADDRESS equ 0x9000
+
+BOOT_MANAGER_OFFSET equ 0x200
+
+BOOT_MANAGER_MAGIC1 equ 0xFB7E
+
+BOOT_AREA_SIZE equ 0x100 ; 256 Sectors
+
+
+
 _boot:
 	; Reset segment registers
 	
@@ -78,18 +78,18 @@ _boot:
 
 	mov bx, BootDrive
 
-	mov [es:bx], dl
+	mov [bx], dl
 
 
 
 	; Check if partition is active
-	mov al, [es:MBR_PARTITION_ADDRESS]
+	mov al, [MBR_PARTITION_ADDRESS]
 	test al, 0x80
 	jz ErrInvalidOrCorruptedFs
 
 	mov bx, MBR_PARTITION_ADDRESS
 	; mov ch, [es:bx + 3]
-	mov eax, [es:bx + 8] ; Lba Start
+	mov eax, [bx + 8] ; Lba Start
 	mov [LbaPacket.Lba], eax
 	call LbaRead
 
@@ -184,7 +184,7 @@ _print:
 	xor bx, bx
 	mov ah, 0x0E
 	.loop:
-		mov al, [es:di]
+		mov al, [di]
 		test al, al
 		jz .exit
 		inc di

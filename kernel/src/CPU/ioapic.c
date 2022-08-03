@@ -80,8 +80,8 @@ void IoApicReadRedirectionTable(ACPI_IOAPIC* IoApic, unsigned char RedirectionTa
 void IoApicWriteRedirectionTable(ACPI_IOAPIC* IoApic, unsigned char RedirectionTableIndex, RFIOAPIC_REDTBL RedirectionTable){
     if(RedirectionTableIndex > IoApicGetMaxRedirectionEntry(IoApic)) SOD(SOD_INTERRUPT_MANAGEMENT, "IOAPIC REDIR ENTRY > MAX_REDIR_ENTRIES (MAY BE A BUG, CONTACT US)");
     QWORD QRedTbl = *(QWORD*)RedirectionTable;
-    // IoApicWrite(IoApic, IOAPIC_REDIRECTION_TABLE_BASE + (RedirectionTableIndex << 1), QRedTbl);
-    // IoApicWrite(IoApic, IOAPIC_REDIRECTION_TABLE_BASE + (RedirectionTableIndex << 1) + 1, QRedTbl >> 32);
+    IoApicWrite(IoApic, IOAPIC_REDIRECTION_TABLE_BASE + (RedirectionTableIndex << 1), QRedTbl);
+    IoApicWrite(IoApic, IOAPIC_REDIRECTION_TABLE_BASE + (RedirectionTableIndex << 1) + 1, QRedTbl >> 32);
 }
 
 unsigned char IoApicGetMaxRedirectionEntry(ACPI_IOAPIC* IoApic){

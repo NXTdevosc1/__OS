@@ -291,16 +291,14 @@ void SetupLocalApicTimer(){
 					break;
 				}
 			}
-			if(!ProcessorInformation) SOD(SOD_INITIALIZATION, "Cannot retreive CPU Information and Bus Speed");
-			_RT_SystemDebugPrint(L"EXTERNAL_BUS_SPEED : %d", CpuBusSpeed);
+
+		}
 			if(!CpuBusSpeed) {
 				// We will assum a 100MHz Bus Frequency
 				CpuBusSpeed = 100000000;
 			}
-
-		}
-
-		UINT64 InitialCount = ((CpuBusSpeed) / 0x10 /*Divisor*/) / 0x800 /*Target clocks per second*/;
+			_RT_SystemDebugPrint(L"EXTERNAL_BUS_SPEED : %d", CpuBusSpeed);
+		UINT64 InitialCount = ((CpuBusSpeed) / 0x10 /*Divisor*/) / 0x1000 /*Target clocks per second*/;
 
 		if(!ApicTimerBaseQuantum){
 			TimerIncrementerCpuId = GetCurrentProcessorId();
@@ -314,7 +312,7 @@ void SetupLocalApicTimer(){
 			ApicTimerClockQuantum = ApicTimerBaseQuantum;
 		}
 		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_LVT) = INT_APIC_TIMER | (LAPIC_TIMER_PERIODIC_MODE); 
-		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_INITIAL_COUNT) = 0x1000;
+		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_INITIAL_COUNT) = InitialCount;
 	
 }
 

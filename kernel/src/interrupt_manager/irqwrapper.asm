@@ -42,10 +42,10 @@ IRQControlWrapper%1:
     ; Task switch will not occur as APIC_EOI is not set
     ; this is why we jmp SchedulerEntry instead of int SCHEDULE
     
+    cli
     push rax
     push rbx
     push rcx
-
 
     mov rax, [rel SystemSpaceBase]
     mov ebx, [rax + APIC_ID]
@@ -72,8 +72,6 @@ IRQControlWrapper%1:
     pop rax
 
 
-    ; int 0x40
-    ; iretq
     jmp SchedulerEntrySSE
     
     ; INT Schedule does the APIC_EOI For us
@@ -82,8 +80,8 @@ align 0x10
 .InterruptsThreadEntry: ; New code is being executed on last registers are discarded
     ; PARAMETERS : rdx = Previous Thread, rdi = Interrupt Stack
     ; CLI Already set on thread settings
-    
 
+    
     mov rsp, rdi ; IST 3
     mov rbp, rsp
 

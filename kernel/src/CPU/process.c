@@ -401,10 +401,10 @@ R0:
         ResumeThread(Thread);
     }
 
+    Thread->SchedulingQuantum = 10;
+    Thread->TimeBurst = 3;
 
-    Thread->TimeBurst = 8;
-
-    // SetThreadPriority(Thread, THREAD_PRIORITY_BELOW_NORMAL);
+    SetThreadPriority(Thread, THREAD_PRIORITY_NORMAL);
 
     __BitRelease(&Process->ControlMutex0, PROCESS_MUTEX0_CREATE_THREAD);
 
