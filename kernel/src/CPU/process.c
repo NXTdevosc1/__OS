@@ -180,6 +180,8 @@ KERNELSTATUS KERNELAPI SetThreadPriority(RFTHREAD Thread, int Priority){
 DebugWrite("SetThreadPriority()");
 DebugWrite(to_hstring64((UINT64)Thread));
 #endif
+
+
     if(!Thread || Priority < THREAD_PRIORITY_MIN || Priority > THREAD_PRIORITY_MAX)
         return KERNEL_SERR_INVALID_PARAMETER;
 
@@ -187,12 +189,13 @@ DebugWrite(to_hstring64((UINT64)Thread));
     __SpinLockSyncBitTestAndSet(&Thread->ThreadControlMutex, THREAD_MUTEX_CHANGE_PRIORITY);
     RFTHREAD_WAITING_QUEUE PreviousWaitingQueue = Thread->WaitingQueue;
     UINT PreviousWaitingQueueIndex = Thread->ThreadWaitingQueueIndex;
+    CPU_MANAGEMENT_TABLE* CpuMgmt = CpuManagementTable[Thread->ProcessorId];
     if(PreviousWaitingQueue) {
-        CpuManagementTable[Thread->ProcessorId]->TotalThreads[Thread->Process->PriorityClass]--;
-        CpuManagementTable[Thread->ProcessorId]->NumReadyThreads[Thread->Process->PriorityClass]--;
+        CpuMgmt->TotalThreads[Thread->Process->PriorityClass]-= 1;
+        CpuMgmt->NumReadyThreads[Thread->Process->PriorityClass]--;
     }
 
-    RFTHREAD_WAITING_QUEUE WaitingQueue = CpuManagementTable[Thread->ProcessorId]->ThreadQueues[Thread->Process->PriorityClass];
+    RFTHREAD_WAITING_QUEUE WaitingQueue = CpuMgmt->ThreadQueues[Thread->Process->PriorityClass];
     Thread->ThreadPriority = Priority;
     Thread->SchedulingQuantum = GlobalThreadPreemptionPriorities[Priority];
 
@@ -210,8 +213,8 @@ DebugWrite(to_hstring64((UINT64)Thread));
                         Thread->ThreadWaitingQueueIndex = i;
                         Thread->WaitingQueue = WaitingQueue;
                         WaitingQueue->NumThreads++;
-                        CpuManagementTable[Thread->ProcessorId]->TotalThreads[Thread->Process->PriorityClass]++;
-                        CpuManagementTable[Thread->ProcessorId]->NumReadyThreads[Thread->Process->PriorityClass]++;
+                        CpuMgmt->TotalThreads[Thread->Process->PriorityClass]+= 1;
+                        CpuMgmt->NumReadyThreads[Thread->Process->PriorityClass]++;
 
                         __BitRelease(&WaitingQueue->Mutex, 0);
                         goto R0;
@@ -404,7 +407,6 @@ R0:
     Thread->SchedulingQuantum = 10;
     Thread->TimeBurst = 1;
 
-    // SetThreadPriority(Thread, THREAD_PRIORITY_NORMAL);
 
     __BitRelease(&Process->ControlMutex0, PROCESS_MUTEX0_CREATE_THREAD);
 

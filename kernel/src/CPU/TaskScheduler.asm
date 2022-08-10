@@ -29,6 +29,8 @@ SchedulerEntrySSE:
 
 	mov rbx, [rax + CPM_CURRENT_THREAD]
 	
+
+
 	test qword [rbx], THS_IDLE
 	jnz .R0 ; Idle threads like System Interrupt & Idle thread do not need register saving
 	; SAVE Schedule Registers
@@ -280,6 +282,12 @@ mov r11d, 0xFF ; Set highest priority number
 	test r15, 1 ; Don't load values on second read (XMM Already has bitshifted value)
 	jnz .SkipXMMLoad
 
+	movq r13, mm5
+	cmp r15, r13
+	jne .A2
+	movq rbx, mm4 ; Compare current thread with other threads to invoke preemption
+.A2:
+
 	
 
 	; Load XMM0-XMM2 With values
@@ -442,6 +450,8 @@ SSEHighestPriorityThreadScan:
 	jb .__E1
 
 	mov r13, [r12] ; State
+	test r13, THS_RUNNABLE | THS_ALIVE
+	jz .__E1
 	test r13, THS_MANUAL | THS_IDLE
 	jnz .__E1
 	test r13, THS_SLEEP
@@ -476,6 +486,8 @@ SSEHighestPriorityThreadScan:
 	cmp r13, [r12 + TH_READY_AT]
 	jb .E1
 	mov r13, [r12] ; State
+	test r13, THS_RUNNABLE | THS_ALIVE
+	jz .__E1
 	test r13, THS_MANUAL | THS_IDLE
 	jnz .E1
 	test r13, THS_SLEEP
@@ -560,6 +572,8 @@ SSEFullScan:
 	cmp [r12 + TH_THREAD_PRIORITY], r11d ; 0 = Highest, 6 = lowest
 	jae .__E1
 	mov r13, [r12] ; State
+	test r13, THS_RUNNABLE | THS_ALIVE
+	jz .__E1
 	test r13, THS_MANUAL | THS_IDLE
 	jnz .__E1
 	test r13, THS_SLEEP
@@ -594,6 +608,8 @@ SSEFullScan:
 	cmp [r12 + TH_THREAD_PRIORITY], r11d
 	jae .E1
 	mov r13, [r12] ; State
+	test r13, THS_RUNNABLE | THS_ALIVE
+	jz .E1
 	test r13, THS_MANUAL | THS_IDLE
 	jnz .E1
 	test r13, THS_SLEEP

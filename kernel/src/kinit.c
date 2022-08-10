@@ -114,6 +114,5 @@ void KernelPagingInitialize(){
 }
 
 void InitFeatures(){
-	ConfigureSystemSpace();
 	IpcInit();
 }

@@ -98,7 +98,8 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 		CpuManagementTable[i]->SystemIdleThread = CreateThread(IdleProcess, 0x1000, IdleThread, 0, NULL);
 		CpuManagementTable[i]->SystemInterruptsThread = CreateThread(SystemInterruptsProcess, 0x10000, NULL, 0, NULL);
 		if (!CpuManagementTable[i]->SystemIdleThread || !CpuManagementTable[i]->SystemInterruptsThread) SET_SOD_PROCESS_MANAGEMENT;
-		SetThreadPriority(CpuManagementTable[i]->SystemInterruptsThread, THREAD_PRIORITY_TIME_CRITICAL);
+		
+
 		// Setup Idle Thread
 		HTHREAD hIdleThread = CpuManagementTable[i]->SystemIdleThread;
 		CpuManagementTable[i]->CurrentThread = hIdleThread;
@@ -264,7 +265,7 @@ static UINT64 CpuBusSpeed = 0;
 
 void SetupLocalApicTimer(){
 	
-
+	__cli();
 	CPUID_INFO CpuInfo = {0};
 	__cpuid(&CpuInfo, 1);
 	// if (CpuInfo.ecx & (CPUID1_ECX_APICTMR_TSC_DEADLINE)) {
@@ -298,17 +299,6 @@ void SetupLocalApicTimer(){
 		}
 		UINT64 InitialCount = ((CpuBusSpeed) / 0x10 /*Divisor*/) / 0x800 /*Target clocks per second*/;
 
-		if(!ApicTimerBaseQuantum){
-			TimerIncrementerCpuId = GetCurrentProcessorId();
-			MapPhysicalPages(kproc->PageMap, &ApicTimerClockCounter, &ApicTimerClockCounter, 1, PM_MAP | PM_CACHE_DISABLE);
-			UINT32 ClocksInOneTenthOfSeconds = (CpuBusSpeed / 0x10) / 10;
-			// must be at least 5000 clocks per second
-
-			TimerClocksPerSecond = ClocksInOneTenthOfSeconds * 10;
-			
-			ApicTimerBaseQuantum = TimerClocksPerSecond / 0x800; // set to 2048 Clocks/s
-			ApicTimerClockQuantum = ApicTimerBaseQuantum;
-		}
 		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_LVT) = INT_APIC_TIMER | (LAPIC_TIMER_PERIODIC_MODE); 
 		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_INITIAL_COUNT) = InitialCount;
 	

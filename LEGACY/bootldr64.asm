@@ -474,7 +474,7 @@ mov rbx, [FileImportTable]
 .E3:
 
 ; Initialize VESA/VBE
-CallRealMode64 SetupVesaVBE, .E4
+; CallRealMode64 SetupVesaVBE, .E4
 
 .E4:
 

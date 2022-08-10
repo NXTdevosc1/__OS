@@ -28,7 +28,7 @@ extern UINT64 HpetMainCounterAddress = 0; // Used on task scheduler
 
 static UINT d = 0;
 void HpetInterruptHandler(RFDRIVER_OBJECT Device, RFINTERRUPT_INFORMATION InterruptInformation) {
-    _RT_SystemDebugPrint(L"HPET Int #%d (Main Counter : %x) Time : %x | in ms : %d", HpetNumClocks, Regs->MainCounterValue, GetHighPrecisionTimeSinceBoot(), GetHighPrecisionTimeSinceBoot() / (HpetFrequency / 1000));
+    // _RT_SystemDebugPrint(L"HPET Int #%d (Main Counter : %x) Time : %x | in ms : %d", HpetNumClocks, Regs->MainCounterValue, GetHighPrecisionTimeSinceBoot(), GetHighPrecisionTimeSinceBoot() / (HpetFrequency / 1000));
     HpetNumClocks++;
     HpetTotalClockTime += 0x1000;
     Regs->GeneralConfiguration &= ~HPET_ENABLE;

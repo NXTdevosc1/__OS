@@ -173,6 +173,8 @@ extern void _start() {
 	OutPortB(SYSTEM_CONTROL_PORT_B, ControlPortB);
 	
 	
+	
+
 	#ifdef ___KERNEL_DEBUG___
 			DebugWrite("Initializing System Tables...");
 		#endif
@@ -244,7 +246,8 @@ extern void _start() {
 
 	UINT32 NumProcessors = AcpiGetNumProcessors();
 	CpuSetupManagementTable(NumProcessors);
-	SetPriorityClass(kproc, PRIORITY_CLASS_NORMAL);
+	ConfigureSystemSpace();
+	SetPriorityClass(kproc, PRIORITY_CLASS_REALTIME);
 	HTHREAD KernelThread = CreateThread(kproc, 0, NULL, 0, NULL);
 	if (!KernelThread) SET_SOD_INITIALIZATION;
 
@@ -291,8 +294,7 @@ __setCR3((UINT64)kproc->PageMap);
 	HpetConfigure();
 
 	SetupLocalApicTimer();
-	
-	
+
 	// TaskSchedulerDisable();
 
 	if(!BootConfiguration->DisableMultiProcessors){
@@ -342,8 +344,8 @@ __setCR3((UINT64)kproc->PageMap);
 
 	// Setting Up ACPI SCI_INT
 	// if(KeControlIrq(AcpiSystemControlInterruptHandler, AcpiGetFadt()->SCI_Interrupt, IRQ_DELIVERY_NORMAL, IRQ_CONTROL_DISABLE_OVERRIDE_FLAGS | IRQ_CONTROL_LOW_ACTIVE | IRQ_CONTROL_LEVEL_SENSITIVE) != KERNEL_SOK) SET_SOD_INITIALIZATION;
-	init_ps2_keyboard();
-	init_ps2_mouse();
+	// init_ps2_keyboard();
+	// init_ps2_mouse();
 	RtcInit();
 	
 
@@ -497,11 +499,14 @@ __setCR3((UINT64)kproc->PageMap);
 
 
 	SetPriorityClass(kproc, PRIORITY_CLASS_IDLE);
-
+	UINT64 LastCSLatency = 0;
 	for(;;){
-		GP_draw_sf_text(to_stringu64(Elapsed - 1), 0, 800, 500);
-		GP_draw_sf_text(to_stringu64(Elapsed), 0xffff, 800, 500);
+		GP_draw_sf_text(to_stringu64(Elapsed - 1), 0, 300, 500);
+		GP_draw_sf_text(to_stringu64(Elapsed), 0xffff, 300, 500);
 		Elapsed++;
+		GP_draw_sf_text(to_stringu64(LastCSLatency), 0, 500, 500);
+		LastCSLatency = CpuManagementTable[0]->LastThreadSwitchLatency[0];
+		GP_draw_sf_text(to_stringu64(LastCSLatency), 0xffff, 500, 500);
 		MicroSleep(100000);
 	}
 

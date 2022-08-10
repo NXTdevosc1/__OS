@@ -334,11 +334,14 @@ typedef struct _AHCI_DEVICE_PORT {
 } AHCI_DEVICE_PORT, *RFAHCI_DEVICE_PORT;
 
 typedef struct _AHCI_DEVICE {
+    RFDRIVER_OBJECT Driver;
     RFDEVICE_OBJECT Device;
     HBA_REGISTERS* Hba;
     HBA_PORT* HbaPorts;
     UINT NumPorts; // Num Implemented Ports
     UINT MaxCommandSlots;
+    BOOL Interrupt;
+
     // Implemented Ports
     AHCI_DEVICE_PORT Ports[AHCI_MAX_PORTS];
 } AHCI_DEVICE, *RFAHCI_DEVICE;

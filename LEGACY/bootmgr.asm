@@ -150,6 +150,8 @@ loader_start:
 
     call GetMemoryMap
 
+    call SetupVesaVBE
+
     jmp EnableProtectedMode
 
 .halt:
