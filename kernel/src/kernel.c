@@ -500,12 +500,14 @@ __setCR3((UINT64)kproc->PageMap);
 
 	SetPriorityClass(kproc, PRIORITY_CLASS_IDLE);
 	UINT64 LastCSLatency = 0;
+
+	// Time in Metric Units Time * Precision(ms, ns...) / Frequency
 	for(;;){
 		GP_draw_sf_text(to_stringu64(Elapsed - 1), 0, 300, 500);
 		GP_draw_sf_text(to_stringu64(Elapsed), 0xffff, 300, 500);
 		Elapsed++;
 		GP_draw_sf_text(to_stringu64(LastCSLatency), 0, 500, 500);
-		LastCSLatency = CpuManagementTable[0]->LastThreadSwitchLatency[0];
+		LastCSLatency = CpuManagementTable[0]->LastThreadSwitchLatency[0] * 1000000 / GetHighPerformanceTimerFrequency();
 		GP_draw_sf_text(to_stringu64(LastCSLatency), 0xffff, 500, 500);
 		MicroSleep(100000);
 	}

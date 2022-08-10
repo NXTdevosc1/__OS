@@ -141,14 +141,14 @@ void ConfigureSystemSpace(){
 BOOL InitSystemSpace(RFPROCESS Process) {
     if (!Process) return FALSE;
     // LAPIC Does not need caching because its embedded in the processor chip which means that access to it is fast
-    MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE_LAPIC), LocalApicPhysicalAddress, 1, PM_MAP | PM_CACHE_DISABLE);
+    MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE_LAPIC), LocalApicPhysicalAddress, 1, PM_MAP);
     // Other processors will write to this, so ready or incrementing (Scheduler Cpu Time) will have a false value
     
     MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE_PMGRT), (void*)&Pmgrt, 0x10, PM_MAP | PM_CACHE_DISABLE);
     UINT64 NumProcessors = AcpiGetNumProcessors();
     if(!NumProcessors) return FALSE;
     for (UINT64 i = 0; i < NumProcessors; i++) {
-        MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE_CPUMGMT + (i << CPU_MGMT_BITSHIFT)), (void*)CpuManagementTable[i], CPU_MGMT_NUM_PAGES, PM_MAP | PM_CACHE_DISABLE);
+        MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE_CPUMGMT + (i << CPU_MGMT_BITSHIFT)), (void*)CpuManagementTable[i], CPU_MGMT_NUM_PAGES, PM_MAP);
     }
     for (UINT64 i = 0; i < 0xff; i++) {
         MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE_INTERRUPT_HANDLERS + (i << 0xf)), GlobalWrapperPointer[i], 8, PM_MAP);
