@@ -227,7 +227,7 @@ Creates partition with DLL OEM_NAME,
 */
 
 
-PFAT32_PARTITION FSBASEAPI Fat32CreatePartition(UINT32 BaseLba, UINT32 NumClusters, UINT8 ClusterSize, UINT8* VolumeLabel, UINT16 NumReservedSectors);
+PFAT32_PARTITION FSBASEAPI Fat32CreatePartition(UINT32 BaseLba, UINT32 NumClusters, UINT8 ClusterSize, UINT8* VolumeLabel, UINT16 NumReservedSectors, char* BootSector);
 __FS_BOOL FSBASEAPI Fat32WriteReservedArea(PFAT32_PARTITION Partition, UINT16 Sector, UINT16 NumSectors, void* Buffer);
 int FSBASEAPI Fat32CreateFile(PFAT32_PARTITION Partition, UINT16* Path, FAT_FILE_ATTRIBUTES FileAttributes);
 

@@ -90,6 +90,7 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 		CpuManagementTable[i]->ProcessorId = i;
 		for (UINT64 c = 0; c < NUM_PRIORITY_CLASSES; c++) {
 			CpuManagementTable[i]->ThreadQueues[c] = WaitingQueue + c;
+			// CpuManagementTable[i]->HighestPriorityThread[c] = (UINT64)-1;
 		}
 		// CpuManagementTable[i]->TaskSchedulerData.cr3 = KeGlobalCR3;
 		
@@ -104,16 +105,15 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 		hIdleThread->State |= THS_IDLE | THS_MANUAL;
 		hIdleThread->ProcessorId = i; // Make thread only runnable on this cpu
 		hIdleThread->SchedulingQuantum = 0;
-		hIdleThread->TimeBurst = 0; // 3 clocks
+		hIdleThread->TimeBurst = 0;
 
 		// Setup Interrupts Thread
 		HTHREAD InterruptsThread = CpuManagementTable[i]->SystemInterruptsThread;
-		InterruptsThread->State |= THS_MANUAL;
+		InterruptsThread->State |= THS_IDLE | THS_MANUAL; // Do not save registers of this thread
 		InterruptsThread->ProcessorId = i;
 		InterruptsThread->Registers.rflags = 0; // Interrupts disabled
 		InterruptsThread->TimeBurst = 0;
 	}
-	// Pmgrt.NumProcessors = CpuCount;
 	__CPU_MGMT_TBL_SETUP__ = TRUE;
 }
 
@@ -129,14 +129,13 @@ extern void SetupCPU() {
 	InitProcessorDescriptors(&CpuManagementTable[ProcessorId]->CpuBuffer, &CpuManagementTable[ProcessorId]->CpuBufferSize);
 	EnableApic();
 	SetupLocalApicTimer();
-	__pause();
+	_RT_SystemDebugPrint(L"Processor#%d ON", ProcessorId);
 	CpuManagementTable[ProcessorId]->Initialized = TRUE;
 	// CpuManagementTable[ProcessorId]->CpuId = ProcessorId;
 	CpuBootStatus = 1; // Declare successful CPU Boot
 
 	__sti();
 	for (;;) {
-		__pause();
 		__hlt();
 	}
 
@@ -147,7 +146,6 @@ extern void SetupCPU() {
 KERNELSTATUS InitializeApicCpu(UINT64 ApicId) {
 
 	CpuBootStatus = 0;
-
 
 	*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_ERROR_STATUS) = 0;
 	*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_HIGH) = (*(uint32_t*)(LAPIC_ADDRESS + 0x310) & 0x00ffffff) | (ApicId << 24);
@@ -293,12 +291,12 @@ void SetupLocalApicTimer(){
 			}
 
 		}
-			if(!CpuBusSpeed) {
-				// We will assum a 100MHz Bus Frequency
-				CpuBusSpeed = 100000000;
-			}
+		if(!CpuBusSpeed) {
+			// We will assum a 100MHz Bus Frequency
+			CpuBusSpeed = 100000000;
 			_RT_SystemDebugPrint(L"EXTERNAL_BUS_SPEED : %d", CpuBusSpeed);
-		UINT64 InitialCount = ((CpuBusSpeed) / 0x10 /*Divisor*/) / 0x1000 /*Target clocks per second*/;
+		}
+		UINT64 InitialCount = ((CpuBusSpeed) / 0x10 /*Divisor*/) / 0x800 /*Target clocks per second*/;
 
 		if(!ApicTimerBaseQuantum){
 			TimerIncrementerCpuId = GetCurrentProcessorId();

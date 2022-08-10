@@ -6,9 +6,9 @@
 
 
 [BITS 16]
-BOOT_PARTITION_BASE_ADDRESS equ 0x9000
+BOOT_PARTITION_BASE_ADDRESS equ 0x7C00
 
-IMAGE_BASE equ 0x9200
+IMAGE_BASE equ 0x7E00
 EXTENDED_BOOT_AREA_END equ 0x16C00
 [ORG IMAGE_BASE]
 
@@ -106,18 +106,17 @@ VbeModeInfo:
     .FrameBufferAddress dd 0
     .OffsetScreenMemory dd 0
     .OffsetScreenMemorySize dw 0
-    times 0x200 db 0 ; Reserved
+    times 0x100 db 0 ; Reserved
 
 
 
-times 0xE00 - ($-$$) db 0xFF
-
+align 0x10
 DiskTransferBuffer:
     times 0x1000 db 0
 
-stack_top:
-    times 0x2200 db 0
 stack_bottom:
+    times 0x2200 db 0
+stack_top:
 times 0x100 db 0
 
 ERROR_INVALID_FS_BOOTAREA db "Invalid or Corrupt File System Boot Area", 13, 10, 0
@@ -150,9 +149,6 @@ loader_start:
 
 
     call GetMemoryMap
-    
-
-    call SetupVesaVBE
 
     jmp EnableProtectedMode
 
@@ -253,6 +249,7 @@ GetMemoryMap:
     mov di, BiosSystemMemoryMap
     ; Set ignore bit if ACPI Field is not supported by BIOS
     mov word [es:di + 20], 1
+
     int 0x15
 
 
@@ -272,8 +269,10 @@ GetMemoryMap:
         ; Set ignore bit if ACPI Field is not supported by BIOS
         mov di, BiosSystemMemoryMap
         mov word [es:di + 20], 1
+
         int 0x15
-        jc .error
+
+        jc .exit
         cmp eax, 0x534D4150
         jne .error
         
@@ -319,6 +318,7 @@ ReEnterProtectedMode:
 
 
 _print16:
+    
     push ax
     push di
     mov ah, 0x0e
@@ -327,7 +327,9 @@ _print16:
 		je .exit
 		mov al, [di]
 		inc di
-		int 0x10
+
+        int 0x10
+
 		jmp .loop
 	.exit:
         pop di
@@ -402,19 +404,31 @@ GDT_END:
 SetupVesaVBE:
     ; Get info block
  
+    pusha
+
     mov eax, 0x4F00
     mov edi, VbeInfoBlock
+    push ds
+    push es
+    push gs
+    push fs
+
     int 0x10
+
+    pop fs
+    pop gs
+    pop es
+    pop ds
 
     cmp eax, 0x4F ; With Status = 0
     mov edi, VesaVbeNotSupported
     jne SetFailureMessage
 
     
-    cmp dword [es:VbeInfoBlock.VbeSignature], 'VESA'
+    cmp dword [VbeInfoBlock.VbeSignature], 'VESA'
     jne SetFailureMessage
     xor ebx, ebx
-    mov bx, [es:VbeInfoBlock.VideoModePtr]; Count for loop
+    mov bx, [VbeInfoBlock.VideoModePtr]; Count for loop
     .loop:
         mov eax, 0x4F01
         mov cx, [bx]
@@ -422,7 +436,17 @@ SetupVesaVBE:
         je .exit
         mov word [VbeMode], cx
         mov edi, VbeModeInfo
+        push ds
+        push es
+        push gs
+        push fs
+
         int 0x10
+
+        pop fs
+        pop gs
+        pop es
+        pop ds
         add bx, 2
         cmp ax, 0x4F
         jne .loop
@@ -451,10 +475,21 @@ SetupVesaVBE:
         mov bx, [VbeMode]
         or bx, 0x4000 ; To use the frame buffer
         xor edi, edi
+        push ds
+        push es
+        push gs
+        push fs
+
         int 0x10
+
+        pop fs
+        pop gs
+        pop es
+        pop ds
         cmp ax, 0x4F
         jne VesaVbeNotSupported
 
+    popa
     ret
 
 ; Di = Message
@@ -491,12 +526,15 @@ RealModeEntry:
 
 
 Int13:
-
+    pusha
     mov si, DiskLbaPacket
     mov ah, 0x42
     mov dl, [BootDrive]
+
     int 0x13
+
     jc .err
+    popa
     ret
 .err:
     mov di, HardDiskReadFailed
@@ -522,11 +560,12 @@ SetupSegmentsAndRet:
     mov ds, ax
     mov es, ax
     mov ss, ax
+    mov gs, ax
+    mov fs, ax
     xor eax, eax
     mov eax, [RealModeCallEaxSaved]
     jmp [RealModeReturn]
 
-ConstentMemoryAlloc:
 
 
 ProtectedModeEntry:
@@ -537,10 +576,11 @@ ProtectedModeEntry:
     mov gs, ax
     mov fs, ax
 
-    mov esp, stack_bottom
+    mov esp, stack_top
     mov ebp, esp
    
     ; Check BOOT_POINTER_TABLE
+
     cmp dword [BootPointerTable], BOOT_POINTER_TABLE_MAGIC
     jne .InvalidFsArea
     cmp dword [BootPointerTable + 4], BOOT_POINTER_TABLE_STRMAGIC
@@ -549,6 +589,8 @@ ProtectedModeEntry:
     jne .UnsupportedFSBootVersion
     cmp word [BootPointerTable + 10], BOOT_MINOR
     jne .UnsupportedFSBootVersion
+
+    
 
     jmp EnterLongMode
     .halt:
@@ -792,12 +834,6 @@ MemoryMap:
 FailedToGetMemoryMap db "An unexpected error ocurred. Failed to get Memory Map.", 13, 10, 0
 bmgr db "Legacy Bios OS Boot Manager 1.0", 13, 10, 0
 VesaVbeNotSupported db "VESA VBE Not Supported. This computer cannot run the Operating System.", 13, 10, 0
-; leave space for details
-AcpiConventionnalMemory db "Conventionnal Memory ", 0
-AcpiReservedMemory db "Reserved Memory ", 0
-AcpiReclaimableMemory db "ACPI Reclaimable Memory ", 0
-AcpiNvsMemory db "ACPI NVS Memory ", 0
-AcpiBadMemory db "Bad Memory ", 0
 
 __SUCCESS db "SUCCESS...", 13, 10, 0
 HardDiskReadFailed db "An unexpected error occurred, Failed to read from Hard Drive.", 13, 10, 0
@@ -811,7 +847,7 @@ NoEnoughMemory db "Loading Failed, no enough memory.", 13, 10, 0
 
 
 %include "bootldr64.asm"
-times 0x12E00 - ($-$$) db 0
+times 0x12200 - ($-$$) db 0
 
 
 

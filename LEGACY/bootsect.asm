@@ -1,50 +1,10 @@
-[ORG 0x7C00]
+[ORG 0x600]
 [BITS 16]
 
-; FAT32 Format Bootsector
+BOOT_BASE equ 0x600
 
 
-; ; JMP
-
-; _jmp:
-; 	jmp $ + BOOT_OFFSET
-
-; ; OEM NAME
-; db "_DEVOS__"
-; ; BIOS_PARAMETER_BLOCK
-; dw 0x200
-; db 1
-; dw 0x100
-; db 2
-; dw 0
-; dw 0
-; db 0xF8 ; Hard disk
-; dw 0
-
-; ; DOS3_PARAMETER_BLOCK
-; dw 0x3F ; All modern drives use 63 sectors per track
-; dw 0
-; dd 0
-; dd 1
-
-; ; EXTENDED_BIOS_PARAMETER_BLOCK
-
-; dd 1
-; dw 0
-; dw 0x100
-; dd 2
-; dw 0
-; dw 0
-; times 12 db 0 ; Reserved
-; db 0 ; PHYSICAL_DRIVE_NUMBER
-; db 0
-; db 0x29 ; EXTENDED_BOOT_SIGNATURE
-; dd 0 ; VOLUME_ID
-; db "HYBRID_BOOT"
-; db "FAT32",0,0,0
-
-
-MBR_PARTITION_ADDRESS equ 0x7DCE
+MBR_PARTITION_ADDRESS equ BOOT_BASE + 0x1CE
 
 	cli
 	cld
@@ -55,11 +15,17 @@ MBR_PARTITION_ADDRESS equ 0x7DCE
 	mov ss, ax
 	mov gs, ax
 	mov fs, ax
+
+	; Relocate bootsector to 0:0x600
+	mov si, 0x7C00
+	mov di, 0x600
+	mov cx, 0x80 ; 0x80 * 4 = 512
+	rep movsd
 	jmp 0:_boot
 
 BootDrive db 0
 
-BOOT_PARTITION_BASE_ADDRESS equ 0x9000
+BOOT_PARTITION_BASE_ADDRESS equ 0x7C00
 
 BOOT_MANAGER_OFFSET equ 0x200
 
@@ -73,13 +39,14 @@ _boot:
 	; Reset segment registers
 	
 
-	mov sp, 0x8000
+	mov sp, 0x1000
 	mov bp, sp
 
 	mov bx, BootDrive
 
 	mov [bx], dl
 
+	
 
 
 	; Check if partition is active
@@ -91,7 +58,9 @@ _boot:
 	; mov ch, [es:bx + 3]
 	mov eax, [bx + 8] ; Lba Start
 	mov [LbaPacket.Lba], eax
+
 	call LbaRead
+
 
 	; Check BOOT_MANAGER Header
 	mov bx, BOOT_PARTITION_BASE_ADDRESS + BOOT_MANAGER_OFFSET
@@ -119,19 +88,20 @@ _boot:
 		cmp word [bx], BOOT_MANAGER_MAGIC1
 		jne ErrInvalidOrCorruptedFs
 
-	mov bx, [BOOT_PARTITION_BASE_ADDRESS + BOOT_MANAGER_OFFSET + 0x10] ; 0x10 offset of boot entry pointer
+	; mov bx, [BOOT_PARTITION_BASE_ADDRESS + BOOT_MANAGER_OFFSET + 0x10] ; 0x10 offset of boot entry pointer
 	mov dl, [BootDrive] ; Send boot drive to BOOT_MANAGER
-	jmp bx
 
-READ_PART2_SEG equ 0x1120
-READ_PART3_SEG equ 0x1920
-READ_PART4_SEG equ 0x2120
+	jmp 0x7C00
+
+READ_PART2_SEG equ 0xFE0
+READ_PART3_SEG equ 0x17E0
+READ_PART4_SEG equ 0x1FE0
 LbaPacket:
 	db 0x10
 	db 0
 	.NumSectors dw 0x41 ; + 1 (PARTITION BOOTSECTOR) (read in 4 parts)
 	.Address dw 0
-	.Segment dw 0x900 ; Address 0x9000 (BOOT_PARTITION_BASE_ADDRESS)
+	.Segment dw BOOT_PARTITION_BASE_ADDRESS / 0x10 ; Address 0x7C00 (BOOT_PARTITION_BASE_ADDRESS)
 	.Lba dq 0 ; Set by bootsector
 
 
@@ -167,13 +137,14 @@ LbaRead:
 	mov si, LbaPacket
 	mov ah, 0x42
 	mov dl, [BootDrive]
+	push cx
 	int 0x13
 	jc .err
+	pop cx
 	add bx, 0x800 ; Segment inc
 	dec cx
 	jmp .loop
 .exit:
-
 	ret
 .err:
 	mov di, CouldNotReadHardDisk
@@ -204,7 +175,7 @@ ErrInvalidOrCorruptedFs:
 	call _print
 	jmp _halt
 
-BOOTMGR_MAGIC0 db "BOOTMGR_"
+BOOTMGR_MAGIC0 db "BOOTMGR_",0
 InvalidOrCorruptedFs db "Invalid or corrupted file system", 13, 10, "Halting...", 13, 10, 0
 CouldNotReadHardDisk db "Could not read from hard disk.", 13, 10, "Halting...", 13, 10, 0
 BOOT_CODE_LENGTH equ 440

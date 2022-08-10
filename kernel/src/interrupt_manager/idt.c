@@ -97,8 +97,15 @@ void GlobalInterruptDescriptorInitialize()
 
 	// Determine which function to use depending on extension support :
 	// (SSE, AVX, AVX512)
-	SetInterruptGate(SchedulerEntrySSE,INT_APIC_TIMER,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
-	
+	CPUID_INFO CpuInfo = {0};
+	__cpuid(&CpuInfo, 1);
+	if(CpuInfo.ecx & CPUID1_ECX_AVX) {
+		SOD(0, "Process Supports AVX");
+		while(1);
+		SetInterruptGate(SchedulerEntryAVX,INT_APIC_TIMER,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
+	} else {
+		SetInterruptGate(SchedulerEntrySSE,INT_APIC_TIMER,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
+	}
 	
 	// SetInterruptGate(SkipTaskSchedule,INT_SCHEDULE,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
 

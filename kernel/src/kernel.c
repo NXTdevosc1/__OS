@@ -63,7 +63,7 @@ HANDLE_TABLE gSystemHandleTable = {0};
 
 RFSERVER KernelServer = NULL;
 
-__declspec(allocate(_FIMPORT)) FILE_IMPORT_ENTRY FileImportTable[] = {
+__declspec(allocate(_FIMPORT)) FILE_IMPORT_ENTRY FileImportTable[0x20] = {
 	{FILE_IMPORT_DATA, 0, NULL, L"$BOOTCONFIG", 0, L"OS\\System\\KeConfig\\$BOOTCONFIG"},
 	{FILE_IMPORT_DATA, 0, NULL, L"$DRVTBL", 0, L"OS\\System\\KeConfig\\$DRVTBL"},
 	{FILE_IMPORT_DLL, 0, NULL, L"osdll.dll", 0, L"OS\\System\\osdll.dll"},
@@ -73,7 +73,7 @@ __declspec(allocate(_FIMPORT)) FILE_IMPORT_ENTRY FileImportTable[] = {
 	// {FILE_IMPORT_DRIVER, 0, NULL, L"usb.sys", 0, L"OS\\System\\usb.sys"},
 	{FILE_IMPORT_DEVICE_DRIVER, 0, NULL, L"ehci.sys", 0, L"OS\\System\\ehci.sys"},
 	{FILE_IMPORT_DEVICE_DRIVER, 0, NULL, L"ahci.sys", 0, L"OS\\System\\ahci.sys"},
-	// {FILE_IMPORT_DEVICE_DRIVER, 0, NULL, L"xhci.sys", 0, L"OS\\System\\xhci.sys"},
+	{FILE_IMPORT_DEVICE_DRIVER, 0, NULL, L"xhci.sys", 0, L"OS\\System\\xhci.sys"},
 	// {FILE_IMPORT_DRIVER, 0, NULL, L"eodx.sys", 0, L"OS\\System\\eodx.sys"},
 	{0}, // End of table
 };
@@ -83,11 +83,7 @@ void KERNELAPI IdleThread() {
 	}
 }
 
-void th() {
-	for(;;) {
-		_RT_SystemDebugPrint(L"TH_RUNNING");
-	}
-}
+
 
 LPWSTR KernelProcessName = L"System Kernel.";
 
@@ -117,9 +113,6 @@ extern void _start() {
 	// Creating Free Entries for Conventionnal Memory
 	
 	KernelHeapInitialize();
-
-	_RT_SystemDebugPrint(L"Kernel Startup. (IMAGE_BASE : %x , IMAGE_SIZE : %x)", InitData.ImageBase, InitData.ImageSize);
-	_RT_SystemDebugPrint(L"Memory : %x, Allocated : %x", PhysicalMemoryStatus.TotalMemory, PhysicalMemoryStatus.AllocatedMemory);
 
 	#ifdef ___KERNEL_DEBUG___
 			DebugWrite("Memory Heaps initialized.");
@@ -219,7 +212,7 @@ extern void _start() {
 		}
 	}else {
 		// Search using Legacy BIOS Method
-		for(char* i = (char*)0xE0000; (UINT64)i<0x00100000;i++) {
+		for(char* i = (char*)0xE0000; i<(char*)0x100000;i++) {
 			if(!SYSTEM_TABLES_SETMAP.acpi_set && 
 			memcmp(i, "RSD PTR ", 8)
 			) {
@@ -234,6 +227,7 @@ extern void _start() {
 	}
 
 
+	
 
 	
 	
@@ -250,8 +244,7 @@ extern void _start() {
 
 	UINT32 NumProcessors = AcpiGetNumProcessors();
 	CpuSetupManagementTable(NumProcessors);
-
-	SetPriorityClass(kproc, PRIORITY_CLASS_REALTIME);
+	SetPriorityClass(kproc, PRIORITY_CLASS_NORMAL);
 	HTHREAD KernelThread = CreateThread(kproc, 0, NULL, 0, NULL);
 	if (!KernelThread) SET_SOD_INITIALIZATION;
 
@@ -294,33 +287,21 @@ __setCR3((UINT64)kproc->PageMap);
 	}
 
 
-	TaskSchedulerEnable(); // Enable scheduler to perform IRQs
-
 
 	HpetConfigure();
 
 	SetupLocalApicTimer();
-
-	__sti();
-	// CreateThread(kproc, 4096, th, 0, 0);
-	UINT64 LastCs = 0;
-	for(;;) {
-		_RT_SystemDebugPrint(L"CS/S : %x, CS_LATENCY : %x", CpuManagementTable[0]->TotalClocks[0] - LastCs, CpuManagementTable[0]->LastThreadSwitchLatency[0]);
-		LastCs = CpuManagementTable[0]->TotalClocks[0];
-		// _RT_SystemDebugPrint(L"Context Switches : %x:%x , Time : %x , CS Latency : %x, OF : %x", CpuManagementTable[0]->TotalClocks[0], CpuManagementTable[0]->TotalClocks[1], CpuManagementTable[0]->HighPrecisionTime[0], (CpuManagementTable[0]->LastThreadSwitchLatency[0] * GetHighPerformanceTimerFrequency()) / 1000000, (UINT64)((UINT64)CpuManagementTable[0]->LastThreadSwitchLatency - (UINT64)CpuManagementTable[0]));
-		// for(int c = 0;c<0x100000;c++);
-		Sleep(1000);
-	}
-
-	while(1);
-
+	
 	
 	// TaskSchedulerDisable();
 
 	if(!BootConfiguration->DisableMultiProcessors){
 		Pmgrt.NumProcessors = NumProcessors;
+		MapPhysicalPages(kproc->PageMap, SMP_BOOT_ADDR, SMP_BOOT_ADDR, 1, PM_MAP);
 		UINT64 SmpCodeSize = (UINT64)&SMP_TRAMPOLINE_END - (UINT64)SMP_TRAMPOLINE;
 		memcpy(SMP_BOOT_ADDR, SMP_TRAMPOLINE, SmpCodeSize);
+
+
 		for (UINT64 i = 0; i < NumProcessors; i++) {
 			if (i == KernelThread->ProcessorId) continue; // the bootstrap processor
 			if(KERNEL_ERROR(InitializeApicCpu(i)))
@@ -333,6 +314,8 @@ __setCR3((UINT64)kproc->PageMap);
 	}
 
 	Pmgrt.SystemInitialized = 1;
+
+	
 	#ifdef ___KERNEL_DEBUG___
 	DebugWrite("System Initialized. Creating Kernel IPC Server");	
 	#endif
@@ -364,6 +347,18 @@ __setCR3((UINT64)kproc->PageMap);
 	RtcInit();
 	
 
+	
+	// __sti();
+	// UINT64 LastCs = 0;
+	// for(;;) {
+	// 	_RT_SystemDebugPrint(L"CS/S : %x, CS_LATENCY : %x", CpuManagementTable[0]->TotalClocks[0] - LastCs, CpuManagementTable[0]->LastThreadSwitchLatency[0]);
+	// 	LastCs = CpuManagementTable[0]->TotalClocks[0];
+	// 	// _RT_SystemDebugPrint(L"Context Switches : %x:%x , Time : %x , CS Latency : %x, OF : %x", CpuManagementTable[0]->TotalClocks[0], CpuManagementTable[0]->TotalClocks[1], CpuManagementTable[0]->HighPrecisionTime[0], (CpuManagementTable[0]->LastThreadSwitchLatency[0] * GetHighPerformanceTimerFrequency()) / 1000000, (UINT64)((UINT64)CpuManagementTable[0]->LastThreadSwitchLatency - (UINT64)CpuManagementTable[0]));
+	// 	// for(int c = 0;c<0x100000;c++);
+	// 	Sleep(1000);
+	// }
+
+	// while(1);
 	
 	// Check Driver Table
 
@@ -501,12 +496,13 @@ __setCR3((UINT64)kproc->PageMap);
 	UINT Elapsed = 0;
 
 
+	SetPriorityClass(kproc, PRIORITY_CLASS_IDLE);
 
 	for(;;){
 		GP_draw_sf_text(to_stringu64(Elapsed - 1), 0, 800, 500);
 		GP_draw_sf_text(to_stringu64(Elapsed), 0xffff, 800, 500);
 		Elapsed++;
-		Sleep(1000);
+		MicroSleep(100000);
 	}
 
 	UINT64 Threshold = 0, NumMessages = 0; // Message / s

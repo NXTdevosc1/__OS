@@ -126,14 +126,6 @@ align 0x10
 
     int 0x40
 
-    mov rax, 0xbeef
-    jmp $
-
-    mov rax, OverflowCheck
-    mov rbx, OverflowCheckStackTop
-
-    int 0x40
-
     jmp OverflowCheck
 
 

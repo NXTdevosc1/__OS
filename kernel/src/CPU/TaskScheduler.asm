@@ -5,8 +5,7 @@
 section .text
 
 global SchedulerEntrySSE
-global SchedulerEntryAVX
-global SchedulerEntryAVX512
+
 
 ; TODO For User mode : DS set to 0x10 at entry, Save & Restore CR3
 
@@ -18,9 +17,7 @@ SchedulerEntrySSE:
 	push rbx
 	push rax
 
-	mov rbx, Pmgrt
-	cmp dword [rbx], 0
-	je .SchedulerNotEnabled
+
 
 	mov rax, [rel SystemSpaceBase]
 	mov ebx, [rax + APIC_ID]
@@ -28,8 +25,12 @@ SchedulerEntrySSE:
 	shl rbx, CPU_MGMT_SHIFT
 	lea rax, [rbx + SYSTEM_SPACE_CPUMGMT + rax]
 
+
+
 	mov rbx, [rax + CPM_CURRENT_THREAD]
 	
+	test qword [rbx], THS_IDLE
+	jnz .R0 ; Idle threads like System Interrupt & Idle thread do not need register saving
 	; SAVE Schedule Registers
 	jmp .SSESaveRegisters
 
@@ -51,14 +52,7 @@ SchedulerEntrySSE:
 	mov [rax + CPM_HIGH_PRECISION_TIME], rdx
 	movq xmm13, rdx
 
-	; mov rdx, 0x100000
-	; .l:
-	; dec rdx
-	; test rdx, rdx
-	; jz .r
-	; jmp short .l
-	; .r:
-
+	
 	cmp qword [rax + CPM_FORCE_NEXT_THREAD], 0
 	je .A0
 
@@ -75,7 +69,7 @@ SchedulerEntrySSE:
 	cmp qword [rax + CPM_NUM_READY_THREADS + r10], 0
 	jne .A1
 	shl r10, 1
-	movdqa [rax + CPM_READY_ON_CLOCK + r10], xmm0
+	mov [rax + CPM_READY_ON_CLOCK + r10], rcx
 .A1:
 
 
@@ -118,10 +112,12 @@ SchedulerEntrySSE:
 	shr rcx, 16
 	mov fs, cx
 
-	push qword [rbx + _RSP]
-	push qword [rbx + _RFLAGS]
-	push qword [rbx + _CS]
-	push qword [rbx + _RIP]
+	sub rsp, 0x20
+	movdqu xmm0, [rbx + __MM16_RIPCS]
+	movdqu [rsp], xmm0
+	movdqu xmm0, [rbx + __MM16_RFLAGSRSP]
+	movdqu [rsp + 0x10], xmm0
+
 	; Calculate Interrupt latency (Only for debugging and optimizing purpose & maybe removed later)
 	
 	
@@ -163,17 +159,7 @@ SchedulerEntrySSE:
 
 
 	iretq
-.SchedulerNotEnabled:
 
-	; Send APIC EOI
-	mov rax, [rel SystemSpaceBase]
-	mov dword [rax + 0xB0], 0
-	
-	pop rax
-	pop rbx
-	pop rcx
-	pop rdx
-	iretq
 
 
 
@@ -198,11 +184,15 @@ SchedulerEntrySSE:
 	movdqu [rbx + __MM16_RFLAGSRSP], xmm0
 	
 	; Segment Registers
-	mov [rbx + _DS], ds
+	mov cx, fs
+	shl rcx, 16
+	mov cx, gs
+	shl rcx, 16
 	mov cx, [rsp + 0x40]
-	mov [rbx + _SS], cx
-	mov [rbx + _GS], gs
-	mov [rbx + _FS], fs
+	shl rcx, 16
+	mov cx, ds
+
+	mov [rbx + _DS], rcx ; DS, SS, GS, FS
 	mov [rbx + _ES], es
 
 	; Remaining Registers	
@@ -247,9 +237,9 @@ SchedulerEntrySSE:
 	jne .J4
 	; Set Ready On Clocks
 	shl r10, 1
-	movdqa [rax + CPM_READY_ON_CLOCK + r10], xmm0
+	mov [rax + CPM_READY_ON_CLOCK + r10], rcx
 .J4:
-	mov r11d, 0xFF ; Set highest priority number
+	
 	pxor mm4, mm4
 	jmp .J2
 .J1:
@@ -258,13 +248,12 @@ SchedulerEntrySSE:
 	mov ecx, [rcx + PROCESS_PRIORITY_CLASS]
 	movq mm5, rcx
 	movq mm4, rbx
-	mov r11d, [rbx + TH_THREAD_PRIORITY]
+	
 .J2:
 
 	lea rcx, [rax + CPM_NUM_READY_THREADS] ; XMM0
 	lea rdx, [rax + CPM_THREAD_QUEUES] ; XMM1
 	lea r8, [rax + CPM_READY_ON_CLOCK] ; XMM2
-	lea r9, [rax + CPM_HIGHEST_PRIORITY_THREAD] ; XMM3
 
 
 
@@ -281,10 +270,9 @@ movq mm6, r13
 
 xor r15, r15 ; Priority index
 
-mov r13, 1
-movq xmm9, r13
 
 xor rbx, rbx
+mov r11d, 0xFF ; Set highest priority number
 .loop:
 	test r15, 8
 	jnz .SSEFindNextTaskEXIT
@@ -294,10 +282,10 @@ xor rbx, rbx
 
 	
 
-	; Load XMM0-XMM3 With values
+	; Load XMM0-XMM2 With values
 	movdqa xmm0, [rcx] ; Num Ready Threads
 	movdqa xmm1, [rdx] ; Thread Queues
-	movdqa xmm3, [r9] ; Highest Priority Thread
+
 	movq r13, mm6
 	movdqa xmm15, [r13] ; Total Threads
 	
@@ -328,8 +316,9 @@ xor rbx, rbx
 	movq r13, xmm4
 	cmp r13, [r8]
 	jb .A0L0E0
+	mov r9, [rcx]
 	call SSEFullScan
-	movlps [rcx], xmm0
+	mov [rcx], r9
 	; Partial scan on the highest priority ready thread (ReadyThreads > 0)
 .A0L0E0:
 	
@@ -338,10 +327,9 @@ xor rbx, rbx
 
 	add r8, 0x10 ; Ready on clock
 	add rcx, 0x8
-
+	
 	psrldq xmm0, 8 ; Shift right by 8 bytes
 	psrldq xmm1, 8
-	psrldq xmm3, 8
 	psrldq xmm15, 8
 
 	inc r15
@@ -383,11 +371,34 @@ xor rbx, rbx
 	jne .R1
 	; Set Ready On Clocks
 	shl r10, 1
-	movdqa [rax + CPM_READY_ON_CLOCK + r10], xmm0
-.SetIdleThread:
-	mov rbx, [rax + CPM_SYSTEM_IDLE_THREAD]
+	mov [rax + CPM_READY_ON_CLOCK + r10], rdi
 	jmp .R1
+.SetIdleThread:
 
+	mov rbx, [rax + CPM_SYSTEM_IDLE_THREAD]
+	mov [rax + CPM_CURRENT_THREAD], rbx
+	inc qword [rax + CPM_TOTAL_CLOCKS]
+	mov rax, [rel SystemSpaceBase]
+	mov dword [rax + 0xB0], 0 ; APIC_EOI
+	; Idle cpu time
+	sti
+	jmp .__Idle
+	; mov rax, .__Idle
+	; push 0x10
+	; push rsp ; Anyway it will not be used
+	; push 0x200
+	; push 0x08
+	; push rax
+	; iretq
+
+.__Idle:
+	mov rax, 0xCAFE
+	hlt
+.SchedulerOverflow:
+	cli
+	mov rax, 0xDBBEEF
+	hlt
+	jmp .SchedulerOverflow
 ; ______________________________________________________________________
 
 
@@ -442,9 +453,8 @@ SSEHighestPriorityThreadScan:
 	
 	mov rbx, r12
 	mov r11d, [rbx + TH_THREAD_PRIORITY]
-	movq r13, xmm3 ; Highest Priority
-	cmp r11d, r13d
-	je .Exit
+	test r11d, r11d
+	jz .Exit ; 0 is the highest priority availaible
 .__E1:
 	psrldq xmm10, 8
 
@@ -477,9 +487,8 @@ SSEHighestPriorityThreadScan:
 	
 	mov rbx, r12
 	mov r11d, [rbx + TH_THREAD_PRIORITY]
-	movq r13, xmm3 ; Highest Priority
-	cmp r11d, r13d
-	je .Exit
+	test r11d, r11d
+	jz .Exit ; 0 is the highest priority availaible
 .E1:
 	add rsi, 2
 	add r10, 0x10
@@ -545,7 +554,9 @@ SSEFullScan:
 	movq r13, xmm4
 	cmp r13, [r12 + TH_READY_AT]
 	jb .__E1
-	paddq xmm0, xmm9 ; Num Ready Threads
+
+	inc r9 ; NUM_READY_THREADS
+	
 	cmp [r12 + TH_THREAD_PRIORITY], r11d ; 0 = Highest, 6 = lowest
 	jae .__E1
 	mov r13, [r12] ; State
@@ -577,7 +588,9 @@ SSEFullScan:
 	movq r13, xmm4
 	cmp r13, [r12 + TH_READY_AT]
 	jb .E1
-	paddq xmm0, xmm9 ; Num Ready Threads
+
+	inc r9 ; NUM_READY_THREADS
+
 	cmp [r12 + TH_THREAD_PRIORITY], r11d
 	jae .E1
 	mov r13, [r12] ; State
@@ -623,6 +636,3 @@ SSEFullScan:
 .Exit:
 	ret
 
-; TODO : VPINSRQ To mov registers across YMM (Result : 4/3 times faster register switching)
-SchedulerEntryAVX:
-SchedulerEntryAVX512:

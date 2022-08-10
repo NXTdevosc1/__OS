@@ -15,6 +15,7 @@ section .text
 
 InterruptServiceWrapper%1:
 	cli
+
 	push rdx
 	lea rdx, [rsp + 8] ; Interrupt Stack Frame
 	push rax

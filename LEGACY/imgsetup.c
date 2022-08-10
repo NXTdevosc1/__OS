@@ -8,9 +8,15 @@
 #include <strsafe.h>
 
 #define IMAGE_NAME "os.img"
+
 #define BOOT_SECT "x86_64/bootsect.bin"
+
+#define PARTITION_BOOT_SECTOR "x86_64/partbootsect.bin"
+
 #define BOOT_STAGE2 "x86_64/osbootmgr.bin"
 #define ORIGINAL_PARTITION "format.img"
+
+
 
 #define KERNEL_PATH L"OS\\System\\OSKRNLX64.exe"
 
@@ -103,7 +109,6 @@ enum MBR_PARTITION_TYPE{
 #define RESERVED_AREA_SIZE (BOOTMGR_SIZE + 0x20000)
 
 typedef struct _CHS_ADDRESS {
-    
     UINT8 Head;
     UINT8 Sector;
     UINT8 Cylinder;
@@ -240,6 +245,7 @@ UINT16 StrlenW(UINT16* Str) {
 int SetupLocalFs(int argc, char** argv, HANDLE OsImage);
 
 int main(int argc, char** argv) {
+
     if(argc == 1) {
         argc = 3;
         argv[1] = "devctl";
@@ -483,6 +489,15 @@ int SetupLocalFs(int argc, char** argv, HANDLE OsImage){
     void* BufferBootStage2 = malloc(SizeBootStage2);
     if(!BufferBootStage2) return -2;
 
+    HANDLE PartBootsect = CreateFileA(PARTITION_BOOT_SECTOR, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+    if(PartBootsect == INVALID_HANDLE_VALUE) ERROR_EXIT("Failed to open Partition BootSector");
+
+    UINT PartbootsectSize = GetFileSize(PartBootsect, NULL);
+    if(PartbootsectSize != 0x200) ERROR_EXIT("INVALID_PARTITION_BOOT_SECTOR");
+
+    char* PartitionBootsector = malloc(0x200);
+    if(!ReadFile(PartBootsect, PartitionBootsector, 0x200, NULL, NULL)) ERROR_EXIT("Failed to read partition bootsector");
+
     printf("READING_FILES\n");
 
     char FsMbr[0x200] = {0};
@@ -543,8 +558,8 @@ int SetupLocalFs(int argc, char** argv, HANDLE OsImage){
     
 
     Partition = Fat32CreatePartition(
-        IMAGE_START_LBA, NumSectors, 1, "FATPART", EXTENDED_BOOT_AREA_SIZE
-    );
+        IMAGE_START_LBA, NumSectors, 1, 
+        "FATPART", EXTENDED_BOOT_AREA_SIZE, PartitionBootsector);
 
 
     Image.Partitions[0].LastLba =  IMAGE_START_LBA + Partition->BootSector.DosParamBlock.TotalSectors;

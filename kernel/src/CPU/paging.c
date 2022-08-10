@@ -36,10 +36,8 @@ int MapPhysicalPages(
     UINT64 Flags
 ){
     if(((UINT64)VirtualAddress & 0xFFFF800000000000) == 0xFFFF800000000000) {
-        _RT_SystemDebugPrint(L"Virtual Address : %x", VirtualAddress);
         (UINT64)VirtualAddress &= ~ 0xFFFF000000000000;
         (UINT64)VirtualAddress |= (UINT64)1 << 48;
-        _RT_SystemDebugPrint(L"Virtual Address : %x", VirtualAddress);
     }
     RFPAGEMAP Pml4Entry = (RFPAGEMAP)((UINT64)PageMap & ~(0xFFF)), PdpEntry = NULL, PdEntry = NULL, PtEntry = NULL;
     UINT64 TmpVirtualAddr = (UINT64)VirtualAddress >> 12;

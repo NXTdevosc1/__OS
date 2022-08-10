@@ -111,20 +111,22 @@ UINT8 FsInfoSig0[4] = "RRaA";
 UINT8 FsInfoSig1[4] = "rrAa";
 
 
-PFAT32_PARTITION FSBASEAPI Fat32CreatePartition(UINT32 BaseLba, UINT32 NumClusters, UINT8 ClusterSize, UINT8* VolumeLabel, UINT16 NumReservedSectors){
+PFAT32_PARTITION FSBASEAPI Fat32CreatePartition(UINT32 BaseLba, UINT32 NumClusters, UINT8 ClusterSize, UINT8* VolumeLabel, UINT16 NumReservedSectors, char* BootSector){
     PFAT32_PARTITION Partition = StartupInfo.AllocateMemory(sizeof(FAT32_PARTITION));
     Fat32MemClear(Partition, sizeof(FAT32_PARTITION));
 
     
     Partition->ReadCluster = StartupInfo.AllocateMemory(ClusterSize << 9);
     if(!Partition->ReadCluster) return (void*)0;
-    
-    // x86 Code for instruction : jmp 0x7C5A
-    Partition->BootSector.Jmp[0] = 0xEB;
-    Partition->BootSector.Jmp[1] = 0x58;
-    // SINCE DOS 2.0, A valid boot sector must start with jmp (0xEB ? 0x90)
-    // followed by a NOP instruction (0x90)
-    Partition->BootSector.Jmp[2] = 0x90; //sizeof(FAT32_BOOTSECTOR) - 442; // Boot Code Offset
+
+    Fat32MemCopy(&Partition->BootSector, BootSector, 0x200);
+
+    // // x86 Code for instruction : jmp 0x7C5A
+    // Partition->BootSector.Jmp[0] = 0xEB;
+    // Partition->BootSector.Jmp[1] = 0x58;
+    // // SINCE DOS 2.0, A valid boot sector must start with jmp (0xEB ? 0x90)
+    // // followed by a NOP instruction (0x90)
+    // Partition->BootSector.Jmp[2] = 0x90; //sizeof(FAT32_BOOTSECTOR) - 442; // Boot Code Offset
     
 
     Fat32MemCopy(Partition->BootSector.OemName, OemName, 8);

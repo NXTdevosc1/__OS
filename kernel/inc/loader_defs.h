@@ -70,9 +70,8 @@ typedef struct _FRAME_BUFFER_DESCRIPTOR{
 	unsigned long long Pitch;
 	FRAME_BUFFER_DESCRIPTOR* Next;
 } FRAME_BUFFER_DESCRIPTOR;
-enum{
-	KeKernelImage = 0x80
-};
+
+
 struct MEMORY_MAP{
 	unsigned long long count;
 	struct {

@@ -35,7 +35,6 @@ EnterLongMode:
     call CheckCpuid
     call CheckLongModeSupport
 
-    
 
     ; Active PAE & Page Global (PGE)
     mov eax, (1 << 5) | (1 << 7)
@@ -53,15 +52,14 @@ EnterLongMode:
     wrmsr
 
     lidt [IDTR64]
- 
 
     ; Set CR0 With (PE, MP, PG)
 
-
     mov eax, 3 | (1 << 31)
     mov cr0, eax
+ 
     cli
-
+    
     
     jmp 0x20:LongModeEntry ; Jmp to long mode
 
@@ -202,7 +200,6 @@ LongModeEntry:
     mov [AllocationTableLba], rax
     mov rax, [BootPointerTable + BPTOFF_DATA_CLUSTERS_LBA]
     mov [DataClustersStartLba], rax
-
     call LoadPsf1Font
 
 
@@ -476,6 +473,8 @@ mov rbx, [FileImportTable]
     jmp .L3
 .E3:
 
+; Initialize VESA/VBE
+CallRealMode64 SetupVesaVBE, .E4
 
 .E4:
 
@@ -501,6 +500,7 @@ mov rbx, [FileImportTable]
     mov ax, [VbeModeInfo.BitsPerPixel]
     mov [FrameBufferDescriptor + 0x20], ax
     mov dword [FrameBufferDescriptor + 0x24], 60 ; 60 FPS (Assumming)
+
 
 
 ; Setup InitData Structure
@@ -568,6 +568,7 @@ LoadPsf1Font:
     call LoadBootPointerFile
     mov [Psf1FontAddress], rax
     ; Check Magic 0 & Magic 1
+
     cmp byte [rax], 0x36 ; PSF1_MAGIC0
     jne FailedToLoadResources
     cmp byte [rax + 1], 0x04 ; PSF1_MAGIC1
@@ -626,7 +627,7 @@ LoadBootPointerFile:
         mov ecx, [rdx + BPT_ENTRY_NUM_CLUSTERS]
         mov eax, ecx
         push rdx
-        mul byte [0x900D]
+        mul byte [BOOT_PARTITION_BASE_ADDRESS + 0xD]
         pop rdx
         mov rcx, rax
         call AllocatePages
@@ -636,7 +637,7 @@ LoadBootPointerFile:
         ; File Size in cluster bytes
         push rdx
         mov eax, [rdx + BPT_ENTRY_NUM_CLUSTERS]
-        mov ecx, [0x900D]
+        mov ecx, [BOOT_PARTITION_BASE_ADDRESS + 0xD]
         and ecx, 0xFF
         mul ecx
         mov rcx, rax
@@ -676,7 +677,7 @@ push r12
 
 mov r8, [LastClusterChainSector]
 mov r11, [DataClustersStartLba]
-mov r12, [0x900D] ; Cluster Size (in Sectors)
+mov r12, [BOOT_PARTITION_BASE_ADDRESS + 0xD] ; Cluster Size (in Sectors)
 and r12, 0xFF
 mov r13, r12
 shl r13, 9 ; Multiply by 512

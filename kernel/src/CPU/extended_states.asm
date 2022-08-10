@@ -32,20 +32,20 @@ EnableExtendedStates:
     test rax, rax
     jnz .NoFpu
 
-    ; Load MXCSR
-    sub rsp, 0x200
-    fxsave [rsp]
-    mov eax, [rsp + 28] ; MXCSR_MASK
-    or eax, eax
-    jnz ._A
-    mov eax, 0xFFBF
-._A:
-    sub rsp, 8
-    and eax, 0x1F80
-    mov [rsp], rax
-    ldmxcsr [rsp]
+;     ; Load MXCSR
+;     sub rsp, 0x200
+;     fxsave [rsp]
+;     mov eax, [rsp + 28] ; MXCSR_MASK
+;     or eax, eax
+;     jnz ._A
+;     mov eax, 0xFFBF
+; ._A:
+;     sub rsp, 8
+;     and eax, 0x1F80
+;     mov [rsp], rax
+;     ; ldmxcsr [rsp]
 
-    add rsp, 0x208
+;     add rsp, 0x208
 
     mov eax, 1
     cpuid
