@@ -9,7 +9,7 @@ void FirmwareControlRelease(){
 }
 
 void KernelHeapInitialize(){
-	_RT_SystemDebugPrint(L"UEFI : %x, Num Entries : %x", InitData.uefi, InitData.memory_map->count);
+	SystemDebugPrint(L"UEFI : %x, Num Entries : %x", InitData.uefi, InitData.memory_map->count);
     
 	// Types (BIOS & UEFI)
 	UINT16 LoaderData = EfiLoaderData;
@@ -97,20 +97,20 @@ void KernelPagingInitialize(){
 	if(!InitData.uefi) {
 
 		// Map Kernel (BIOS Bootloader memory map is very simple and kernel memory region is not mapped)
-		MapPhysicalPages(kproc->PageMap, (char*)InitData.ImageBase - 0x20000, (char*)InitData.ImageBase - 0x20000, (InitData.ImageSize >> 12) + 0x100 , PM_MAP);
+		MapPhysicalPages(kproc->PageMap, (char*)InitData.ImageBase, (char*)InitData.ImageBase, (InitData.ImageSize >> 12) + 0x100 , PM_MAP);
 
 		// Map Low Memory & 1MB Of high memory (Not declared by LEGACY BIOS Bootloader)
 		MapPhysicalPages(kproc->PageMap, 0, 0, 0x200, PM_MAP);
 
 		// Map Allocated Memory by bootloader
 		MapPhysicalPages(kproc->PageMap, InitData.start_font, InitData.start_font, 8, PM_MAP); // 0x8000 KB For PSF1 Font
-	
 		FILE_IMPORT_ENTRY* Entry = FileImportTable;
 		while(Entry->Type != FILE_IMPORT_ENDOFTABLE) {
 			MapPhysicalPages(kproc->PageMap, Entry->LoadedFileBuffer, Entry->LoadedFileBuffer, (Entry->LoadedFileSize >> 12) + 1, PM_MAP);
 			Entry++;
 		}
 	}
+	MapPhysicalPages(kproc->PageMap, InitData.PEDataDirectories, InitData.PEDataDirectories, 1, PM_MAP);
 }
 
 void InitFeatures(){

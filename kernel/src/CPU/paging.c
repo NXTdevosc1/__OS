@@ -8,10 +8,11 @@
 #include <CPU/process.h>
 #define ResetPageMap(x) memset((LPVOID)(x), 0, 0x1000)
 
-void* GetPhysAddr(RFPROCESS Process, const void* Ptr){
+LPVOID KEXPORT KERNELAPI KeResolvePhysicalAddress(RFPROCESS Process, const void* VirtualAddress)
+{
     // from image
    
-    UINT64 PageIndex = (UINT64)Ptr >> 12;
+    UINT64 PageIndex = (UINT64)VirtualAddress >> 12;
     UINT64 pt = PageIndex & 0x1FF;
     UINT64 pd = (PageIndex >> 9) & 0x1FF;
     UINT64 pdp = (PageIndex >> 18) & 0x1FF;
@@ -20,10 +21,15 @@ void* GetPhysAddr(RFPROCESS Process, const void* Ptr){
     UINT64 cr3 = (UINT64)Process->PageMap;
     cr3 &= ~(0xFFF);
     RFPAGEMAP _pml4 = (RFPAGEMAP)(cr3 + (pml4 << 3));
+    if(!_pml4->Present) return NULL;
     RFPAGEMAP _pdp = (RFPAGEMAP)((_pml4->PhysicalAddr << 12) + (pdp << 3));
+    if(!_pdp->Present) return NULL;
     RFPAGEMAP _pd = (RFPAGEMAP)((_pdp->PhysicalAddr << 12) + (pd << 3));
+    if(!_pd->Present) return NULL;
     RFPAGEMAP _pt = (RFPAGEMAP)((_pd->PhysicalAddr << 12) + (pt << 3));
-    return (void*)((_pt->PhysicalAddr << 12) + ((UINT64)Ptr & 0xFFF));
+    if(!_pt->Present) return NULL;
+    
+    return (void*)((_pt->PhysicalAddr << 12) + ((UINT64)VirtualAddress & 0xFFF));
 }
 
 
@@ -128,6 +134,14 @@ int MapPhysicalPages(
         __setCR3((UINT64)PageMap);
     }
     return 0;
+}
+
+int KERNELAPI KeMapMemory(void* PhysicalAddress, void* VirtualAddress, UINT64 NumPages, UINT64 Flags) {
+    return MapPhysicalPages(kproc->PageMap, VirtualAddress, PhysicalAddress, NumPages, Flags);
+}
+
+int KERNELAPI KeMapProcessMemory(RFPROCESS Process, void* PhysicalAddress, void* VirtualAddress, UINT64 NumPages, UINT64 Flags) {
+    return MapPhysicalPages(Process->PageMap, VirtualAddress, PhysicalAddress, NumPages, Flags);
 }
 
 RFPAGEMAP CreatePageMap(){

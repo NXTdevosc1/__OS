@@ -50,6 +50,7 @@ typedef void* HANDLE;
 
 typedef void VOID;
 typedef void* PVOID;
+typedef void* LPVOID;
 typedef UINT64 SIZE;
 
 typedef HANDLE HTHREAD;

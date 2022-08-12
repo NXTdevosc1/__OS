@@ -7,6 +7,7 @@
 DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver) {
     // __cli();
     SystemDebugPrint(L"XHCI Driver Entry : Num Devices %d", Driver->NumDevices);
+    while(1);
     for(UINT32 x = 0;x<Driver->NumDevices;x++) {
         RFDEVICE_OBJECT Device = Driver->Devices[x];
         BOOL Mmio = FALSE;
@@ -17,9 +18,9 @@ DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver) {
         ObjZeroMemory(Xhci);
         SetDeviceExtension(Device, Xhci);
         Xhci->CapabilityRegisters = XhciBaseAddress;
-        KeMapMemory(Xhci->CapabilityRegisters, 1, PM_MAP | PM_CACHE_DISABLE);
+        KeMapMemory(Xhci->CapabilityRegisters, Xhci->CapabilityRegisters, 1, PM_MAP | PM_CACHE_DISABLE);
         Xhci->OperationalRegisters = (void*)((char*)XhciBaseAddress + Xhci->CapabilityRegisters->CapLength);
-        KeMapMemory(Xhci->OperationalRegisters, 1, PM_MAP | PM_CACHE_DISABLE);
+        KeMapMemory(Xhci->OperationalRegisters, Xhci->OperationalRegisters, 1, PM_MAP | PM_CACHE_DISABLE);
 
         SystemDebugPrint(L"XHCI Revision : %x", Xhci->CapabilityRegisters->HciVersion);
     }

@@ -2,6 +2,9 @@
 global _Xmemset128
 export _Xmemset128
 
+global _Xmemset128U
+export _Xmemset128U
+
 global _Xmemset256
 export _Xmemset256
 
@@ -11,17 +14,28 @@ export _Xmemset512
 section .text
 
 
-_Xmemset128:
-    push rdx
-    push rdx
-    movdqu xmm0, [rsp]
-    pop rdx
-    pop rdx
+_Xmemset128U:
+    movq xmm0, rdx
+    movq xmm1, rdx
+    movlhps xmm0, xmm1
     .loop:
         test r8, r8
         jz .exit
         movdqu [rcx], xmm0
         add rcx, 16
+        dec r8
+        jmp .loop
+    .exit:
+        ret
+_Xmemset128: ; Aligned memset
+    movq xmm0, rdx
+    movq xmm1, rdx
+    movlhps xmm0, xmm1
+    .loop:
+        test r8, r8
+        jz .exit
+        movdqa [rcx], xmm0
+        add rcx, 0x10
         dec r8
         jmp .loop
     .exit:

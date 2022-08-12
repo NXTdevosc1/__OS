@@ -18,21 +18,21 @@ void AcpiReadDsdt(RFACPI_DSDT Dsdt){
     UINT64 AmlLength = Dsdt->Sdt.Length - sizeof(ACPI_DSDT);
     UINT8* c1 = Dsdt->Sdt.OEMTableId;
     UINT8* c2 = Dsdt->Sdt.OEMID;
-    _RT_SystemDebugPrint(L"AML_LENGTH : %x, TABLE_ID : %c%c%c%c%c%c%c%c, OEM_ID : %c%c%c%c%c%c", AmlLength, c1[0], c1[1], c1[2], c1[3], c1[4], c1[5], c1[6], c1[7], c2[0], c2[1], c2[2], c2[3], c2[4], c2[5]);
+    SystemDebugPrint(L"AML_LENGTH : %x, TABLE_ID : %c%c%c%c%c%c%c%c, OEM_ID : %c%c%c%c%c%c", AmlLength, c1[0], c1[1], c1[2], c1[3], c1[4], c1[5], c1[6], c1[7], c2[0], c2[1], c2[2], c2[3], c2[4], c2[5]);
     char* Aml = Dsdt->aml;
     char DefName[0x100] = {0};
     for(UINT64 i = 0;i<AmlLength;) {
         if(*Aml == AML_ALIAS_OP) {
             INC_AML(1);
 
-            _RT_SystemDebugPrint(L"ACPI : ALIAS_OP (%c%c%c%c %c%c%c%c)", Aml[0], Aml[1], Aml[2], Aml[3], Aml[4], Aml[5], Aml[6], Aml[7]);
+            SystemDebugPrint(L"ACPI : ALIAS_OP (%c%c%c%c %c%c%c%c)", Aml[0], Aml[1], Aml[2], Aml[3], Aml[4], Aml[5], Aml[6], Aml[7]);
             INC_AML(8);
         }
         else if(*Aml == AML_NAME_OP) {
             INC_AML(1);
             UINT64 NameStringBytes = 0;
             UINT Namelen = AmlCopyName(DefName, Aml, &NameStringBytes);
-            _RT_SystemDebugPrint(L"ACPI : NAME (%s)", DefName);
+            SystemDebugPrint(L"ACPI : NAME (%s)", DefName);
             INC_AML(Namelen);
         }
         else if(*Aml == AML_SCOPE_OP) {
@@ -62,8 +62,8 @@ void AcpiReadDsdt(RFACPI_DSDT Dsdt){
             INC_AML(FollowingBytes);
             UINT64 NameStringBytes = 0;
             UINT LenScopeName = AmlCopyName(DefName, AMLSTRUCT Aml, &NameStringBytes);
-            // _RT_SystemDebugPrint(L"ACPI : SCOPE (%s) PKG=%x, FollowingBytes = %x, DECODED_LENGTH : %x, NSB : %x, FIRST_NAME_BYTES : %c%c%c%c %c%c%c%c %c%c%c%c%c", DefName, (UINT64)Package->PackageLength, (UINT64)Package->FollowingByteDataCount, (UINT64)PkgLength, NameStringBytes, Aml[0], Aml[1], Aml[2], Aml[3], Aml[4], Aml[5], Aml[6], Aml[7], Aml[8], Aml[9], Aml[10], Aml[11], Aml[12]);
-            _RT_SystemDebugPrint(L"ACPI : SCOPE (%s) PKG=%x, FollowingBytes = %x, DECODED_LENGTH : %x, NSB : %x", DefName, (UINT64)Package->PackageLength, (UINT64)Package->FollowingByteDataCount, (UINT64)PkgLength, NameStringBytes, Aml[0], Aml[1], Aml[2], Aml[3], Aml[4], Aml[5], Aml[6], Aml[7], Aml[8], Aml[9], Aml[10], Aml[11], Aml[12]);
+            // SystemDebugPrint(L"ACPI : SCOPE (%s) PKG=%x, FollowingBytes = %x, DECODED_LENGTH : %x, NSB : %x, FIRST_NAME_BYTES : %c%c%c%c %c%c%c%c %c%c%c%c%c", DefName, (UINT64)Package->PackageLength, (UINT64)Package->FollowingByteDataCount, (UINT64)PkgLength, NameStringBytes, Aml[0], Aml[1], Aml[2], Aml[3], Aml[4], Aml[5], Aml[6], Aml[7], Aml[8], Aml[9], Aml[10], Aml[11], Aml[12]);
+            SystemDebugPrint(L"ACPI : SCOPE (%s) PKG=%x, FollowingBytes = %x, DECODED_LENGTH : %x, NSB : %x", DefName, (UINT64)Package->PackageLength, (UINT64)Package->FollowingByteDataCount, (UINT64)PkgLength, NameStringBytes, Aml[0], Aml[1], Aml[2], Aml[3], Aml[4], Aml[5], Aml[6], Aml[7], Aml[8], Aml[9], Aml[10], Aml[11], Aml[12]);
             
             // INC_AML(NameStringBytes);
             char* PkgBuffer = AMLSTRUCT (Aml + NameStringBytes);
@@ -91,7 +91,7 @@ void AcpiReadDsdt(RFACPI_DSDT Dsdt){
             INC_AML(FollowingBytes);
 
             // UINT LenMethodName = AmlCopyName(DefName, Aml);
-            _RT_SystemDebugPrint(L"Method (%s) PACKAGE_LENGTH : %x, NAME_BYTES : %c%c%c%c%c%c%c%c%c%c%c", DefName, PkgLength, Aml[0], Aml[1], Aml[2], Aml[3], Aml[4], Aml[5], Aml[6], Aml[7], Aml[8], Aml[9], Aml[10]);
+            SystemDebugPrint(L"Method (%s) PACKAGE_LENGTH : %x, NAME_BYTES : %c%c%c%c%c%c%c%c%c%c%c", DefName, PkgLength, Aml[0], Aml[1], Aml[2], Aml[3], Aml[4], Aml[5], Aml[6], Aml[7], Aml[8], Aml[9], Aml[10]);
             INC_AML(PkgLength - FollowingBytes - 2);
         }else {
             INC_AML(1);

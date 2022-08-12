@@ -108,7 +108,7 @@ char* KERNELAPI AmlParseFieldElement(char* Aml) {
             UINT IncBytes = 0;
             UINT PkgLength = AmlReadPkgLength(Aml, &IncBytes);
             INC_AML(PkgLength + IncBytes);
-            _RT_SystemDebugPrint(L"Reserved Field (PKG_LEN : %x)", PkgLength);
+            SystemDebugPrint(L"Reserved Field (PKG_LEN : %x)", PkgLength);
             break;
         }
         case FIELD_TYPE_ACCESS:
@@ -117,7 +117,7 @@ char* KERNELAPI AmlParseFieldElement(char* Aml) {
             UINT8 AccessType = *Aml;
             UINT8 AccessAttributes = *(Aml + 1);
             INC_AML(2);
-            _RT_SystemDebugPrint(L"ACCESS_FIELD : (Access Type : %x , Attrib : %x)", AccessType, AccessAttributes);
+            SystemDebugPrint(L"ACCESS_FIELD : (Access Type : %x , Attrib : %x)", AccessType, AccessAttributes);
             break;
         }
         case FIELD_TYPE_ACCESS_EXTENDED:
@@ -126,7 +126,7 @@ char* KERNELAPI AmlParseFieldElement(char* Aml) {
             UINT8 AccessType = *Aml;
             UINT8 AccessAttributesEx = *(Aml + 1);
             // TODO : Access Length (Undocumented)
-            _RT_SystemDebugPrint(L"EXTENDED_ACCESS_FIELD : (Access Type : %x , Attrib : %x)", AccessType, AccessAttributesEx);
+            SystemDebugPrint(L"EXTENDED_ACCESS_FIELD : (Access Type : %x , Attrib : %x)", AccessType, AccessAttributesEx);
             while(1);
 
             break;
@@ -134,7 +134,7 @@ char* KERNELAPI AmlParseFieldElement(char* Aml) {
         case FIELD_TYPE_CONNECT:
         {
             INC_AML(1);
-            _RT_SystemDebugPrint(L"FIELD_TYPE_CONNECT");
+            SystemDebugPrint(L"FIELD_TYPE_CONNECT");
             AmlCopyName(NameStr, Aml, &NmBytes);
             while(1);
 
@@ -148,7 +148,7 @@ char* KERNELAPI AmlParseFieldElement(char* Aml) {
             UINT PkgLength = AmlReadPkgLength(Aml, &IncBytes);
             INC_AML(IncBytes);
             INC_AML(PkgLength);
-            _RT_SystemDebugPrint(L"FIELD_NAME : %s (Pkg Length : %x)", NameStr, PkgLength);
+            SystemDebugPrint(L"FIELD_NAME : %s (Pkg Length : %x)", NameStr, PkgLength);
             break;
         }
     }

@@ -99,13 +99,13 @@ void GlobalInterruptDescriptorInitialize()
 	// (SSE, AVX, AVX512)
 	CPUID_INFO CpuInfo = {0};
 	__cpuid(&CpuInfo, 1);
-	if(CpuInfo.ecx & CPUID1_ECX_AVX) {
-		SOD(0, "Process Supports AVX");
-		while(1);
-		SetInterruptGate(SchedulerEntryAVX,INT_APIC_TIMER,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
-	} else {
+	// if(CpuInfo.ecx & CPUID1_ECX_AVX) {
+	// 	SOD(0, "Process Supports AVX");
+	// 	while(1);
+	// 	SetInterruptGate(SchedulerEntryAVX,INT_APIC_TIMER,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
+	// } else {
 		SetInterruptGate(SchedulerEntrySSE,INT_APIC_TIMER,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
-	}
+	// }
 	
 	// SetInterruptGate(SkipTaskSchedule,INT_SCHEDULE,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
 
@@ -195,16 +195,16 @@ KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT 
 		UINT RedirectedIrqFlags = 0;
 		UINT RedirectedIrq = GetRedirectedIrq(IrqNumber, &RedirectedIrqFlags);
 		if(RedirectedIrq != 0){
-			// _RT_SystemDebugPrint(L"Detected Redirected IRQ from %d to %d (Flags = %x)", IrqNumber, RedirectedIrq, RedirectedIrqFlags);
+			// SystemDebugPrint(L"Detected Redirected IRQ from %d to %d (Flags = %x)", IrqNumber, RedirectedIrq, RedirectedIrqFlags);
 			if(!(Flags & IRQ_CONTROL_DISABLE_OVERRIDE_FLAGS)){
 				// Set the new flags
 				Flags &= ~0x1F;
 				if(MULTIBIT_TEST(RedirectedIrqFlags, ISO_ACTIVE_LOW)) {
-					// _RT_SystemDebugPrint(L"ACTIVE_LOW");
+					// SystemDebugPrint(L"ACTIVE_LOW");
 					Flags |= IRQ_CONTROL_LOW_ACTIVE;
 				}
 				if(!MULTIBIT_TEST(RedirectedIrqFlags, ISO_EDGE_TRIGGERED)) {
-					// _RT_SystemDebugPrint(L"EDGE_TRIGGERED");
+					// SystemDebugPrint(L"EDGE_TRIGGERED");
 					Flags |= IRQ_CONTROL_LEVEL_SENSITIVE;
 				}
 			}
@@ -220,7 +220,7 @@ KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT 
 	// just as pre-check
 
 	// Check if IRQ is controlled by another process
-	void* Process = (void*)GetCurrentProcess();
+	void* Process = (void*)KeGetCurrentProcess();
 
 	for(UINT x = 0;x<Pmgrt.NumProcessors;x++){
 		for(UINT i = 0;i<NUM_IRQS_PER_PROCESSOR;i++){
@@ -251,7 +251,7 @@ KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT 
 		// get aligned ids (for e.g. IOAPIC 0 May be 5, and IOAPIC1 May be 6)
 		IoApic = QueryIoApic(i);
 		unsigned char MaxRedirectionEntry = IoApicGetMaxRedirectionEntry(IoApic);
-		// _RT_SystemDebugPrint(L"IOAPIC#%d Max Redirection Entry : %d, GSYS_INT_BASE : %d", IoApic->IoApicId, MaxRedirectionEntry);
+		// SystemDebugPrint(L"IOAPIC#%d Max Redirection Entry : %d, GSYS_INT_BASE : %d", IoApic->IoApicId, MaxRedirectionEntry);
 		if(MaxRedirectionEntry >= IrqIndex) {
 			_redirentryfound = TRUE;
 			VirtualIoApicId = i;
@@ -281,7 +281,7 @@ KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT 
 	IrqControlDescriptor->PhysicalIrqNumber = IrqNumber;
 	IrqControlDescriptor->IoApicIrqNumber = IrqIndex;
 	IrqControlDescriptor->Flags = Flags;
-	IrqControlDescriptor->Process = GetCurrentProcess();
+	IrqControlDescriptor->Process = KeGetCurrentProcess();
 	IrqControlDescriptor->Handler = Handler;
 	IrqControlDescriptor->Source = INTERRUPT_SOURCE_IRQ;
 	IrqControlDescriptor->Present = TRUE;
@@ -310,15 +310,15 @@ KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT 
 	}else RedirectionTable.TriggerMode = 1;
 
 	if(Flags & IRQ_CONTROL_USE_BASIC_INTERRUPT_WRAPPER) {
-		// _RT_SystemDebugPrint(L"USE_BASIC_WRAPPER : IV (%d)", (UINT64)IrqControlDescriptor->InterruptVector);
+		// SystemDebugPrint(L"USE_BASIC_WRAPPER : IV (%d)", (UINT64)IrqControlDescriptor->InterruptVector);
 		RegisterInterruptServiceRoutine((INTERRUPT_SERVICE_ROUTINE)Handler, IrqControlDescriptor->InterruptVector);
 	} else {
-		// _RT_SystemDebugPrint(L"IRQ_WRAPPER : IRQ %d | IV : %d", (UINT64)IrqControlDescriptor->PhysicalIrqNumber, (UINT64)IrqControlDescriptor->InterruptVector);
+		// SystemDebugPrint(L"IRQ_WRAPPER : IRQ %d | IV : %d", (UINT64)IrqControlDescriptor->PhysicalIrqNumber, (UINT64)IrqControlDescriptor->InterruptVector);
 		SetInterruptGate(gIRQCtrlWrapPtr[IrqControlDescriptor->InterruptVector - 0x20], IrqControlDescriptor->InterruptVector, 0, 3, IDT_INTERRUPT_GATE, 0x08);
 	}
 	IoApicWriteRedirectionTable(IoApic, IrqControlDescriptor->IoApicIrqNumber, &RedirectionTable);
 	
-	// _RT_SystemDebugPrint(L"IOAPIC#%d Modified (INT_VEC : 0x%x DEST : %d HANDLER: 0x%x PHYS_IRQ: 0x%x)", IoApic->IoApicId, RedirectionTable.InterruptVector, RedirectionTable.DestinationField, IrqControlDescriptor->Handler, (UINT64)IrqControlDescriptor->PhysicalIrqNumber);
+	// SystemDebugPrint(L"IOAPIC#%d Modified (INT_VEC : 0x%x DEST : %d HANDLER: 0x%x PHYS_IRQ: 0x%x)", IoApic->IoApicId, RedirectionTable.InterruptVector, RedirectionTable.DestinationField, IrqControlDescriptor->Handler, (UINT64)IrqControlDescriptor->PhysicalIrqNumber);
 
 	gIRQ_MGR_ProcessorSwitch++;
 	__BitRelease(&gIRQ_MGR_MUTEX, 0);
@@ -341,7 +341,7 @@ IRQ_CONTROL_DESCRIPTOR* KERNELAPI RegisterIrq(UINT32 IrqSource, void* Handler, U
 				CpuMt->InterruptVector = c + 0x20;
 				SetInterruptGate(gIRQCtrlWrapPtr[c], CpuMt->InterruptVector, 0, 3, IDT_INTERRUPT_GATE, 0x08);
 				CpuMt->PhysicalIrqNumber = IrqSource;
-				CpuMt->Process = GetCurrentProcess();
+				CpuMt->Process = KeGetCurrentProcess();
 				CpuMt->VirtualIoApicId = IoApicId;
 				CpuMt->LapicId = CpuManagementTable[i]->ProcessorId;
 				CpuMt->Handler = Handler;
@@ -364,18 +364,18 @@ IRQ_CONTROL_DESCRIPTOR* KERNELAPI RegisterIrq(UINT32 IrqSource, void* Handler, U
 KERNELSTATUS KERNELAPI SetInterruptService(RFDEVICE_OBJECT Device, KEIRQ_ROUTINE Handler) {
 	// if(!ValidateDevice(Device)) return KERNEL_SERR_INVALID_PARAMETER;
 	
-	// _RT_SystemDebugPrint(L"SET_INT_SERVICE (Device : %x) (Handler : %x)", Device, Handler);
+	// SystemDebugPrint(L"SET_INT_SERVICE (Device : %x) (Handler : %x)", Device, Handler);
 
 	UINT16 PciStatus = PciDeviceConfigurationRead16(Device, PCI_STATUS);
 
 	// Enable device interrupts
 	UINT16 Command = PciDeviceConfigurationRead16(Device, PCI_COMMAND);
-	// _RT_SystemDebugPrint(L"PCI Command (BEFORE) : %x, STATUS : %x", (UINT64)Command, (UINT64)PciStatus);
+	// SystemDebugPrint(L"PCI Command (BEFORE) : %x, STATUS : %x", (UINT64)Command, (UINT64)PciStatus);
 	Command &= ~0x400; // Remove Interrupt disable
 	Command |= (7); // Set Bus master & IO-Space & Memory Space
 	
 
-	// _RT_SystemDebugPrint(L"(TARGET) PCI Command : %x", (UINT64)Command);
+	// SystemDebugPrint(L"(TARGET) PCI Command : %x", (UINT64)Command);
 
 	PciDeviceConfigurationWrite16(Device, Command , PCI_COMMAND);
 	Command = PciDeviceConfigurationRead16(Device, PCI_COMMAND);
@@ -383,7 +383,7 @@ KERNELSTATUS KERNELAPI SetInterruptService(RFDEVICE_OBJECT Device, KEIRQ_ROUTINE
 	PciStatus = PciDeviceConfigurationRead16(Device, PCI_STATUS);
 
 	
-	// _RT_SystemDebugPrint(L"PCI Command : %x, STATUS : %x", (UINT64)Command, (UINT64)PciStatus);
+	// SystemDebugPrint(L"PCI Command : %x, STATUS : %x", (UINT64)Command, (UINT64)PciStatus);
 
 	if(PciStatus & PCI_STATUS_CAPABILITES_LIST) {
             // Capabilites Supported
@@ -393,7 +393,7 @@ KERNELSTATUS KERNELAPI SetInterruptService(RFDEVICE_OBJECT Device, KEIRQ_ROUTINE
             DWORD CapBuffer[0x40] = {0};
             for(;;) {
                 if(CapabilityHeader->CapabilityId == PCI_CAPABILITY_ID_MSI) {
-					_RT_SystemDebugPrint(L"MSI Capability Found");
+					SystemDebugPrint(L"MSI Capability Found");
                     for(UINT i = 0;i<sizeof(PCI_MSI_CAPABILITY_64BIT) >> 2;i++){
                         CapBuffer[i] = PciDeviceConfigurationRead32(Device, CapOffset + (i << 2));
                     }
@@ -419,7 +419,7 @@ KERNELSTATUS KERNELAPI SetInterruptService(RFDEVICE_OBJECT Device, KEIRQ_ROUTINE
 						MsiX64->MessageControl.MsiEnable = 1;
 						MsiX64->Mask = 0;
 						MsiX64->MessageControl.MultipleMessageEnable = 0;
-                    // _RT_SystemDebugPrint(L"PCI : MSI64 Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&MsiX64->MessageControl, (UINT64)MsiX64->MessageAddress, (UINT64)MsiX64->MessageData);
+                    // SystemDebugPrint(L"PCI : MSI64 Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&MsiX64->MessageControl, (UINT64)MsiX64->MessageAddress, (UINT64)MsiX64->MessageData);
 						PciDeviceConfigurationWrite64(Device, MsiX64->MessageAddress, CapOffset + MSI_MESSAGE_ADDRESS);
 						PciDeviceConfigurationWrite16(Device, MsiX64->MessageData, CapOffset + MSI64_MESSAGE_DATA);
 						PciDeviceConfigurationWrite16(Device, *(UINT16*)&MsiX64->MessageControl, CapOffset + MSI_MESSAGE_CONTROL);
@@ -431,7 +431,7 @@ KERNELSTATUS KERNELAPI SetInterruptService(RFDEVICE_OBJECT Device, KEIRQ_ROUTINE
 						Msi->Mask = 0;
 						Msi->MessageControl.MultipleMessageEnable = 0;
 
-                    // _RT_SystemDebugPrint(L"PCI : MSI Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&Msi->MessageControl, (UINT64)Msi->MessageAddress, (UINT64)Msi->MessageData);
+                    // SystemDebugPrint(L"PCI : MSI Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&Msi->MessageControl, (UINT64)Msi->MessageAddress, (UINT64)Msi->MessageData);
 
 						PciDeviceConfigurationWrite32(Device, Msi->MessageAddress, CapOffset + MSI_MESSAGE_ADDRESS);
 						PciDeviceConfigurationWrite16(Device, Msi->MessageData, CapOffset + MSI_MESSAGE_DATA);
@@ -440,7 +440,7 @@ KERNELSTATUS KERNELAPI SetInterruptService(RFDEVICE_OBJECT Device, KEIRQ_ROUTINE
 					}
 
 					
-					_RT_SystemDebugPrint(L"Registered IRQ : %d, APIC_ID : %d", (UINT64)Icd->InterruptVector, (UINT64)Icd->LapicId);
+					SystemDebugPrint(L"Registered IRQ : %d, APIC_ID : %d", (UINT64)Icd->InterruptVector, (UINT64)Icd->LapicId);
 					// while(1);
 	
 					SZeroMemory(Msi);
@@ -450,16 +450,16 @@ KERNELSTATUS KERNELAPI SetInterruptService(RFDEVICE_OBJECT Device, KEIRQ_ROUTINE
                     
                     if(Msi->MessageControl.x64AddressCapable) {
 						PCI_MSI_CAPABILITY_64BIT* MsiX64 = (PCI_MSI_CAPABILITY_64BIT*)CapBuffer;
-                    // _RT_SystemDebugPrint(L"PCI (RESULT) : MSI64 Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&MsiX64->MessageControl, (UINT64)MsiX64->MessageAddress, (UINT64)MsiX64->MessageData);
+                    // SystemDebugPrint(L"PCI (RESULT) : MSI64 Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&MsiX64->MessageControl, (UINT64)MsiX64->MessageAddress, (UINT64)MsiX64->MessageData);
 
 					} else {
-                    // _RT_SystemDebugPrint(L"PCI (RESULT) : MSI Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&Msi->MessageControl, (UINT64)Msi->MessageAddress, (UINT64)Msi->MessageData);
+                    // SystemDebugPrint(L"PCI (RESULT) : MSI Capability MSG_CONTROL : %x, MessageAddress : %x, MSG_DATA : %x", (UINT64)*(UINT16*)&Msi->MessageControl, (UINT64)Msi->MessageAddress, (UINT64)Msi->MessageData);
 
 					}
-					// _RT_SystemDebugPrint(L"IRQ%d HANDLER: %x", (UINT64)Icd->InterruptVector, Icd->Handler);
+					// SystemDebugPrint(L"IRQ%d HANDLER: %x", (UINT64)Icd->InterruptVector, Icd->Handler);
 					return KERNEL_SOK;
                 } else if(CapabilityHeader->CapabilityId == PCI_CAPABILITY_ID_MSI_X) {
-					_RT_SystemDebugPrint(L"MSI-X Supported");
+					SystemDebugPrint(L"MSI-X Supported");
 					while(1);
 				}
 

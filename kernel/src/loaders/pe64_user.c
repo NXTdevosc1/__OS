@@ -42,7 +42,7 @@ KERNELSTATUS Pe64LoadUserApplication(LPWSTR path){
     if (image->ThirdHeader.Subsystem == SUBSYSTEM_NATIVE) return KERNEL_SERR;
 
     
-    RFPROCESS Process = CreateProcess(NULL, FileName, image->ThirdHeader.Subsystem, USERMODE_PROCESS);
+    RFPROCESS Process = KeCreateProcess(NULL, FileName, image->ThirdHeader.Subsystem, USERMODE_PROCESS);
     if(!Process){
         CloseFile(executable_file);
         free(buffer, kproc);
@@ -72,7 +72,7 @@ KERNELSTATUS Pe64LoadUserApplication(LPWSTR path){
         free(buffer, kproc);
         return -5;
     }
-    char* VirtualBuffer = ExtendedMemoryAlloc(NULL, VirtualBufferLength, 0x1000, NULL, 0);
+    char* VirtualBuffer = VirtualAllocateEx(NULL, VirtualBufferLength, 0x1000, NULL, 0);
     if (!VirtualBuffer) SET_SOD_MEMORY_MANAGEMENT;
 
     for (UINT16 i = 0; i < image->NumSections; i++, Section++) {
@@ -108,7 +108,7 @@ KERNELSTATUS Pe64LoadUserApplication(LPWSTR path){
 
     Process->ImageHandle = image;
 
-    HTHREAD MainThread = CreateThread(Process, image->ThirdHeader.StackReserve, (THREAD_START_ROUTINE)(ImageBase + image->OptionnalHeader.EntryPointAddr), THREAD_CREATE_SUSPEND, NULL);
+    HTHREAD MainThread = KeCreateThread(Process, image->ThirdHeader.StackReserve, (THREAD_START_ROUTINE)(ImageBase + image->OptionnalHeader.EntryPointAddr), THREAD_CREATE_SUSPEND, NULL);
 
     if (!MainThread) SET_SOD_PROCESS_MANAGEMENT;
 
@@ -136,7 +136,7 @@ KERNELSTATUS Pe64LoadUserApplication(LPWSTR path){
 
     if (!InitSystemSpace(Process)) SET_SOD_PROCESS_MANAGEMENT;
 
-    ResumeThread(MainThread);
+    KeResumeThread(MainThread);
     CloseFile(executable_file);
     
     return KERNEL_SOK;

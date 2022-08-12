@@ -88,7 +88,7 @@ static inline int KERNELAPI SetProcess(
     return 0;
 }
 
-RFPROCESS KERNELAPI CreateProcess(RFPROCESS ParentProcess, LPWSTR ProcessName, UINT64 Subsystem, UINT16 OperatingMode){
+RFPROCESS KEXPORT KERNELAPI KeCreateProcess(RFPROCESS ParentProcess, LPWSTR ProcessName, UINT64 Subsystem, UINT16 OperatingMode){
 
     if (!ProcessName || !OperatingMode || Subsystem > SUBSYSTEM_MAX || (OperatingMode != KERNELMODE_PROCESS && OperatingMode != USERMODE_PROCESS)) return NULL;
     UINT16 len = wstrlen(ProcessName);
@@ -121,14 +121,14 @@ RFPROCESS KERNELAPI CreateProcess(RFPROCESS ParentProcess, LPWSTR ProcessName, U
     return &current->processes[0];
 }
 
-BOOL KERNELAPI SuspendThread(RFTHREAD Thread) {
+BOOL KEXPORT KERNELAPI KeSuspendThread(RFTHREAD Thread) {
     if (!Thread) return FALSE;
     Thread->State &= ~(THS_ALIVE);
     //Pmgrt.TargetSuspensionThread = Thread;
     //IpiBroadcast(IPI_THREAD_SUSPEND, TRUE);
     return TRUE;
 }
-BOOL KERNELAPI ResumeThread(RFTHREAD Thread) {
+BOOL KEXPORT KERNELAPI KeResumeThread(RFTHREAD Thread) {
     if (!Thread) return FALSE;
     Thread->State |= THS_ALIVE;
     return TRUE;
@@ -328,7 +328,7 @@ static inline RFTHREAD KERNELAPI AllocateThread(RFPROCESS Process, UINT64* LpThr
 
 
 
-RFTHREAD KERNELAPI CreateThread(RFPROCESS Process, UINT64 StackSize, THREAD_START_ROUTINE StartAddress, UINT64 Flags, UINT64* ThreadId){ // parameters
+RFTHREAD KEXPORT KERNELAPI KeCreateThread(RFPROCESS Process, UINT64 StackSize, THREAD_START_ROUTINE StartAddress, UINT64 Flags, UINT64* ThreadId){ // parameters
     if(!Process || !Process->Set) return NULL;
 
     __SpinLockSyncBitTestAndSet(&Process->ControlMutex0, PROCESS_MUTEX0_CREATE_THREAD);
@@ -401,7 +401,7 @@ RFTHREAD KERNELAPI CreateThread(RFPROCESS Process, UINT64 StackSize, THREAD_STAR
     }
 R0:
     if(!(Flags & THREAD_CREATE_SUSPEND)){
-        ResumeThread(Thread);
+        KeResumeThread(Thread);
     }
 
     Thread->SchedulingQuantum = 10;
@@ -417,10 +417,10 @@ R0:
 
 
 int KERNELAPI TerminateCurrentProcess(int exit_code){
-    return TerminateProcess(GetCurrentProcess(), exit_code);
+    return TerminateProcess(KeGetCurrentProcess(), exit_code);
 }
 int KERNELAPI TerminateCurrentThread(int exit_code){
-    return TerminateThread(GetCurrentThread(), exit_code);
+    return TerminateThread(KeGetCurrentThread(), exit_code);
 }
 int KERNELAPI TerminateProcess(RFPROCESS process, int ExitCode){
     return 0;
@@ -465,27 +465,27 @@ int KERNELAPI TerminateThread(RFTHREAD thread, int ExitCode){
 // }
 
 
-RFPROCESS KERNELAPI GetCurrentProcess(){
+RFPROCESS KERNELAPI KeGetCurrentProcess(){
     if (!Pmgrt.SystemInitialized) return kproc;
-    return GetCurrentThread()->Process;
+    return KeGetCurrentThread()->Process;
 }
 
 
-RFTHREAD KERNELAPI GetCurrentThread(){
+RFTHREAD KERNELAPI KeGetCurrentThread(){
     if (!Pmgrt.SystemInitialized) return kproc->StartupThread;
     RFTHREAD Thread = CpuManagementTable[*(UINT32*)((char*)SystemSpaceBase + CPU_LAPIC_ID)]->CurrentThread;
     return Thread;
 }
 
-UINT64 KERNELAPI GetCurrentProcessId(){
-    return GetCurrentProcess()->ProcessId;
+UINT64 KERNELAPI KeGetCurrentProcessId(){
+    return KeGetCurrentProcess()->ProcessId;
 }
-UINT64 KERNELAPI GetCurrentThreadId(){
-    return GetCurrentThread()->ThreadId;
+UINT64 KERNELAPI KeGetCurrentThreadId(){
+    return KeGetCurrentThread()->ThreadId;
 }
 
 
-RFTHREAD KERNELAPI GetProcessorIdleThread(UINT64 ProcessorId) {
+RFTHREAD KERNELAPI KeGetProcessorIdleThread(UINT64 ProcessorId) {
     if (ProcessorId >= Pmgrt.NumProcessors || !CpuManagementTable[ProcessorId]->Initialized) return NULL;
     RFTHREAD Thread = CpuManagementTable[ProcessorId]->SystemIdleThread;
     return Thread;
@@ -531,7 +531,7 @@ double KERNELAPI GetTotalCpuTime() {
 }
 double KERNELAPI GetProcessorIdleTime(UINT64 ProcessorId) {
 
-    RFTHREAD ProcessorIdleThread = GetProcessorIdleThread(ProcessorId);
+    RFTHREAD ProcessorIdleThread = KeGetProcessorIdleThread(ProcessorId);
     if (!ProcessorIdleThread) return 0;
     return GetThreadCpuTime(ProcessorIdleThread);
 }
@@ -553,7 +553,7 @@ void KERNELAPI TaskSchedulerDisable() {
 
 // Can be only set by the current thread
 BOOL KERNELAPI IoWait() {
-    GetCurrentThread()->State |= THS_IOWAIT;
+    KeGetCurrentThread()->State |= THS_IOWAIT;
     __Schedule();
     return TRUE;
 }

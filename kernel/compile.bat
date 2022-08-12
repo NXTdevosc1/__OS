@@ -19,13 +19,13 @@ set OBJFILES=x86_64/Assembly/*.obj x86_64/fs/*.obj x86_64/fs/fat32/*.obj
 %COMPILE% /c src/fs/*.c %OUT%/fs/ %CFLAGS%
 %COMPILE% /c src/fs/fat32/*.c %OUT%/fs/fat32/ %CFLAGS%
 
-%COMPILE% %srcfiles% %OBJFILES% /Fo:x86_64/ %CFLAGS% /Fe:OSKRNLX64.exe /link /MACHINE:x64 /NODEFAULTLIB /SUBSYSTEM:native /ENTRY:KrnlEntry /FIXED:no /DYNAMICBASE /LARGEADDRESSAWARE 
+%COMPILE% %srcfiles% %OBJFILES% /Fo:x86_64/ %CFLAGS% /Fe:oskrnlx64.exe /LD /link /DLL /MACHINE:x64 /NODEFAULTLIB /SUBSYSTEM:native /ENTRY:KrnlEntry /FIXED:no /DYNAMICBASE /LARGEADDRESSAWARE 
 
 @REM wsl cd ../UEFI/gnu-efi; make bootloader
 
-copy OSKRNLX64.exe iso\OS\System
+copy oskrnlx64.exe iso\OS\System
 copy "..\UEFI\edk2\Build\MdeModule\DEBUG_GCC5\X64\EfiBoot\bootx64\OUTPUT\EfiBoot.efi" "iso\efi\boot\bootx64.efi"
-
+copy oskrnlx64.lib "..\drivers"
 @REM wsl make build_iso
 @REM wsl make img
 

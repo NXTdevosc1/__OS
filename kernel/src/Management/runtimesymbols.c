@@ -43,11 +43,11 @@ char _DEBUGPRINT_FORMATNUMBER[0x100] = {0};
 
 #define IS_LETTER(Char) ((Char >= 'a' && Char <= 'z') || (Char >= 'A' && Char <= 'Z'))
 
-KERNELSTATUS KERNELAPI _RT_SystemDebugPrint(LPWSTR Format, ...){
+KERNELSTATUS KERNELAPI SystemDebugPrint(LPWSTR Format, ...){
     if(!Format) return KERNEL_SERR_INVALID_PARAMETER;
     UINT8 Len = wstrlen(Format);
     if(!Len) return KERNEL_SERR_INVALID_PARAMETER;
-    RFPROCESS Process = GetCurrentProcess();
+    RFPROCESS Process = KeGetCurrentProcess();
     UINT RFLAGS = __getRFLAGS();
     __cli();
     // if(Process != SystemInterruptsProcess || Process != kproc) // May set a permanent spinlock on system interrupts
@@ -171,71 +171,71 @@ BOOL InitializeRuntimeSymbols(){
     if (SymbolsCreated) return FALSE;
     // kernelruntime.h
 
-    CreateRuntimeSymbol("SystemDebugPrint", _RT_SystemDebugPrint);
+    // CreateRuntimeSymbol("SystemDebugPrint", SystemDebugPrint);
     
-    CreateRuntimeSymbol("KeCreateProcess", CreateProcess);
-    CreateRuntimeSymbol("KeCreateThread", CreateThread);
-    CreateRuntimeSymbol("KeTaskSchedulerEnable", TaskSchedulerEnable);
-    CreateRuntimeSymbol("KeTaskSchedulerDisable", TaskSchedulerDisable);
-    CreateRuntimeSymbol("KeGetRuntimeSymbol", GetRuntimeSymbol);
-    CreateRuntimeSymbol("KeSetPriorityClass", SetPriorityClass);
-    CreateRuntimeSymbol("KeSetThreadPriority", SetThreadPriority);
-    CreateRuntimeSymbol("KeGetCurrentProcess", GetCurrentProcess);
-    CreateRuntimeSymbol("KeGetProcessById", GetProcessById);
-    CreateRuntimeSymbol("KeGetCurrentThread", GetCurrentThread);
-    CreateRuntimeSymbol("KeGetCurrentProcessId", GetCurrentProcessId);
-    CreateRuntimeSymbol("KeGetCurrentThreadId", GetCurrentThreadId);
-    CreateRuntimeSymbol("KeSetDeathScreen", KeSetDeathScreen);
-    CreateRuntimeSymbol("malloc", CurrentProcessMalloc);
-    CreateRuntimeSymbol("KeExtendedAlloc", ExtendedMemoryAlloc);
-    CreateRuntimeSymbol("free", CurrentProcessFree);
-    CreateRuntimeSymbol("MapPhysicalPages", _RTMapPhysicalPages);
-    CreateRuntimeSymbol("KeMapMemory", _RT_MapKernelMemory);
-    CreateRuntimeSymbol("KeResumeThread", ResumeThread);
-    CreateRuntimeSymbol("KeSuspendThread", SuspendThread);
-    CreateRuntimeSymbol("KeControlIrq", KeControlIrq);
-    CreateRuntimeSymbol("KeReleaseIrq", KeReleaseIrq);
-    CreateRuntimeSymbol("Sleep", Sleep);
-    CreateRuntimeSymbol("MicroSleep", MicroSleep);
-    CreateRuntimeSymbol("SetInterruptService", SetInterruptService);
-    CreateRuntimeSymbol("IoWait", IoWait);
-    CreateRuntimeSymbol("IoFinish", IoFinish);
+    // CreateRuntimeSymbol("KeCreateProcess", KeCreateProcess);
+    // CreateRuntimeSymbol("KeCreateThread", KeCreateThread);
+    // CreateRuntimeSymbol("KeTaskSchedulerEnable", TaskSchedulerEnable);
+    // CreateRuntimeSymbol("KeTaskSchedulerDisable", TaskSchedulerDisable);
+    // CreateRuntimeSymbol("KeGetRuntimeSymbol", GetRuntimeSymbol);
+    // CreateRuntimeSymbol("KeSetPriorityClass", SetPriorityClass);
+    // CreateRuntimeSymbol("KeSetThreadPriority", SetThreadPriority);
+    // CreateRuntimeSymbol("KeGetCurrentProcess", GetCurrentProcess);
+    // CreateRuntimeSymbol("KeGetProcessById", GetProcessById);
+    // CreateRuntimeSymbol("KeGetCurrentThread", GetCurrentThread);
+    // CreateRuntimeSymbol("KeGetCurrentProcessId", GetCurrentProcessId);
+    // CreateRuntimeSymbol("KeGetCurrentThreadId", GetCurrentThreadId);
+    // CreateRuntimeSymbol("KeSetDeathScreen", KeSetDeathScreen);
+    // CreateRuntimeSymbol("malloc", CurrentProcessMalloc);
+    // CreateRuntimeSymbol("KeExtendedAlloc", ExtendedMemoryAlloc);
+    // CreateRuntimeSymbol("free", CurrentProcessFree);
+    // CreateRuntimeSymbol("MapPhysicalPages", _RTMapPhysicalPages);
+    // CreateRuntimeSymbol("KeMapMemory", _RT_MapKernelMemory);
+    // CreateRuntimeSymbol("KeResumeThread", ResumeThread);
+    // CreateRuntimeSymbol("KeSuspendThread", SuspendThread);
+    // CreateRuntimeSymbol("KeControlIrq", KeControlIrq);
+    // CreateRuntimeSymbol("KeReleaseIrq", KeReleaseIrq);
+    // CreateRuntimeSymbol("Sleep", Sleep);
+    // CreateRuntimeSymbol("MicroSleep", MicroSleep);
+    // CreateRuntimeSymbol("SetInterruptService", SetInterruptService);
+    // CreateRuntimeSymbol("IoWait", IoWait);
+    // CreateRuntimeSymbol("IoFinish", IoFinish);
     
-    // sysipc.h
-    CreateRuntimeSymbol("IpcClientCreate", IpcClientCreate);
-    CreateRuntimeSymbol("IpcIsValidClient", IpcIsValidClient);
-    CreateRuntimeSymbol("IpcClientDestroy", IpcClientDestroy);
+    // // sysipc.h
+    // CreateRuntimeSymbol("IpcClientCreate", IpcClientCreate);
+    // CreateRuntimeSymbol("IpcIsValidClient", IpcIsValidClient);
+    // CreateRuntimeSymbol("IpcClientDestroy", IpcClientDestroy);
 
-    CreateRuntimeSymbol("IpcSendMessage", IpcSendMessage);
-    CreateRuntimeSymbol("IpcSetCallStatus", IpcSetStatus);
-    CreateRuntimeSymbol("IpcMessageDispatch", IpcMessageDispatch);
-    CreateRuntimeSymbol("IpcPostThreadMessage", IpcPostThreadMessage);
-    CreateRuntimeSymbol("IpcGetMessage", IpcGetMessage);
-    CreateRuntimeSymbol("IpcGetThreadClient", IpcGetThreadClient);
-    // ipcserver.h
-    CreateRuntimeSymbol("IpcServerCreate", IpcServerCreate);
-    CreateRuntimeSymbol("IpcServerDestroy", IpcServerDestroy);
-    CreateRuntimeSymbol("IpcServerConnect", IpcServerConnect);
-    CreateRuntimeSymbol("IpcServerDisconnect", IpcServerDisconnect);
-    CreateRuntimeSymbol("IpcSendToServer", IpcSendToServer);
-    CreateRuntimeSymbol("IpcServerSend", IpcServerSend);
-    CreateRuntimeSymbol("IpcServerReceive", IpcServerReceive);
-    CreateRuntimeSymbol("IpcBroadcast", IpcBroadcast);
-    CreateRuntimeSymbol("IpcServerMessageDispatch", IpcServerMessageDispatch);
-    CreateRuntimeSymbol("IpcGetServer", IpcGetServer);
-    CreateRuntimeSymbol("IpcIsValidServer", isValidServer);
-    CreateRuntimeSymbol("IpcCheckClientConnection", isConnectedClient);
+    // CreateRuntimeSymbol("IpcSendMessage", IpcSendMessage);
+    // CreateRuntimeSymbol("IpcSetCallStatus", IpcSetStatus);
+    // CreateRuntimeSymbol("IpcMessageDispatch", IpcMessageDispatch);
+    // CreateRuntimeSymbol("IpcPostThreadMessage", IpcPostThreadMessage);
+    // CreateRuntimeSymbol("IpcGetMessage", IpcGetMessage);
+    // CreateRuntimeSymbol("IpcGetThreadClient", IpcGetThreadClient);
+    // // ipcserver.h
+    // CreateRuntimeSymbol("IpcServerCreate", IpcServerCreate);
+    // CreateRuntimeSymbol("IpcServerDestroy", IpcServerDestroy);
+    // CreateRuntimeSymbol("IpcServerConnect", IpcServerConnect);
+    // CreateRuntimeSymbol("IpcServerDisconnect", IpcServerDisconnect);
+    // CreateRuntimeSymbol("IpcSendToServer", IpcSendToServer);
+    // CreateRuntimeSymbol("IpcServerSend", IpcServerSend);
+    // CreateRuntimeSymbol("IpcServerReceive", IpcServerReceive);
+    // CreateRuntimeSymbol("IpcBroadcast", IpcBroadcast);
+    // CreateRuntimeSymbol("IpcServerMessageDispatch", IpcServerMessageDispatch);
+    // CreateRuntimeSymbol("IpcGetServer", IpcGetServer);
+    // CreateRuntimeSymbol("IpcIsValidServer", isValidServer);
+    // CreateRuntimeSymbol("IpcCheckClientConnection", isConnectedClient);
 
 
-    // pciexpressapi
-    CreateRuntimeSymbol("CheckPciExpress", GetPcieCompatibility);
-    CreateRuntimeSymbol("PciExpressConfigurationRead", PcieConfigurationRead);
-    CreateRuntimeSymbol("PciExpressEnumerateDevices", PcieEnumerateDevices);
-    CreateRuntimeSymbol("PciExpressFindDevice", PcieFindDevice);
+    // // pciexpressapi
+    // CreateRuntimeSymbol("CheckPciExpress", GetPcieCompatibility);
+    // CreateRuntimeSymbol("PciExpressConfigurationRead", PcieConfigurationRead);
+    // CreateRuntimeSymbol("PciExpressEnumerateDevices", PcieEnumerateDevices);
+    // CreateRuntimeSymbol("PciExpressFindDevice", PcieFindDevice);
 
-    // Runtime Variables
+    // // Runtime Variables
 
-    CreateRuntimeSymbol(".$_BasicGraphicsOutputDescriptor", InitData.fb);
+    // CreateRuntimeSymbol(".$_BasicGraphicsOutputDescriptor", InitData.fb);
 
     
     SymbolsCreated = TRUE;
@@ -250,7 +250,7 @@ void KERNELAPI CreateRuntimeSymbol(char* SymbolName, LPVOID SymbolReference) {
     SymbolIndex++;
 }
 
-void* KERNELAPI GetRuntimeSymbol(char* SymbolName) {
+LPVOID KERNELAPI GetRuntimeSymbol(char* SymbolName) {
     // Check if they are not initialized
 
     for (UINT64 i = 0; i < KERNEL_LINK_SYMBOLS_SIZE; i++) {

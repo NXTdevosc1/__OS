@@ -35,7 +35,7 @@ PCLIENT AllocateClient() {
 		}
 		if (!List->Next) {
 			UINT64 NumPages = ALIGN_VALUE(sizeof(CLIENT_LIST), 0x1000) >> 12;
-			List->Next = ExtendedMemoryAlloc(NULL, NumPages, 0x1000, NULL, 0);
+			List->Next = VirtualAllocateEx(NULL, NumPages, 0x1000, NULL, 0);
 			if (!List->Next) SET_SOD_MEMORY_MANAGEMENT;
 			SZeroMemory(List->Next);
 			MapPhysicalPages(kproc->PageMap, List->Next, List->Next, NumPages, PM_MAP | PM_CACHE_DISABLE);
@@ -57,7 +57,7 @@ PCLIENT KERNELAPI IpcClientCreate(HTHREAD HostThread, UINT MessageQueueLength, U
 		Process = HostThread->Process;
 	}
 	else {
-		HostThread = GetCurrentThread();
+		HostThread = KeGetCurrentThread();
 		Process = HostThread->Process;
 	}
 
@@ -70,7 +70,7 @@ PCLIENT KERNELAPI IpcClientCreate(HTHREAD HostThread, UINT MessageQueueLength, U
 	UINT64 NumPages = ALIGN_VALUE(sizeof(struct _MSG_QUEUE) + sizeof(MSG_OBJECT) * (UINT64)MessageQueueLength, 0x1000) >> 12;
 
 
-	Client->InMessageQueue = ExtendedMemoryAlloc(NULL, NumPages << 12, 0x1000, NULL, 0);
+	Client->InMessageQueue = VirtualAllocateEx(NULL, NumPages << 12, 0x1000, NULL, 0);
 	if(!Client->InMessageQueue) SET_SOD_MEMORY_MANAGEMENT;
 
 	ZeroMemory(Client->InMessageQueue, NumPages << 12);
@@ -123,7 +123,7 @@ BOOL KERNELAPI	IpcClientDestroy(PCLIENT Client) {
 
 KERNELSTATUS KERNELAPI IpcPostThreadMessage(HTHREAD Thread, UINT64 Message, void* Data, UINT64 NumBytes){
 	if (!Thread) return KERNEL_SERR_INVALID_PARAMETER;
-	return IpcSendMessage(GetCurrentThread()->Client, Thread->Client, TRUE, Message, Data, NumBytes);
+	return IpcSendMessage(KeGetCurrentThread()->Client, Thread->Client, TRUE, Message, Data, NumBytes);
 }
 
 #define MAX_ALLOCATE_MESSAGE_ATTEMPTS 20
@@ -135,7 +135,7 @@ KERNELSTATUS KERNELAPI IpcSendMessage(PCLIENT Source, PCLIENT Destination, BOOL 
 	DebugWrite("IPC : SendMessage");
 #endif //  ___KERNEL_DEBUG___
 
-	if (Source == Destination || !IpcIsValidClient(GetCurrentProcess(), Source)
+	if (Source == Destination || !IpcIsValidClient(KeGetCurrentProcess(), Source)
 		|| !IpcIsValidClient(NULL, Destination)) return KERNEL_SERR_INVALID_PARAMETER;
 
 	MSG_OBJECT* Msg = NULL;
@@ -203,12 +203,12 @@ KERNELSTATUS KERNELAPI IpcSendMessage(PCLIENT Source, PCLIENT Destination, BOOL 
 // Get Server/Process Message
 BOOL KERNELAPI		 IpcGetMessage(PCLIENT Client, MSG* Message) {
 	if (!Message) return FALSE;
-	if (!Client) Client = GetCurrentThread()->Client;
+	if (!Client) Client = KeGetCurrentThread()->Client;
 	if (!IpcIsValidClient(NULL, Client)) return FALSE;
 	RFPROCESS Process = Client->Process;
 	if (Client->CurrentMessage) return FALSE;
 	if (Process->OperatingMode != KERNELMODE_PROCESS) {
-		Message = GetPhysAddr(Process, Message);
+		Message = KeResolvePhysicalAddress(Process, Message);
 		if (!Message) return FALSE;
 	}
 
@@ -285,7 +285,7 @@ BOOL KERNELAPI		 IpcGetMessage(PCLIENT Client, MSG* Message) {
 
 BOOL KERNELAPI IpcSetStatus(PCLIENT Client, KERNELSTATUS Status) {
 
-	if (!IpcIsValidClient(GetCurrentProcess(), Client)) return FALSE;
+	if (!IpcIsValidClient(KeGetCurrentProcess(), Client)) return FALSE;
 
 	while (!Client->CurrentMessage || !Client->InMessageQueue->PendingMessages);
 
@@ -297,7 +297,7 @@ BOOL KERNELAPI IpcSetStatus(PCLIENT Client, KERNELSTATUS Status) {
 
 
 BOOL KERNELAPI IpcMessageDispatch(PCLIENT Client) {
-	// if (!IpcIsValidClient(GetCurrentProcess(), Client)) return FALSE;
+	// if (!IpcIsValidClient(KeGetCurrentProcess(), Client)) return FALSE;
 
 	if (!Client->CurrentMessage || !Client->InMessageQueue->PendingMessages) return FALSE;
 
@@ -333,7 +333,7 @@ void* KERNELAPI IpcGetMessagePacket(PCLIENT Client){
 	if(!IpcIsValidClient(NULL, Client) || !Client->CurrentMessage) return NULL;
 	void* Packet = Client->CurrentMessage->Body.Data;
 	if(Client->CurrentMessage->Header.Source->Process->OperatingMode == USERMODE_PROCESS){
-		Packet = GetPhysAddr(Client->CurrentMessage->Header.Source->Process, Packet);
+		Packet = KeResolvePhysicalAddress(Client->CurrentMessage->Header.Source->Process, Packet);
 	}
 	return Packet;
 }

@@ -320,7 +320,7 @@ LongModeEntry:
 
     shr ecx, 3 ; Divide by 8
     rep movsq
-    ; Set Uninitialized data to 0
+;     ; Set Uninitialized data to 0
     mov ecx, [rdx + 8] ; Virtual Size
     sub ecx, [rdx + 0x10] ; Sizeof Raw Data
     test ecx, 7
@@ -524,17 +524,27 @@ mov [rax + 0x3C], rbx ; Image Base
 mov rbx, [VirtualBufferSize]
 mov [rax + 0x44], rbx ; Image Size
 
+; Set PE data directories offset
+mov rbx, [KernelPeHdrAddress]
+
+add rbx, 0x88 ; Offset to data directories
+
+
+mov [rax + 0x58], rbx ; PE Data Directories
 
 mov rax, [KernelPeHdrAddress]
 mov eax, [rax + 40] ; EntryPointAddress
 add rax, [ImageBase]
+
 
 ; Map Frame Buffer (Temporary for testing)
 mov rbx, [FrameBufferDescriptor + 0x10] ; FB Base
 mov rcx, [FrameBufferDescriptor + 0x18] ; FB Size
 shr rcx, 12 ; Divide by 0x1000
 inc rcx ; Padding
+
 call IdentityMapPages
+
 
 wbinvd
 

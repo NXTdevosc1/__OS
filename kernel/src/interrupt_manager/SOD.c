@@ -45,9 +45,9 @@ void SOD(unsigned int code, char* message){
 		}
 	}
 #endif
-	_RT_SystemDebugPrint(L"CURRENT_THREAD : %x , Scheduler Clocks : %x : %x", CpuManagementTable[0]->CurrentThread, CpuManagementTable[0]->TotalClocks[0], CpuManagementTable[0]->TotalClocks[1]);
-	_RT_SystemDebugPrint(L"IDLE_THREAD : %x , SYSTEM_INTERRUPTS_THREAD : %x", CpuManagementTable[0]->SystemIdleThread, CpuManagementTable[0]->SystemInterruptsThread);
-	_RT_SystemDebugPrint(L"Last Thread Switch Latency : %x:%x", CpuManagementTable[0]->LastThreadSwitchLatency[0], CpuManagementTable[0]->LastThreadSwitchLatency[1]);
+	SystemDebugPrint(L"CURRENT_THREAD : %x , Scheduler Clocks : %x : %x", CpuManagementTable[0]->CurrentThread, CpuManagementTable[0]->TotalClocks[0], CpuManagementTable[0]->TotalClocks[1]);
+	SystemDebugPrint(L"IDLE_THREAD : %x , SYSTEM_INTERRUPTS_THREAD : %x", CpuManagementTable[0]->SystemIdleThread, CpuManagementTable[0]->SystemInterruptsThread);
+	SystemDebugPrint(L"Last Thread Switch Latency : %x:%x", CpuManagementTable[0]->LastThreadSwitchLatency[0], CpuManagementTable[0]->LastThreadSwitchLatency[1]);
 	while(1){
 		__hlt();
 	}

@@ -72,7 +72,7 @@ RFDEVICE_OBJECT KERNELAPI InstallDevice(RFDEVICE_OBJECT ParentDevice, UINT32 Dev
 					Device->DeviceId = IoPciRead16(Device->Bus, Device->DeviceNumber, Device->Function, PCI_DEVICE_ID);
 					Device->PciAccessType = 1; // IO Access
 
-					_RT_SystemDebugPrint(L"LEGACY PCI DEVICE : (%d,%d,%d) CLASS = %x, SUBCLASS = %x, PROGIF = %x", (UINT64)Device->Bus, (UINT64)Device->DeviceNumber, (UINT64)Device->Function, (UINT64)Device->DeviceClass, (UINT64)Device->DeviceSubclass, (UINT64)Device->ProgramInterface);
+					SystemDebugPrint(L"LEGACY PCI DEVICE : (%d,%d,%d) CLASS = %x, SUBCLASS = %x, PROGIF = %x", (UINT64)Device->Bus, (UINT64)Device->DeviceNumber, (UINT64)Device->Function, (UINT64)Device->DeviceClass, (UINT64)Device->DeviceSubclass, (UINT64)Device->ProgramInterface);
 
 				}else{
 					PCI_CONFIGURATION_HEADER* PciConfig = Device->DeviceConfiguration;
@@ -87,7 +87,7 @@ RFDEVICE_OBJECT KERNELAPI InstallDevice(RFDEVICE_OBJECT ParentDevice, UINT32 Dev
 					Device->VendorId = PciConfig->VendorId;
 					Device->DeviceId = PciConfig->DeviceId;
 
-					_RT_SystemDebugPrint(L"PCI Express DEVICE : (%d,%d,%d) CLASS = %x, SUBCLASS = %x, PROGIF = %x", (UINT64)Device->Bus, (UINT64)Device->DeviceNumber, (UINT64)Device->Function, (UINT64)Device->DeviceClass, (UINT64)Device->DeviceSubclass, (UINT64)Device->ProgramInterface);
+					SystemDebugPrint(L"PCI Express DEVICE : (%d,%d,%d) CLASS = %x, SUBCLASS = %x, PROGIF = %x", (UINT64)Device->Bus, (UINT64)Device->DeviceNumber, (UINT64)Device->Function, (UINT64)Device->DeviceClass, (UINT64)Device->DeviceSubclass, (UINT64)Device->ProgramInterface);
 
 				}
 
@@ -97,7 +97,7 @@ RFDEVICE_OBJECT KERNELAPI InstallDevice(RFDEVICE_OBJECT ParentDevice, UINT32 Dev
 			
 			if(Driver) {
 				if(!ControlDevice(Driver, Device)) SOD(SOD_DEVICE_MANAGEMENT, "FAILED TO CONTROL DEVICE");
-				_RT_SystemDebugPrint(L"Driver#%d Controls Device %x", Driver->DriverId, Device);
+				SystemDebugPrint(L"Driver#%d Controls Device %x", Driver->DriverId, Device);
 			}
 			DeviceManagementTable.NumDevices++;
 			return Device;
@@ -146,7 +146,7 @@ BOOL KERNELAPI ValidateDevice(RFDEVICE_OBJECT Device) {
 BOOL KERNELAPI DisableDevice(RFDEVICE_OBJECT Device) {
 	if (!Device) return FALSE;
 	if (Device->DeviceDisable) return TRUE;
-	RFPROCESS Process = GetCurrentProcess();
+	RFPROCESS Process = KeGetCurrentProcess();
 
 	// if (!Device->DeviceControl || Device->ControlDriverProcess != Process) return FALSE;
 	// Device->DeviceDisable = TRUE;
@@ -155,7 +155,7 @@ BOOL KERNELAPI DisableDevice(RFDEVICE_OBJECT Device) {
 BOOL KERNELAPI EnableDevice(RFDEVICE_OBJECT Device) {
 	if (!Device) return FALSE;
 	if (!Device->DeviceDisable) return TRUE;
-	RFPROCESS Process = GetCurrentProcess();
+	RFPROCESS Process = KeGetCurrentProcess();
 
 	// if (!Device->DeviceControl || Device->ControlDriverProcess != Process) return FALSE;
 	// Device->DeviceDisable = FALSE;
@@ -171,7 +171,7 @@ BOOL KERNELAPI SetDeviceInterface(RFDEVICE_OBJECT Device, void* DeviceInterface)
 	// Must have control of the device
 
 	if (!Device || !ValidateDevice(Device) || !DeviceInterface) return FALSE;
-	RFPROCESS Process = GetCurrentProcess();
+	RFPROCESS Process = KeGetCurrentProcess();
 	if (!Device->DeviceControl || Device->Driver->Process != Process) return FALSE;
 	Device->ControlInterface = DeviceInterface;
 	return TRUE;
@@ -181,7 +181,7 @@ BOOL KERNELAPI SetDeviceInterface(RFDEVICE_OBJECT Device, void* DeviceInterface)
 BOOL KERNELAPI SetDeviceDisplayName(RFDEVICE_OBJECT Device, LPWSTR DeviceName) // Not that device name must be a fixed memory
 {
 	if (!Device || !ValidateDevice(Device)) return FALSE;
-	RFPROCESS Process = GetCurrentProcess();
+	RFPROCESS Process = KeGetCurrentProcess();
 	if (!Device->DeviceControl || Device->Driver->Process != Process) return FALSE;
 	Device->DisplayName = DeviceName; // If name is NULL Then original name is used
 	return TRUE;

@@ -28,7 +28,7 @@ extern UINT64 HpetMainCounterAddress = 0; // Used on task scheduler
 
 static UINT d = 0;
 void HpetInterruptHandler(RFDRIVER_OBJECT Device, RFINTERRUPT_INFORMATION InterruptInformation) {
-    // _RT_SystemDebugPrint(L"HPET Int #%d (Main Counter : %x) Time : %x | in ms : %d", HpetNumClocks, Regs->MainCounterValue, GetHighPrecisionTimeSinceBoot(), GetHighPrecisionTimeSinceBoot() / (HpetFrequency / 1000));
+    // SystemDebugPrint(L"HPET Int #%d (Main Counter : %x) Time : %x | in ms : %d", HpetNumClocks, Regs->MainCounterValue, GetHighPrecisionTimeSinceBoot(), GetHighPrecisionTimeSinceBoot() / (HpetFrequency / 1000));
     HpetNumClocks++;
     HpetTotalClockTime += 0x1000;
     Regs->GeneralConfiguration &= ~HPET_ENABLE;
@@ -61,7 +61,7 @@ void HpetInitialize(ACPI_HPET* Hpet) {
     if(!HpetDevice) SET_SOD_MEDIA_MANAGEMENT;
     SetDeviceDisplayName(HpetDevice, L"High Precision Event Timer (HPET)");
 
-	_RT_SystemDebugPrint(L"High Precision Event Timer (HPET) Found.");
+	SystemDebugPrint(L"High Precision Event Timer (HPET) Found.");
     
     Regs->GeneralConfiguration &= ~HPET_ENABLE;
     Regs->GeneralConfiguration |= HPET_LEGACY_REPLACEMENT_ROUTE_ENABLE;
@@ -69,7 +69,7 @@ void HpetInitialize(ACPI_HPET* Hpet) {
     UINT AdditionalTimers = Regs->GeneralCapabilitiesAndId >> HPET_NUM_TIMERS;
     AdditionalTimers &= 0x1F;
     AdditionalTimers -= 2; // Not - 3 because NUM_TMR = Last timer which is NumTimers - 1
-    _RT_SystemDebugPrint(L"Additional Timers : %d , Address Space : %x | Address : %x | Access Size : %x",AdditionalTimers, Hpet->Address.AddressSpace, Hpet->Address.Address, Hpet->Address.AccessSize);
+    SystemDebugPrint(L"Additional Timers : %d , Address Space : %x | Address : %x | Access Size : %x",AdditionalTimers, Hpet->Address.AddressSpace, Hpet->Address.Address, Hpet->Address.AccessSize);
     // Disable timers
     Regs->Timer0ConfigurationAndCapability &= ~(1 << TIMER_INT_ENABLE);
     Regs->Timer1ConfigurationAndCapability &= ~(1 << TIMER_INT_ENABLE);
@@ -110,10 +110,10 @@ BOOL HpetConfigure() {
 
 
     
-    _RT_SystemDebugPrint(L"HPET_SUCCESSFULLY_CONFIGURED (INT_ROUTE_CAP : %x , PERIOD : %x)", Regs->Timer0ConfigurationAndCapability >> TIMER_INTERRUPT_ROUTING_CAPABILILTY, Regs->GeneralCapabilitiesAndId >> HPET_COUNTER_CLICK_PERIOD);
+    SystemDebugPrint(L"HPET_SUCCESSFULLY_CONFIGURED (INT_ROUTE_CAP : %x , PERIOD : %x)", Regs->Timer0ConfigurationAndCapability >> TIMER_INTERRUPT_ROUTING_CAPABILILTY, Regs->GeneralCapabilitiesAndId >> HPET_COUNTER_CLICK_PERIOD);
     UINT64 Frequency = 0x38D7EA4C68000 / (Regs->GeneralCapabilitiesAndId >> HPET_COUNTER_CLICK_PERIOD);
     HpetFrequency = Frequency;
-    _RT_SystemDebugPrint(L"Frequency : %d HZ", Frequency);
+    SystemDebugPrint(L"Frequency : %d HZ", Frequency);
     Regs->MainCounterValue = 0;
     Regs->Timer0ComparatorValue = HpetFrequency;
     Regs->Timer0ConfigurationAndCapability |= (1 << TIMER_INT_ENABLE);

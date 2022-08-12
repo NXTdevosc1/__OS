@@ -140,12 +140,13 @@ DDKEXPORT BOOL DDKAPI SetDeviceFeature(_RFDEVICE_OBJECT Device, UINT64 DeviceFea
 DDKEXPORT void* DDKAPI AllocateDeviceMemory(_RFDEVICE_OBJECT Device, UINT64 NumBytes, UINT Alignment){
 	void* Heap = NULL;
 	if(Device->DeviceFeatures & DEVICE_64BIT_ADDRESS_ALLOCATIONS) {
-		Heap = KeExtendedAlloc(NULL, NumBytes, Alignment, NULL, 0);
+		Heap = VirtualAllocateEx(NULL, NumBytes, Alignment, NULL, 0);
 	}else{
-		Heap = KeExtendedAlloc(NULL, NumBytes, Alignment, NULL, 0xFFFFFFFF - NumBytes - Alignment);
+		Heap = VirtualAllocateEx(NULL, NumBytes, Alignment, NULL, 0xFFFFFFFF - NumBytes - Alignment);
 	}
 	if(Heap == NULL && Device->DeviceFeatures & DEVICE_FORCE_MEMORY_ALLOCATION) {
-		KeSetDeathScreen(0, L"DEVICE_ALLOCATION_FAILED (FORCE_ALLOCATION ENABLED)", NULL, OS_SUPPORT_LNKW);
+		// KeSetDeathScreen(0, L"DEVICE_ALLOCATION_FAILED (FORCE_ALLOCATION ENABLED)", NULL, OS_SUPPORT_LNKW);
+        while(1);
 	}
 	ZeroMemory(Heap, NumBytes);
 	return Heap;

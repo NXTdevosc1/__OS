@@ -142,8 +142,8 @@ typedef struct _USER_SYSTEM_CONFIG {
 
 void InitProcessorDescriptors(void** CpuBuffer, UINT64* CpuBufferSize);
 
-void KERNELAPI Sleep(UINT64 Milliseconds);
-void KERNELAPI MicroSleep(UINT64 Microseconds);
+void KEXPORT KERNELAPI Sleep(UINT64 Milliseconds);
+void KEXPORT KERNELAPI MicroSleep(UINT64 Microseconds);
 
 KERNELSTATUS InitializeApicCpu(UINT64 ApicId);
 void SetupLocalApicTimer();

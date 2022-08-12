@@ -2,10 +2,13 @@
 #include <stdint.h>
 #ifndef ___EDK2___
 #include <efi.h>
+#include <loaders/pe.h>
 #else
 // EDK2 Official UEFI Specification & Implementation
 #include <Uefi.h>
+typedef struct _OPTIONNAL_HEADER_DATA_DIRECTORIES, OPTIONNAL_HEADER_DATA_DIRECTORIES;
 #endif
+
 
 
 #define SECTION_NAME_SIZE 8
@@ -95,6 +98,7 @@ typedef struct _KERNEL_INITIALISATION_DATA {
 	UINT64 ImageSize;
 	int	Reserved1;
 	EFI_SYSTEM_TABLE* EfiSystemTable;
+	OPTIONNAL_HEADER_DATA_DIRECTORIES* PEDataDirectories; // Used for e.g. to export kernel functions to drivers
 } INITDATA;
 
 #pragma pack(pop)

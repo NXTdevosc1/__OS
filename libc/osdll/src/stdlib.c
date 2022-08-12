@@ -138,20 +138,21 @@ _DECL char* itoa(long long _Value, char* _Buffer, int _Radix){
     else return 0;
 }
 
+extern void _Xmemset128U(void*, unsigned long long, unsigned long long);
+
 _DECL void memset(void* ptr, unsigned char val, size_t size){
     unsigned long long V = val;
     V |= (V << 8) | (V << 16) | (V << 24) | (V << 32) | (V << 40) | (V << 48) | (V << 56);
-    if(!(size % 16)){
+    if((unsigned long long)ptr & 0xF) {
+        _Xmemset128U(ptr, V, size >> 4);
+        (char*)ptr+=(size & ~0xF);
+        __memset(ptr, val, size & 0xF);
+    } else {
         _Xmemset128(ptr, V, size >> 4);
-    }else if(!(size % 8)){
-        __memset64(ptr, V, size >> 3);
-    }else if(!(size % 4)){
-        __memset32(ptr, V, size >> 2);
-    }else if(!(size % 2)){
-        __memset16(ptr, V, size >> 1);
-    }else{
-        __memset(ptr, val, size);
+        (char*)ptr+=(size & ~0xF);
+        __memset(ptr, val, size & 0xF);
     }
+    
 }
 _DECL void _memset16(void* ptr, unsigned short val, size_t size){
     unsigned short* p = ptr;

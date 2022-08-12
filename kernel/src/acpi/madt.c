@@ -49,19 +49,19 @@ void AcpiReadMadt(ACPI_SDT* Sdt){
 			// Changes in interrupts sources from PIC to IOAPIC
 			// for e.g. on newer hardware (PIT maybe mapped on IRQ 2 instead of IRQ 0)
 			ACPI_IOAPIC_ISO* Iso = (ACPI_IOAPIC_ISO*)Record;
-			_RT_SystemDebugPrint(L"INTERRUPT SOURCE OVERRIDE From %d to %d (FLAGS : %x, BUS_SOURCE = %x)", Iso->IrqSource, Iso->GlobalSysInterrupt, Iso->Flags, Iso->BusSource);
+			SystemDebugPrint(L"INTERRUPT SOURCE OVERRIDE From %d to %d (FLAGS : %x, BUS_SOURCE = %x)", Iso->IrqSource, Iso->GlobalSysInterrupt, Iso->Flags, Iso->BusSource);
 			break;
 		}
 		case ACPI_MADT_RECORD_IO_APIC_NMIS:
 		{
 			ACPI_IOAPIC_NMIS* Nmis = (ACPI_IOAPIC_NMIS*)Record;
-			// _RT_SystemDebugPrint(L"IOAPIC_NMIS : NmiSource : %d, Flags : %x, GlobalSysInt : %x", Nmis->NmiSource, Nmis->Flags, Nmis->GlobalSysInterrupt);
+			// SystemDebugPrint(L"IOAPIC_NMIS : NmiSource : %d, Flags : %x, GlobalSysInt : %x", Nmis->NmiSource, Nmis->Flags, Nmis->GlobalSysInterrupt);
 			break;
 		}
 		case ACPI_MADT_RECORD_LOCAL_APIC_NMI:
 		{
 			ACPI_LAPIC_NMI* LNmi = (ACPI_LAPIC_NMI*)Record;
-			// _RT_SystemDebugPrint(L"LAPIC NMI : ProcessorId : %d, Flags : %x, LINT : %x", LNmi->AcpiProcessorId, LNmi->Flags, LNmi->LINT);
+			// SystemDebugPrint(L"LAPIC NMI : ProcessorId : %d, Flags : %x, LINT : %x", LNmi->AcpiProcessorId, LNmi->Flags, LNmi->LINT);
 			break;
 		}
 		}

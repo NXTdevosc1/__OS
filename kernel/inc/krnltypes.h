@@ -5,6 +5,8 @@
 #define KERNELAPI __cdecl
 #define __KERNELAPI __cdecl // Applies to types
 
+#define KEXPORT __declspec(dllexport)
+
 #define OPTAPI __stdcall
 #define __OPTAPI __stdcall
 

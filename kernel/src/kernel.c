@@ -102,7 +102,7 @@ extern void _start() {
 	Pmgrt.NumProcessors = 1;
 
 	if (!InitializeRuntimeSymbols()) SET_SOD_INITIALIZATION;
-	kproc = CreateProcess(NULL,KernelProcessName, SUBSYSTEM_NATIVE, KERNELMODE_PROCESS);
+	kproc = KeCreateProcess(NULL,KernelProcessName, SUBSYSTEM_NATIVE, KERNELMODE_PROCESS);
 	if(!kproc) SET_SOD_INITIALIZATION;
 
 	
@@ -153,11 +153,11 @@ extern void _start() {
 
 	
 
-	IdleProcess = CreateProcess(kproc, L"System Idle Process.", 0, KERNELMODE_PROCESS);
+	IdleProcess = KeCreateProcess(kproc, L"System Idle Process.", 0, KERNELMODE_PROCESS);
 
 	if (!IdleProcess) SET_SOD_PROCESS_MANAGEMENT;
 
-	SystemInterruptsProcess = CreateProcess(kproc, L"System Interrupts.", 0, KERNELMODE_PROCESS);
+	SystemInterruptsProcess = KeCreateProcess(kproc, L"System Interrupts.", 0, KERNELMODE_PROCESS);
 
    // Setting up system tables
 	
@@ -248,7 +248,7 @@ extern void _start() {
 	CpuSetupManagementTable(NumProcessors);
 	ConfigureSystemSpace();
 	SetPriorityClass(kproc, PRIORITY_CLASS_REALTIME);
-	HTHREAD KernelThread = CreateThread(kproc, 0, NULL, 0, NULL);
+	HTHREAD KernelThread = KeCreateThread(kproc, 0, NULL, 0, NULL);
 	if (!KernelThread) SET_SOD_INITIALIZATION;
 
 	SetThreadPriority(KernelThread, THREAD_PRIORITY_BELOW_NORMAL);
@@ -279,7 +279,7 @@ __setCR3((UINT64)kproc->PageMap);
 
 	// Parse Boot Configuration
 	RFBOOT_CONFIGURATION BootConfiguration = FileImportTable[FIMPORT_BOOT_CONFIG].LoadedFileBuffer;
-	// _RT_SystemDebugPrint(L"BOOT_CONFIG : KERNEL(%d.%d), OS(%d.%d), SIGNATURE : %ls, EOHOFF : %x, ENDOFHDR : %ls", BootConfiguration->Header.MajorKernelVersion, BootConfiguration->Header.MinorKernelVersion, BootConfiguration->Header.MajorOsVersion, BootConfiguration->Header.MinorOsVersion, BootConfiguration->Header.Signature, (UINT64)&BootConfiguration->Header.HeaderEnd - (UINT64)BootConfiguration, BootConfiguration->Header.HeaderEnd);
+	// SystemDebugPrint(L"BOOT_CONFIG : KERNEL(%d.%d), OS(%d.%d), SIGNATURE : %ls, EOHOFF : %x, ENDOFHDR : %ls", BootConfiguration->Header.MajorKernelVersion, BootConfiguration->Header.MinorKernelVersion, BootConfiguration->Header.MajorOsVersion, BootConfiguration->Header.MinorOsVersion, BootConfiguration->Header.Signature, (UINT64)&BootConfiguration->Header.HeaderEnd - (UINT64)BootConfiguration, BootConfiguration->Header.HeaderEnd);
 	if(!memcmp(BootConfiguration->Header.Signature, BOOTCONFIG_SIGNATURE, 28) ||
 	BootConfiguration->Header.MajorKernelVersion != MAJOR_KERNEL_VERSION ||
 	BootConfiguration->Header.MinorKernelVersion != MINOR_KERNEL_VERSION ||
@@ -328,7 +328,7 @@ __setCR3((UINT64)kproc->PageMap);
 	if(KERNEL_ERROR(IpcServerCreate(KernelThread, IPC_MAKEADDRESS(0, 0, 0, 1), NULL, 0, &KernelServer)))
 		SET_SOD_INITIALIZATION;
 
-	ResumeThread(KernelThread);
+	KeResumeThread(KernelThread);
 	#ifdef ___KERNEL_DEBUG___
 	DebugWrite("Enabling Task Scheduler & __sti()");	
 	#endif
@@ -353,9 +353,9 @@ __setCR3((UINT64)kproc->PageMap);
 	// __sti();
 	// UINT64 LastCs = 0;
 	// for(;;) {
-	// 	_RT_SystemDebugPrint(L"CS/S : %x, CS_LATENCY : %x", CpuManagementTable[0]->TotalClocks[0] - LastCs, CpuManagementTable[0]->LastThreadSwitchLatency[0]);
+	// 	SystemDebugPrint(L"CS/S : %x, CS_LATENCY : %x", CpuManagementTable[0]->TotalClocks[0] - LastCs, CpuManagementTable[0]->LastThreadSwitchLatency[0]);
 	// 	LastCs = CpuManagementTable[0]->TotalClocks[0];
-	// 	// _RT_SystemDebugPrint(L"Context Switches : %x:%x , Time : %x , CS Latency : %x, OF : %x", CpuManagementTable[0]->TotalClocks[0], CpuManagementTable[0]->TotalClocks[1], CpuManagementTable[0]->HighPrecisionTime[0], (CpuManagementTable[0]->LastThreadSwitchLatency[0] * GetHighPerformanceTimerFrequency()) / 1000000, (UINT64)((UINT64)CpuManagementTable[0]->LastThreadSwitchLatency - (UINT64)CpuManagementTable[0]));
+	// 	// SystemDebugPrint(L"Context Switches : %x:%x , Time : %x , CS Latency : %x, OF : %x", CpuManagementTable[0]->TotalClocks[0], CpuManagementTable[0]->TotalClocks[1], CpuManagementTable[0]->HighPrecisionTime[0], (CpuManagementTable[0]->LastThreadSwitchLatency[0] * GetHighPerformanceTimerFrequency()) / 1000000, (UINT64)((UINT64)CpuManagementTable[0]->LastThreadSwitchLatency - (UINT64)CpuManagementTable[0]));
 	// 	// for(int c = 0;c<0x100000;c++);
 	// 	Sleep(1000);
 	// }
@@ -381,7 +381,7 @@ __setCR3((UINT64)kproc->PageMap);
 	for(UINT64 i = 0;i<DriverTable->TotalDrivers;i++){
 		if(DriverTable->Drivers[i].Present){
 			DRIVER_IDENTIFICATION_DATA* drv = &DriverTable->Drivers[i];
-			_RT_SystemDebugPrint(L"DRVD#%d : Type %d, EN: %x, SRC : %d/%d, CLS : %x, SUBCS : %x, IF : %x, UNMSK : %x", 
+			SystemDebugPrint(L"DRVD#%d : Type %d, EN: %x, SRC : %d/%d, CLS : %x, SUBCS : %x, IF : %x, UNMSK : %x", 
 			i, drv->DriverType, drv->Enabled, drv->DeviceSource, drv->DeviceSearchType, drv->DeviceClass, drv->DeviceSubclass, drv->ProgramInterface, drv->DataUnmask);
 			if(DriverTable->Drivers[i].DriverType == INVALID_DRIVER_TYPE || DriverTable->Drivers[i].DriverType > MAX_DRIVER_TYPE) SOD(SOD_INITIALIZATION, "INVALID_DRIVER_TYPE");
 			if(DriverTable->Drivers[i].DriverType == KERNEL_EXTENSION_DRIVER) NumKexDrivers++;
@@ -445,7 +445,7 @@ __setCR3((UINT64)kproc->PageMap);
 						if((DeviceHeaderType & ~(0x80)) == 0){
 							InstallDevice(NULL, DEVICE_SOURCE_PCI, DeviceConfiguration);
 						}else if((DeviceHeaderType & ~(0x80)) == 1){
-							_RT_SystemDebugPrint(L"PCI-to-PCI Bridge.");
+							SystemDebugPrint(L"PCI-to-PCI Bridge.");
 						}
 					}
 				}
@@ -467,7 +467,7 @@ __setCR3((UINT64)kproc->PageMap);
 					if((HeaderType & ~(0x80)) == 0) {
 						InstallDevice(NULL, DEVICE_SOURCE_PCI, IOPCI_CONFIGURATION(Bus, Device, Function));
 					}else if((HeaderType & ~(0x80)) == 1){
-							_RT_SystemDebugPrint(L"PCI-to-PCI Bridge.");
+							SystemDebugPrint(L"PCI-to-PCI Bridge.");
 					}
 				}
 

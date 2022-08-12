@@ -24,6 +24,3 @@ typedef struct _CREATE_PROCESS_STRUCTURE {
 	UINT64* ProcessId;
 } CREATE_PROCESS_STRUCTURE;
 
-#define KEXAPI KERNELAPI // Kernel Export Api
-
-RFPROCESS KEXAPI KeCreateProcess(RFPROCESS ParentProcess, LPWSTR DisplayName, LPWSTR DisplayDescription, UINT SubSystem, UINT64 Privileges, UINT64* ProcessId);

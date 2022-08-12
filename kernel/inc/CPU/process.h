@@ -20,13 +20,13 @@ typedef void (__cdecl *THREAD_START_ROUTINE)();
 #define KERNELRUNTIMEDLL "kernelruntime.dll"
 
 
-RFPROCESS KERNELAPI CreateProcess(RFPROCESS ParentProcess, LPWSTR ProcessName, UINT64 Subsystem, UINT16 OperatingMode);
+RFPROCESS KEXPORT KERNELAPI KeCreateProcess(RFPROCESS ParentProcess, LPWSTR ProcessName, UINT64 Subsystem, UINT16 OperatingMode);
 RFPROCESS KERNELAPI GetProcessById(UINT64 ProcessId);
 
 BOOL KERNELAPI SetProcessName(RFPROCESS Process, LPWSTR ProcessName);
 
 
-RFTHREAD KERNELAPI CreateThread(RFPROCESS Process, UINT64 StackSize, THREAD_START_ROUTINE StartAddress, UINT64 Flags, UINT64* ThreadId); // parameters
+RFTHREAD KEXPORT KERNELAPI KeCreateThread(RFPROCESS Process, UINT64 StackSize, THREAD_START_ROUTINE StartAddress, UINT64 Flags, UINT64* ThreadId); // parameters
 KERNELSTATUS KERNELAPI SetThreadPriority(RFTHREAD Thread, int Priority);
 KERNELSTATUS KERNELAPI SetPriorityClass(RFPROCESS Process, int PriorityClass);
 
@@ -36,15 +36,15 @@ int KERNELAPI TerminateCurrentThread(int ExitCode);
 int KERNELAPI TerminateProcess(RFPROCESS process, int ExitCode);
 int KERNELAPI TerminateThread(RFTHREAD thread, int ExitCode);
 
-RFPROCESS KERNELAPI GetCurrentProcess();
-RFTHREAD KERNELAPI GetCurrentThread();
-RFTHREAD KERNELAPI GetProcessorIdleThread(UINT64 ProcessorId);
+RFPROCESS KEXPORT KERNELAPI KeGetCurrentProcess();
+RFTHREAD KEXPORT KERNELAPI KeGetCurrentThread();
+RFTHREAD KEXPORT KERNELAPI KeGetProcessorIdleThread(UINT64 ProcessorId);
 
-UINT64 KERNELAPI GetCurrentProcessId();
-UINT64 KERNELAPI GetCurrentThreadId();
+UINT64 KEXPORT KERNELAPI KeGetCurrentProcessId();
+UINT64 KEXPORT KERNELAPI KeGetCurrentThreadId();
 
-BOOL KERNELAPI SuspendThread(RFTHREAD Thread);
-BOOL KERNELAPI ResumeThread(RFTHREAD Thread);
+BOOL KEXPORT KERNELAPI KeSuspendThread(RFTHREAD Thread);
+BOOL KEXPORT KERNELAPI KeResumeThread(RFTHREAD Thread);
 
 extern PROCESSMGRTABLE Pmgrt;
 extern void ScheduleTask();
@@ -63,7 +63,7 @@ BOOL SetThreadProcessor(RFTHREAD Thread, UINT ProcessorId);
 void KERNELAPI TaskSchedulerEnable();
 void KERNELAPI TaskSchedulerDisable();
 
-BOOL KERNELAPI IoWait();
-BOOL KERNELAPI IoFinish(RFTHREAD Thread);
+BOOL KEXPORT KERNELAPI IoWait();
+BOOL KEXPORT KERNELAPI IoFinish(RFTHREAD Thread);
 
 BOOL isValidProcess(RFPROCESS Process);

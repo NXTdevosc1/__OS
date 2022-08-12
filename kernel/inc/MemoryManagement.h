@@ -86,27 +86,28 @@ PFREE_HEAP_DESCRIPTOR KERNELAPI AllocateFreeHeapDescriptor(
 	UINT64 HeapLength
 );
 
-void* KERNELAPI HeapCreate(MEMORY_MANAGEMENT_TABLE* MemoryTable, UINT64* NumBytes, UINT32 Align, PFREE_HEAP_DESCRIPTOR* SourceHeap, UINT64 MaxAddress); // Search for a heap
+LPVOID KERNELAPI HeapCreate(MEMORY_MANAGEMENT_TABLE* MemoryTable, UINT64* NumBytes, UINT32 Align, PFREE_HEAP_DESCRIPTOR* SourceHeap, UINT64 MaxAddress); // Search for a heap
 
-void* KERNELAPI ExtendedMemoryAlloc(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, LPVOID* AllocationSegment, UINT64 MaxAddress);
+LPVOID KEXPORT KERNELAPI VirtualAllocateEx(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, LPVOID* AllocationSegment, UINT64 MaxAddress);
 
-void* KERNELAPI malloc(UINT64 NumBytes);
-void* KERNELAPI free(void* Heap, RFPROCESS Process);
-void* KERNELAPI FastFree(LPVOID AllocationSegment, RFPROCESS Process);
-void* KERNELAPI kfree(void* Heap);
 
-void* KERNELAPI kmalloc(UINT64 NumBytes);
-void* KERNELAPI kpalloc(UINT64 NumPages);
+LPVOID KEXPORT KERNELAPI malloc(UINT64 NumBytes);
+LPVOID KEXPORT KERNELAPI free(LPVOID Heap, RFPROCESS Process);
+LPVOID KEXPORT KERNELAPI FastFree(LPVOID AllocationSegment, RFPROCESS Process);
+LPVOID KERNELAPI kfree(LPVOID Heap);
 
-void* KERNELAPI UserExtendedAlloc(UINT64 NumBytes, UINT32 Align);
-void* KERNELAPI UserMalloc(UINT64 NumBytes);
+LPVOID KERNELAPI kmalloc(UINT64 NumBytes);
+LPVOID KERNELAPI kpalloc(UINT64 NumPages);
 
-void* KERNELAPI AllocateUserHeapSpace(RFPROCESS Process, UINT64 NumBytes); // Automatically Aligned to 0x1000
+LPVOID KERNELAPI UserExtendedAlloc(UINT64 NumBytes, UINT32 Align);
+LPVOID KERNELAPI UserMalloc(UINT64 NumBytes);
+
+LPVOID KERNELAPI AllocateUserHeapSpace(RFPROCESS Process, UINT64 NumBytes); // Automatically Aligned to 0x1000
 
 BOOL GetPhysicalMemoryStatus(LPMEMORYSTATUS MemoryStatus);
 
-void* KERNELAPI CurrentProcessMalloc(unsigned long long HeapSize);
-void* KERNELAPI CurrentProcessFree(void* Heap);
+LPVOID KERNELAPI CurrentProcessMalloc(unsigned long long HeapSize);
+LPVOID KERNELAPI CurrentProcessFree(LPVOID Heap);
 
 typedef struct _GLOBAL_MEMORY_STATUS {
 	UINT64 TotalMemory;

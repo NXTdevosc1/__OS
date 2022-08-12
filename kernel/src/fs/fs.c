@@ -105,7 +105,7 @@ FILE KERNELAPI DefaultOpenFile(PARTITION_INSTANCE* Partition, LPWSTR Path, UINT6
     if (!ValidatePartition(Partition) || !Path) return NULL;
     if (!Partition->Interface.GetInfo) return NULL;
     UINT64 PathLength = wstrlen(Path);
-    RFPROCESS Process = GetCurrentProcess();
+    RFPROCESS Process = KeGetCurrentProcess();
     LPWSTR Copy = kmalloc((PathLength + 1) << 1);
     memcpy16(Copy, Path, PathLength);
     Copy[PathLength] = 0;
@@ -151,7 +151,7 @@ FILE KERNELAPI DefaultOpenFile(PARTITION_INSTANCE* Partition, LPWSTR Path, UINT6
 
     // After success create file handle
 
-    HANDLE FileHandle = OpenHandle(File->Process->FileHandles, GetCurrentThread(),
+    HANDLE FileHandle = OpenHandle(File->Process->FileHandles, KeGetCurrentThread(),
         HANDLE_FLAG_CLOSE_FILE_ON_EXIT, HANDLE_FILE, File, NULL
     );
     if (!FileHandle) SET_SOD_MEDIA_MANAGEMENT;

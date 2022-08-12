@@ -17,6 +17,8 @@
 #define SYSTEM_PATH L"//OS/System/"
 
 
+#define IMPORT_OSKRNLX64 "oskrnlx64.exe"
+
 // USER PE64 LoadDll (void* ImageBuffer, void* ProgramVBuffer, PE_IMAGE* ProgImg, IMPORT_DIR ImportDir, void** (received : TargetVirtualAddress)(return : DllPhysicalAddress), 
 // UINT64* (receive : RFPROCESS UserProcess)(return : UINT64 DllImageSize
 HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR* ProgramImage, PIMAGE_IMPORT_DIRECTORY ImportDirectory, void** DllImage, UINT64* DllImageSize) {
@@ -48,22 +50,32 @@ HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR*
 
 	FILE DllFile = NULL;
 	char* DllBuffer = NULL;
-	
-	if (DllNameLength == sizeof(KERNELRUNTIMEDLL) - 1/*strlen(kernelruntime.dll)*/  && memcmp(dllname, KERNELRUNTIMEDLL, sizeof(KERNELRUNTIMEDLL) - 1)) {
-		return Pe64LinkKernelSymbols(ProgramVirtualBuffer, ProgramImage, ImportDirectory);
-	}
-	for(unsigned int i = 0;FileImportTable[i].Type != FILE_IMPORT_ENDOFTABLE;i++){
-		if(FileImportTable[i].Type == FILE_IMPORT_DLL && FileImportTable[i].LenBaseName == DllNameLength &&
-		wstrcmp_nocs(FileImportTable[i].BaseName, WDllName, DllNameLength)
-		){
-			// Fork the dll
-			DllBuffer = kmalloc(FileImportTable[i].LoadedFileSize);
-			if(!DllBuffer) SET_SOD_MEMORY_MANAGEMENT;
-			memcpy(DllBuffer, FileImportTable[i].LoadedFileBuffer, FileImportTable[i].LoadedFileSize);
-			
-			goto LoadDLL;
+	char* VirtualBuffer = NULL;
+	BOOL OSKRNLX64 = FALSE;
+	PIMAGE_EXPORT_DIRECTORY ExportDirectory = NULL;
+
+	SystemDebugPrint(L"Loading DLL...");
+	if (DllNameLength == sizeof(IMPORT_OSKRNLX64) - 1/*strlen(oskrnlx64.exe)*/  && memcmp(dllname, IMPORT_OSKRNLX64, sizeof(IMPORT_OSKRNLX64) - 1)) {
+		// return Pe64LinkKernelSymbols(ProgramVirtualBuffer, ProgramImage, ImportDirectory);
+
+		OSKRNLX64 = TRUE;
+		SystemDebugPrint(L"OSKRNLX64 = %x, KRNL_BASE : %x, DD : %x, EDT : %x", OSKRNLX64, InitData.ImageBase, InitData.PEDataDirectories, InitData.PEDataDirectories->ExportTable.VirtualAddress);
+		goto LinkDLL;
+	} else {
+		for(unsigned int i = 0;FileImportTable[i].Type != FILE_IMPORT_ENDOFTABLE;i++){
+			if(FileImportTable[i].Type == FILE_IMPORT_DLL && FileImportTable[i].LenBaseName == DllNameLength &&
+			wstrcmp_nocs(FileImportTable[i].BaseName, WDllName, DllNameLength)
+			){
+				// Fork the dll
+				DllBuffer = kmalloc(FileImportTable[i].LoadedFileSize);
+				if(!DllBuffer) SET_SOD_MEMORY_MANAGEMENT;
+				memcpy(DllBuffer, FileImportTable[i].LoadedFileBuffer, FileImportTable[i].LoadedFileSize);
+				
+				goto LoadDLL;
+			}
 		}
 	}
+	SOD(0, "CANNOT_FILE_DLL");
 	LPWSTR ResultPath = wstrcat(SYSTEM_PATH, WDllName);
 
 	FILE_INFORMATION_STRUCT DllFileInfo = { 0 };
@@ -96,23 +108,12 @@ HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR*
 
 	ImportDirectory->TimeDataStamp = PeImage->TimeDateStamp; // Set the time/date of the dll on import
 	
+
+
 	if (PeImage->OptionnalDataDirectories.ExportTable.VirtualAddress) {
 		// There is an export table and thats what all is about
-		PE_SECTION_TABLE* ExportDataSection = GetRvaSection(PeImage->OptionnalDataDirectories.ExportTable.VirtualAddress, PeImage);
-		if (!ExportDataSection) return -1;
-		PIMAGE_EXPORT_DIRECTORY ExportDirectory = (PIMAGE_EXPORT_DIRECTORY)(DllBuffer + ExportDataSection->PtrToRawData + (PeImage->OptionnalDataDirectories.ExportTable.VirtualAddress - ExportDataSection->VirtualAddress));
-		
-		
-		PE_SECTION_TABLE* DllNameSection = GetRvaSection(ExportDirectory->NameRva, PeImage);
-		PE_SECTION_TABLE* ExportAddressTableSection = GetRvaSection(ExportDirectory->ExportAddressTableRva, PeImage);
-		PE_SECTION_TABLE* NamePtrSection = GetRvaSection(ExportDirectory->NamePointerRva, PeImage);
 
-
-		UINT32* NamePtr = (UINT32*)CalculatePhysicalRva(DllBuffer, NamePtrSection, ExportDirectory->NamePointerRva);
-
-		char* DllName = (char*)CalculatePhysicalRva(DllBuffer, DllNameSection, ExportDirectory->NameRva);
-
-
+		SystemDebugPrint(L"EXPORT_TABLE");
 	
 		PE_SECTION_TABLE* Section = (PE_SECTION_TABLE*)((char*)&PeImage->OptionnalHeader + PeImage->SizeofOptionnalHeader);
 
@@ -122,13 +123,16 @@ HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR*
 			for (UINT16 i = 0; i < PeImage->NumSections; i++, s++) {
 				if (!(s->Characteristics & (PE_SECTION_CODE | PE_SECTION_INITIALIZED_DATA | PE_SECTION_UNINITIALIZED_DATA)) || !s->VirtualSize) continue;
 				// 0x1000 Align
-				if (s->VirtualSize % 0x1000) s->VirtualSize += 0x1000 - (s->VirtualSize % 0x1000);
+				if (s->VirtualSize & 0xFFF) {
+					s->VirtualSize += 0x1000;
+					s->VirtualSize &= ~0xFFF;
+				}
 				VirtualBufferLength += s->VirtualSize;
 			}
 		}
 
 		if (!VirtualBufferLength) return -1;
-		char* VirtualBuffer = ExtendedMemoryAlloc(NULL, VirtualBufferLength, 0x1000, NULL, 0);
+		VirtualBuffer = VirtualAllocateEx(NULL, VirtualBufferLength, 0x1000, NULL, 0);
 		if (!VirtualBuffer) SET_SOD_MEMORY_MANAGEMENT;
 		if (!DllVirtualBase) DllVirtualBase = VirtualBuffer;
 		Section = (PE_SECTION_TABLE*)((char*)&PeImage->OptionnalHeader + PeImage->SizeofOptionnalHeader);
@@ -136,7 +140,7 @@ HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR*
 		for (UINT16 i = 0; i < PeImage->NumSections; i++, Section++) {
 
 			if (Section->Characteristics & (PE_SECTION_CODE | PE_SECTION_INITIALIZED_DATA | PE_SECTION_UNINITIALIZED_DATA)) {
-				memcpy((void*)(VirtualBuffer + Section->VirtualAddress), (UINT64*)((char*)DllBuffer + Section->PtrToRawData), Section->SizeofRawData);
+				memcpy((void*)(VirtualBuffer + Section->VirtualAddress), (void*)((char*)DllBuffer + Section->PtrToRawData), Section->SizeofRawData);
 				if (Section->VirtualSize > Section->SizeofRawData) {
 					UINT64 UninitializedDataSize = Section->VirtualSize - Section->SizeofRawData;
 					memset((void*)(VirtualBuffer + Section->VirtualAddress + Section->SizeofRawData), 0, UninitializedDataSize);
@@ -144,14 +148,33 @@ HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR*
 			}
 		}
 
+		LinkDLL:
 
+		// Importing Symbols
+		if(OSKRNLX64) {
+			VirtualBuffer = InitData.ImageBase;
+			DllVirtualBase = InitData.ImageBase;
+			ExportDirectory = (PIMAGE_EXPORT_DIRECTORY)(VirtualBuffer + InitData.PEDataDirectories->ExportTable.VirtualAddress);
+		}else {
+			ExportDirectory = (PIMAGE_EXPORT_DIRECTORY)(VirtualBuffer + PeImage->OptionnalDataDirectories.ExportTable.VirtualAddress);// (DllBuffer + ExportDataSection->PtrToRawData + (PeImage->OptionnalDataDirectories.ExportTable.VirtualAddress - ExportDataSection->VirtualAddress));
+		}
+
+		
+		SystemDebugPrint(L"DLL Image Loaded. Linking to the target program...");
+
+		// SystemDebugPrint(L"ETVA : %x, ET : %x, EDVT : %x", PeImage->OptionnalDataDirectories.ExportTable.VirtualAddress, ExportDirectory, ExportDataSection->VirtualAddress);
+		SystemDebugPrint(L"NR : %x, NPR : %x, EATR : %x", ExportDirectory->NameRva, ExportDirectory->NamePointerRva, ExportDirectory->ExportAddressTableRva);
+
+		UINT32* NamePtr = (UINT32*)(VirtualBuffer + ExportDirectory->NamePointerRva);
+		char* DllName = (char*)(VirtualBuffer + ExportDirectory->NameRva);
+		SystemDebugPrint(L"Dll Name : %s, VB : %x, ED : %x", DllName, VirtualBuffer, ExportDirectory);
 		UINT64* ImportLookupTable = (UINT64*)((char*)ProgramVirtualBuffer + ImportDirectory->ImportLookupTable);
 		UINT64* ImportAddressTable = (UINT64*)((char*)ProgramVirtualBuffer + ImportDirectory->ImportAddressTableRva);
 
-		PE_SECTION_TABLE* ExportSection = GetRvaSection(ExportDirectory->ExportAddressTableRva, PeImage);
-		if (!ExportSection) return -1;
-		UINT32* ExportAddressTable = (UINT32*)CalculatePhysicalRva(DllBuffer, ExportSection, ExportDirectory->ExportAddressTableRva);
-		UINT16* ExportOrdinalTable = (UINT16*)CalculatePhysicalRva(DllBuffer, ExportSection, ExportDirectory->OrdinalTableRva);
+		// PE_SECTION_TABLE* ExportSection = GetRvaSection(ExportDirectory->ExportAddressTableRva, PeImage);
+		// if (!ExportSection) return -1;
+		UINT32* ExportAddressTable = (UINT32*)(VirtualBuffer + ExportDirectory->ExportAddressTableRva);// CalculatePhysicalRva(DllBuffer, ExportSection, ExportDirectory->ExportAddressTableRva);
+		UINT16* ExportOrdinalTable = (UINT16*)(VirtualBuffer + ExportDirectory->OrdinalTableRva); //(DllBuffer, ExportSection, ExportDirectory->OrdinalTableRva);
 
 		while (*ImportLookupTable) {
 			
@@ -171,6 +194,7 @@ HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR*
 				
 				UINT32* n = NamePtr;
 				BOOL SymbolFound = FALSE;
+				SystemDebugPrint(L"Searching Symbol : %s", entry->Name);
 				for (UINT32 i = 0; i < ExportDirectory->NumNamePointers; i++, n++) {
 					char* name = (char*)(VirtualBuffer + *n);
 
@@ -187,19 +211,24 @@ HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR*
 						break;
 					}
 				}
-				if (!SymbolFound) return -2;
+				if (!SymbolFound) {
+					SystemDebugPrint(L"Symbol : %s Not FOUND!", entry->Name);
+					while(1);
+				}
+				//return -2;
 			}
 
 			ImportLookupTable++;
 			ImportAddressTable++; // first is for address, second one is address of symbol name
 		}
+		if(!OSKRNLX64) {
+			if (PeImage->OptionnalDataDirectories.BaseRelocationTable.VirtualAddress) {
+				if (FAILED(Pe64RelocateImage(PeImage, DllBuffer, VirtualBuffer, DllVirtualBase))) return -1;
+			}
 
-		if (PeImage->OptionnalDataDirectories.BaseRelocationTable.VirtualAddress) {
-			if (FAILED(Pe64RelocateImage(PeImage, DllBuffer, VirtualBuffer, DllVirtualBase))) return -1;
-		}
-
-		if (PeImage->OptionnalDataDirectories.ImportAddressTable.VirtualAddress) {
-			if (FAILED(Pe64ResolveImports(VirtualBuffer, DllBuffer, PeImage, UserProcess))) return -1;
+			if (PeImage->OptionnalDataDirectories.ImportAddressTable.VirtualAddress) {
+				if (FAILED(Pe64ResolveImports(VirtualBuffer, DllBuffer, PeImage, UserProcess))) return -1;
+			}
 		}
 		if (DllImage) {
 			*DllImage = VirtualBuffer;
@@ -208,8 +237,14 @@ HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR*
 			*DllImageSize = VirtualBufferLength;
 		}
 	}
-	CloseFile(DllFile);
-	free(DllBuffer, kproc);
+	// if(DllFile) {
+	// 	CloseFile(DllFile);
+	// }
+	if(OSKRNLX64) {
+		SystemDebugPrint(L"OSKRNLX64 Loaded !");
+	} else {
+		free(DllBuffer, kproc);
+	}
 
 	
 

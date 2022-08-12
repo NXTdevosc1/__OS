@@ -148,7 +148,7 @@ PFREE_HEAP_DESCRIPTOR KERNELAPI AllocateFreeHeapDescriptor(
 		if (!List->Next) {
 			UINT64 ListBytes = sizeof(FREE_MEMORY_LIST) + 0x100;
 			PMEMORY_HEAP_DESCRIPTOR ListHeap = NULL;
-			List = ExtendedMemoryAlloc(NULL, ListBytes, 0, &ListHeap, 0);
+			List = VirtualAllocateEx(NULL, ListBytes, 0, &ListHeap, 0);
 			
 			if (!List || !ListHeap) SET_SOD_MEMORY_MANAGEMENT;
 			SZeroMemory(List);
@@ -175,7 +175,7 @@ PFREE_HEAP_DESCRIPTOR KERNELAPI AllocateFreeHeapDescriptor(
 	return NULL;
 }
 
-void* KERNELAPI HeapCreate(MEMORY_MANAGEMENT_TABLE* MemoryTable, UINT64* NumBytes, UINT32 Align, PFREE_HEAP_DESCRIPTOR* SourceHeap, UINT64 MaxAddress) {
+LPVOID KERNELAPI HeapCreate(MEMORY_MANAGEMENT_TABLE* MemoryTable, UINT64* NumBytes, UINT32 Align, PFREE_HEAP_DESCRIPTOR* SourceHeap, UINT64 MaxAddress) {
 	if (!MemoryTable || !SourceHeap || !NumBytes || !*NumBytes) return NULL;
 	if(!MaxAddress) MaxAddress = (UINT64)-1;
 	if (Align < 0x10) Align = 0x10; // Force 16 Byte Align
@@ -207,7 +207,7 @@ void* KERNELAPI HeapCreate(MEMORY_MANAGEMENT_TABLE* MemoryTable, UINT64* NumByte
 				*NumBytes = EstimatedSize;
 				MemoryTable->PhysicalUsedMemory += EstimatedSize;
 				PhysicalMemoryStatus.AllocatedMemory += EstimatedSize;
-				return (void*)Address;
+				return (LPVOID)Address;
 			}
 		}
 
@@ -219,15 +219,15 @@ void* KERNELAPI HeapCreate(MEMORY_MANAGEMENT_TABLE* MemoryTable, UINT64* NumByte
 	return NULL;
 }
 
-void* KERNELAPI ExtendedMemoryAlloc(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, LPVOID* AllocationSegment, UINT64 MaxAddress) {
+LPVOID KERNELAPI VirtualAllocateEx(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, LPVOID* AllocationSegment, UINT64 MaxAddress){
 	if (!NumBytes) return NULL;
 	RFPROCESS Process = NULL;
 	if (Thread) Process = Thread->Process;
-	else Process = GetCurrentProcess();
+	else Process = KeGetCurrentProcess();
 	PFREE_HEAP_DESCRIPTOR SourceHeap = NULL;
 	if (Process->OperatingMode == KERNELMODE_PROCESS) Process = kproc;
 
-	void* Heap = HeapCreate(&Process->MemoryManagementTable, &NumBytes, Align, &SourceHeap, MaxAddress);
+	LPVOID Heap = HeapCreate(&Process->MemoryManagementTable, &NumBytes, Align, &SourceHeap, MaxAddress);
 	if (!Heap) {
 		if (Process == kproc) SET_SOD_MEMORY_MANAGEMENT;// Kernel mode process
 		
@@ -245,23 +245,23 @@ void* KERNELAPI ExtendedMemoryAlloc(HTHREAD Thread, UINT64 NumBytes, UINT32 Alig
 	return Heap;
 }
 
-void* KERNELAPI malloc(UINT64 NumBytes) {
-	return ExtendedMemoryAlloc(GetCurrentThread(), NumBytes, 0x10, NULL, 0);
+LPVOID KERNELAPI malloc(UINT64 NumBytes) {
+	return VirtualAllocateEx(KeGetCurrentThread(), NumBytes, 0x10, NULL, 0);
 }
 
-void* kmalloc(UINT64 NumBytes) {
-	return ExtendedMemoryAlloc(NULL, NumBytes, 0x10, NULL, 0);
+LPVOID kmalloc(UINT64 NumBytes) {
+	return VirtualAllocateEx(NULL, NumBytes, 0x10, NULL, 0);
 }
-void* KERNELAPI kpalloc(UINT64 NumPages) {
-	return ExtendedMemoryAlloc(NULL, NumPages << 12, 0x1000, NULL, 0);
+LPVOID KERNELAPI kpalloc(UINT64 NumPages) {
+	return VirtualAllocateEx(NULL, NumPages << 12, 0x1000, NULL, 0);
 }
 
-void* KERNELAPI FastFree(LPVOID AllocationSegment, RFPROCESS Process) {
+LPVOID KERNELAPI FastFree(LPVOID AllocationSegment, RFPROCESS Process) {
 	if (!AllocationSegment) return NULL;
 	
 	PMEMORY_HEAP_DESCRIPTOR Descriptor = AllocationSegment;
 	HTHREAD Thread = Descriptor->Thread;
-	RFPROCESS DescriptorProcess = GetCurrentProcess();
+	RFPROCESS DescriptorProcess = KeGetCurrentProcess();
 	if (Thread) DescriptorProcess = Thread->Process;
 
 	if (!Descriptor->Present || !Descriptor->ParentList || DescriptorProcess != Process) return NULL;
@@ -275,21 +275,21 @@ void* KERNELAPI FastFree(LPVOID AllocationSegment, RFPROCESS Process) {
 		Thread->Process->MemoryManagementTable.UsedMemory -= Descriptor->HeapLength;
 	}
 	PhysicalMemoryStatus.AllocatedMemory -= Descriptor->HeapLength;
-	void* ReturnAddress = (void*)Descriptor->Address;
+	LPVOID ReturnAddress = (LPVOID)Descriptor->Address;
 	Descriptor->ParentList->HeapCount--;
 	if (Descriptor->ParentList->SearchMax + 1 == Descriptor->Index) Descriptor->ParentList->SearchMax--;
 	Descriptor->Present = FALSE;
 	return ReturnAddress;
 }
 
-void* KERNELAPI UserExtendedAlloc(UINT64 NumBytes, UINT32 Align) {
+LPVOID KERNELAPI UserExtendedAlloc(UINT64 NumBytes, UINT32 Align) {
 	return NULL;
 }
-void* KERNELAPI UserMalloc(UINT64 NumBytes) {
+LPVOID KERNELAPI UserMalloc(UINT64 NumBytes) {
 	return NULL;
 }
 
-void* KERNELAPI free(void* Heap, RFPROCESS Process) {
+LPVOID KERNELAPI free(LPVOID Heap, RFPROCESS Process) {
 	ALLOCATED_MEMORY_LIST* List = Process->MemoryManagementTable.AllocatedMemory;
 	ALLOCATED_MEMORY_LIST* LastList = List;
 	for (;;) {
@@ -297,7 +297,7 @@ void* KERNELAPI free(void* Heap, RFPROCESS Process) {
 			// Unlink List And Lower memory usage
 			if (LastList != List) {
 				LastList->Next = List->Next;
-				kfree((void*)List);
+				kfree((LPVOID)List);
 				List = LastList;
 			}
 			goto NextList;
@@ -318,7 +318,7 @@ void* KERNELAPI free(void* Heap, RFPROCESS Process) {
 					Process->MemoryManagementTable.UsedMemory -= Descriptor->HeapLength;
 				}
 
-				void* ReturnAddress = (void*)Descriptor->Address;
+				LPVOID ReturnAddress = (LPVOID)Descriptor->Address;
 				Descriptor->ParentList->HeapCount--;
 				if (Descriptor->ParentList->SearchMax + 1 == Descriptor->Index) Descriptor->ParentList->SearchMax--;
 
@@ -333,25 +333,25 @@ void* KERNELAPI free(void* Heap, RFPROCESS Process) {
 	}
 	return NULL;
 }
-void* KERNELAPI kfree(void* Heap) {
+LPVOID KERNELAPI kfree(LPVOID Heap) {
 	return free(Heap, kproc);
 }
 
-void* KERNELAPI CurrentProcessMalloc(unsigned long long HeapSize) {
-	HTHREAD Thread = GetCurrentThread();
-	return ExtendedMemoryAlloc(Thread, HeapSize, 0, NULL, 0);
+LPVOID KERNELAPI CurrentProcessMalloc(unsigned long long HeapSize) {
+	HTHREAD Thread = KeGetCurrentThread();
+	return VirtualAllocateEx(Thread, HeapSize, 0, NULL, 0);
 }
-void* KERNELAPI CurrentProcessFree(void* Heap) {
-	return free(Heap, GetCurrentProcess());
+LPVOID KERNELAPI CurrentProcessFree(LPVOID Heap) {
+	return free(Heap, KeGetCurrentProcess());
 }
 
-void* KERNELAPI AllocateUserHeapSpace(RFPROCESS Process, UINT64 NumBytes) {
+LPVOID KERNELAPI AllocateUserHeapSpace(RFPROCESS Process, UINT64 NumBytes) {
 	if (!Process || Process->OperatingMode != USERMODE_PROCESS) return NULL;
 	if (!NumBytes) NumBytes = 0x1000;
 
 	if (NumBytes % 0x1000) NumBytes += 0x1000 - (NumBytes % 0x1000);
 	PMEMORY_HEAP_DESCRIPTOR SourceHeap = NULL;
-	void* Buffer = ExtendedMemoryAlloc(NULL, NumBytes, 0x1000, (LPVOID*)&SourceHeap, 0);
+	LPVOID Buffer = VirtualAllocateEx(NULL, NumBytes, 0x1000, (LPVOID*)&SourceHeap, 0);
 	if (!Buffer || !SourceHeap) SET_SOD_MEMORY_MANAGEMENT;
 
 	

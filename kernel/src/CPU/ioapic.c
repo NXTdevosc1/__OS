@@ -42,7 +42,7 @@ void SortIoApics(){
             NumSortedIoApics++;
             // now mask all interrupt sources
             UINT MaxRedirectionEntry = IoApicGetMaxRedirectionEntry(IoApic);
-            _RT_SystemDebugPrint(L"IOAPIC #%d MAX_REDIR_ENTRY : %d, GSYS_INTBASE : %d", IoApic->IoApicId, MaxRedirectionEntry, IoApic->GlobalSysInterruptBase);
+            SystemDebugPrint(L"IOAPIC #%d MAX_REDIR_ENTRY : %d, GSYS_INTBASE : %d", IoApic->IoApicId, MaxRedirectionEntry, IoApic->GlobalSysInterruptBase);
             for(UINT c = 0;c<MaxRedirectionEntry + 1;c++){
                 IoApicWriteRedirectionTable(IoApic, c, &RedirectionEntry);
             }

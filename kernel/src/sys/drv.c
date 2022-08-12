@@ -13,7 +13,7 @@ DRIVER_OBJECT* DriverObjects = NULL;
 
 void RunEssentialExtensionDrivers(){
 	DRIVER_TABLE* DriverTable = FileImportTable[FIMPORT_DRVTBL].LoadedFileBuffer;
-	DriverObjects = ExtendedMemoryAlloc(NULL, sizeof(DRIVER_OBJECT) * DriverTable->TotalDrivers, 0x1000, NULL, 0);
+	DriverObjects = VirtualAllocateEx(NULL, sizeof(DRIVER_OBJECT) * DriverTable->TotalDrivers, 0x1000, NULL, 0);
 	if(!DriverObjects) SET_SOD_MEMORY_MANAGEMENT;
 
 	ZeroMemory(DriverObjects, sizeof(DRIVER_OBJECT) * DriverTable->TotalDrivers);
@@ -76,7 +76,7 @@ RFDRIVER_OBJECT KERNELAPI LoadDriverObject(UINT64 DriverIdentificationId){
 
 	Driver->MajorOsVersion = BootConfiguration->Header.MajorOsVersion;
 	Driver->MinorOsVersion = BootConfiguration->Header.MinorOsVersion;
-	Driver->Process = CreateProcess(NULL, DriverIdentification->DriverPath, SUBSYSTEM_NATIVE, KERNELMODE_PROCESS);
+	Driver->Process = KeCreateProcess(NULL, DriverIdentification->DriverPath, SUBSYSTEM_NATIVE, KERNELMODE_PROCESS);
 	if(!Driver->Process) SET_SOD_PROCESS_MANAGEMENT;
 
 	return Driver;
@@ -91,7 +91,7 @@ RFDRIVER_OBJECT KERNELAPI QueryDriverById(UINT64 DriverId){
 }
 
 BOOL KERNELAPI isDriver(RFDRIVER_OBJECT DriverObject){
-	if(!DriverObject || GetPhysAddr(kproc, DriverObject) != DriverObject) return FALSE;
+	if(!DriverObject || KeResolvePhysicalAddress(kproc, DriverObject) != DriverObject) return FALSE;
 	DRIVER_TABLE* DriverTable = FileImportTable[FIMPORT_DRVTBL].LoadedFileBuffer;
 	if(DriverObject->DriverId >= DriverTable->TotalDrivers ||
 	&DriverObjects[DriverObject->DriverId] != DriverObject
@@ -115,12 +115,12 @@ KERNELSTATUS KERNELAPI RunDriver(RFDRIVER_OBJECT DriverObject){
 	}
 	if(Buffer){
 		if(KERNEL_ERROR(Pe64LoadNativeApplication(Buffer, DriverObject))) return KERNEL_SERR;
-		RFTHREAD Thread = CreateThread(DriverObject->Process, DriverObject->StackSize, DriverObject->DriverStartup, THREAD_CREATE_SUSPEND, NULL);
+		RFTHREAD Thread = KeCreateThread(DriverObject->Process, DriverObject->StackSize, DriverObject->DriverStartup, THREAD_CREATE_SUSPEND, NULL);
 		if(!Thread) SET_SOD_PROCESS_MANAGEMENT;
 		SetThreadPriority(Thread, THREAD_PRIORITY_ABOVE_NORMAL);
 		Thread->Registers.rcx = (UINT64)DriverObject;
 		__STACK_PUSH(Thread->Registers.rsp, Thread->Registers.rcx);
-		ResumeThread(Thread);
+		KeResumeThread(Thread);
 	}
 	
 	// otherwise, use file system & disk drivers to load the driver

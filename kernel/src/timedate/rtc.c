@@ -110,12 +110,12 @@ KERNELSTATUS RtcGetTimeAndDate(RTC_TIME_DATE* TimeDate){
 }
 
 KERNELSTATUS RtcSetTimeAndDate(RTC_TIME_DATE* TimeDate){
-	return IpcSendMessage(GetCurrentThread()->Client, RtcClientThread->Client, FALSE, RTC_SETTIME, TimeDate, sizeof(RTC_TIME_DATE));
+	return IpcSendMessage(KeGetCurrentThread()->Client, RtcClientThread->Client, FALSE, RTC_SETTIME, TimeDate, sizeof(RTC_TIME_DATE));
 }
 
 void RtcInit(){
 	// Enable RTC
-	RtcClientThread = CreateThread(kproc, 0x2000, RtcClient, 0, 0);
+	RtcClientThread = KeCreateThread(kproc, 0x2000, RtcClient, 0, 0);
 	if(!RtcClientThread) SET_SOD_INITIALIZATION;
 
 	// if(KeControlIrq(RtcInterruptHandler, 8, IRQ_DELIVERY_NORMAL, 0) != KERNEL_SOK) SET_SOD_INITIALIZATION;

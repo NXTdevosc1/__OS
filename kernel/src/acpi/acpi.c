@@ -57,7 +57,7 @@ ACPI_FADT* RequiredFadtTable = NULL;
 
 // SCI_Handler
 void __cdecl AcpiSystemControlInterruptHandler(RFDRIVER_OBJECT DriverObject, RFINTERRUPT_INFORMATION InterruptInformation){
-	_RT_SystemDebugPrint(L"ACPI SCI_Interrupt");
+	SystemDebugPrint(L"ACPI SCI_Interrupt");
 }
 
 void AcpiInit(void* RsdpAddress){
@@ -83,7 +83,7 @@ void AcpiInit(void* RsdpAddress){
 	#endif
 
 		UINT8 RsdpRevision = Rsdp->RsdpDescriptor.Revision;
-		_RT_SystemDebugPrint(L"RSDP_REVISION : %d", RsdpRevision);
+		SystemDebugPrint(L"RSDP_REVISION : %d", RsdpRevision);
 	if(RsdpRevision == 2) {
 		if(!is_valid_rsdp_checksum(RsdpAddress,sizeof(ACPI_RSDP_DESCRIPTOR))
 		|| !is_valid_rsdp_checksum((void*)(&Rsdp->RsdpDescriptor + 1), Rsdp->Length-sizeof(ACPI_RSDP_DESCRIPTOR)))
@@ -167,7 +167,7 @@ void AcpiInit(void* RsdpAddress){
 			
 			if (!AcpiSdtCalculateChecksum(AcpiSdtHeader)) SET_SOD_INVALID_ACPI_TABLE;
 
-			_RT_SystemDebugPrint(L"ACPI SDT : %c%c%c%c", AcpiSdtHeader->Signature[0], AcpiSdtHeader->Signature[1], AcpiSdtHeader->Signature[2], AcpiSdtHeader->Signature[3]);
+			SystemDebugPrint(L"ACPI SDT : %c%c%c%c", AcpiSdtHeader->Signature[0], AcpiSdtHeader->Signature[1], AcpiSdtHeader->Signature[2], AcpiSdtHeader->Signature[3]);
 			#ifdef ___KERNEL_DEBUG___
 		DebugWrite("SDT IS VALID (CHECKSUM SUCCESSFULLY CHECKED)");
 	#endif
@@ -201,7 +201,7 @@ void AcpiInit(void* RsdpAddress){
 			}else if(memcmp(AcpiSdtHeader->Signature, "HPET", 4)){
 				HpetInitialize((ACPI_HPET*)AcpiSdtHeader);
 			}else if(memcmp(AcpiSdtHeader->Signature, "SSDT", 4)) {
-				// _RT_SystemDebugPrint(L"SSDT Found.");
+				// SystemDebugPrint(L"SSDT Found.");
 				// AcpiReadDsdt((RFACPI_DSDT)AcpiSdtHeader);
 			}
 		}

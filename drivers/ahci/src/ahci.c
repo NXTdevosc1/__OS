@@ -48,12 +48,13 @@ DDKSTATUS AhciSataRead(RFAHCI_DEVICE_PORT Port, UINT64 Address, UINT64 NumBytes,
     UINT64 Remaining = NumBytes;
     RFTHREAD Thread = KeGetCurrentThread();
     while(Remaining) {
+        SystemDebugPrint(L"READ.");
         RFTHREAD* Th = Port->PendingCommands;
         for(UINT i = 0;i<Port->Ahci->MaxCommandSlots;i++, Th++) {
             // Clear all acked reads
             if(*Th == Thread && (Port->DoneCommands & (1 << i))) {
                 // Release Command Slot
-                // SystemDebugPrint(L"SATA_READ : Command Done");
+                SystemDebugPrint(L"SATA_READ : Command Done");
                 Port->DoneCommands &= ~(1 << i);
                 *Th = NULL;
             }
@@ -108,14 +109,14 @@ DDKSTATUS AhciSataRead(RFAHCI_DEVICE_PORT Port, UINT64 Address, UINT64 NumBytes,
             ThreadPending = TRUE;
             if((Port->DoneCommands & (1 << i))) {
                 // Release Command Slot
-                // SystemDebugPrint(L"LAST_SATA_READ : Command Done");
+                SystemDebugPrint(L"LAST_SATA_READ : Command Done");
                 Port->DoneCommands &= ~(1 << i);
                 *Th = NULL;
             }
         }
         if(!ThreadPending) break;
     }
-    // SystemDebugPrint(L"LAST_READ");
+    SystemDebugPrint(L"LAST_READ");
     return KERNEL_SOK;
 }
 
@@ -161,7 +162,7 @@ void AhciInterruptHandler(RFDRIVER_OBJECT Driver, RFINTERRUPT_INFORMATION Interr
 
                 for(UINT8 c = 0;c<Ahci->MaxCommandSlots;c++, Pending++) {
                     if(*Pending && !(CmdIssue & 1)) {
-                        SystemDebugPrint(L"AHCI : Command#%d Compeleted", c);
+                        // SystemDebugPrint(L"AHCI : Command#%d Compeleted", c);
                         RFTHREAD Th = *Pending;
                         Ahci->Ports[i].DoneCommands |= (1 << c);
                         Port->UsedCommandSlots &= ~(1 << c);
@@ -238,7 +239,7 @@ DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver){
         SetDeviceFeature(Device, DEVICE_FORCE_MEMORY_ALLOCATION);
         BOOL MMio = FALSE;
         HBA_REGISTERS* Hba = PciGetBaseAddress(Device, 5, &MMio);
-        KeMapMemory((void*)Hba, AHCI_CONFIGURATION_PAGES, PM_MAP | PM_CACHE_DISABLE | PM_WRITE_THROUGH);
+        KeMapMemory(Hba, Hba, AHCI_CONFIGURATION_PAGES, PM_MAP | PM_CACHE_DISABLE | PM_WRITE_THROUGH);
         if(!MMio) {
             WriteDeviceLogA(Device, "Device BAR is not Memory Mapped (BAR5.IO = 1)");
             SetDeviceStatus(Device, KERNEL_SERR_INCORRECT_DEVICE_CONFIGURATION);
@@ -251,9 +252,9 @@ DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver){
         // Check if BIOS is device owner and take device ownership
 
 
-        RFAHCI_DEVICE Ahci = KeExtendedAlloc(KeGetCurrentThread(), ALIGN_VALUE(sizeof(AHCI_DEVICE), 0x1000), 0x1000, NULL, 0);
+        RFAHCI_DEVICE Ahci = VirtualAllocateEx(KeGetCurrentThread(), ALIGN_VALUE(sizeof(AHCI_DEVICE), 0x1000), 0x1000, NULL, 0);
         if(!Ahci) return KERNEL_SERR_UNSUFFICIENT_MEMORY;
-        KeMapMemory(Ahci, ALIGN_VALUE(sizeof(AHCI_DEVICE), 0x1000) >> 12, PM_MAP | PM_CACHE_DISABLE);
+        KeMapMemory(Ahci, Ahci, ALIGN_VALUE(sizeof(AHCI_DEVICE), 0x1000) >> 12, PM_MAP | PM_CACHE_DISABLE);
         ObjZeroMemory(Ahci);
 
         Ahci->Device = Device;
@@ -296,7 +297,7 @@ DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver){
         for(UINT i = 0;i<MaxPorts;i++){
             if(PortsImplemented & 1){
                 HBA_PORT* HbaPort = &Ahci->HbaPorts[i];
-                KeMapMemory(HbaPort, 1, PM_MAP | PM_CACHE_DISABLE | PM_WRITE_THROUGH);
+                KeMapMemory(HbaPort, HbaPort, 1, PM_MAP | PM_CACHE_DISABLE | PM_WRITE_THROUGH);
                 AHCI_DEVICE_PORT* Port = &Ahci->Ports[Ahci->NumPorts];
                 Ahci->NumPorts++;
                 Port->Port = HbaPort;
@@ -315,18 +316,20 @@ DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver){
             if(!Port->DeviceDetected) continue;
             SystemDebugPrint(L"SATA AHCI Device Detected (Port : %x). ATAPI = %x", i, HbaPort->CommandStatus & PORTxCMDxATAPI);
             if(!Port->Atapi) {
-                char* Sector0 = malloc(0x8000000);
-                ATA_IDENTIFY_DEVICE_DATA IdentifyDevice = {0};
-                ZeroMemory(Sector0, 0x8000000);
-                AHCI_COMMAND_ADDRESS CommandAddress = {0};
-                CommandAddress.BaseAddress = Sector0;
-                CommandAddress.NumBytes = 0x10000000;//sizeof(ATA_IDENTIFY_DEVICE_DATA);
-                // KERNELSTATUS Status = AhciHostToDevice(Port, 0, ATA_READ_DMA, AHCI_DEVICE_LBA, 8, 1, &CommandAddress);
-                t:
-                KERNELSTATUS Status = AhciSataRead(Port, 0, 0x8000000, Sector0);
+                SystemDebugPrint(L"Allocating...");
+                char* Sector0 = malloc(500000000);
+                if(!Sector0) {
+                    SystemDebugPrint(L"ALLOCATION_FAILED.");
+                    while(1);
+                }
+                SystemDebugPrint(L"Allocated...");
+                ZeroMemory(Sector0, 500000000);
+                SystemDebugPrint(L"Memory Zeroed");
+                SystemDebugPrint(L"Reading Data...");
+                KERNELSTATUS Status = AhciSataRead(Port, 0, 0x1000, Sector0);
                 // SystemDebugPrint(L"MAX_LBA : %x , WWN : %s", IdentifyDevice.Max48BitLBA, IdentifyDevice.WorldWideName);
-                SystemDebugPrint(L"STATUS = %x, SECTOR0 (%x) : %s", Status, *(UINT64*)Sector0, Sector0);
-                SystemDebugPrint(L"SECTOR 1 (%x) : %s ||| SECTOR 2 (%x) : %s", *(UINT64*)(Sector0 + 0x200), Sector0 + 0x200, *(UINT64*)(Sector0 + 0x400), Sector0 + 0x400);
+                SystemDebugPrint(L"STATUS = %x, SECTOR0 (%x)", Status, *(UINT64*)Sector0);
+                SystemDebugPrint(L"SECTOR 1 (%x) : %s ||| SECTOR 2 (%x)", *(UINT64*)(Sector0 + 0x200), Sector0 + 0x200, *(UINT64*)(Sector0 + 0x400), Sector0 + 0x400);
             // goto t;
                 // DRIVE_INFO* DriveInfo = malloc(sizeof(DRIVE_INFO));
                 // ObjZeroMemory(DriveInfo);
@@ -368,7 +371,7 @@ void AhciReset(RFAHCI_DEVICE Ahci){
 void AhciInitializePort(RFAHCI_DEVICE_PORT Port){
     UINT64 NumBytes = ALIGN_VALUE(sizeof(AHCI_COMMAND_LIST_ENTRY) * Port->Ahci->MaxCommandSlots + 0x100 + sizeof(AHCI_COMMAND_TABLE) * Port->Ahci->MaxCommandSlots + 0x100, 0x1000);
     Port->AllocatedBuffer = AllocateDeviceMemory(Port->Controller, NumBytes, 0x1000);
-    KeMapMemory(Port->AllocatedBuffer, NumBytes >> 12, PM_MAP | PM_CACHE_DISABLE | PM_WRITE_THROUGH);
+    KeMapMemory(Port->AllocatedBuffer, Port->AllocatedBuffer, NumBytes >> 12, PM_MAP | PM_CACHE_DISABLE | PM_WRITE_THROUGH);
     AHCI_COMMAND_LIST_ENTRY* CommandList = (void*)Port->AllocatedBuffer;
     AHCI_COMMAND_TABLE* CommandTables = (void*)(ALIGN_VALUE((UINT64)Port->AllocatedBuffer + sizeof(AHCI_COMMAND_LIST_ENTRY) * Port->Ahci->MaxCommandSlots, 0x100)); // Set after command list (struct is 128 bytes aligned)
     AHCI_RECEIVED_FIS* ReceivedFis = (void*)(Port->AllocatedBuffer + NumBytes - 0x100);

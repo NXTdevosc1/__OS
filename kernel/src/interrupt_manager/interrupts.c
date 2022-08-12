@@ -63,18 +63,18 @@ void INTH_DEBUG_EXCEPTION(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME Interru
 void INTH_NON_MASKABLE_INTERRUPT(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFrame){
 	__cli();
 	// __setCR3(KeGlobalCR3);
-	_RT_SystemDebugPrint(L"NMI");
+	SystemDebugPrint(L"NMI");
 	UINT8 SystemControlPortA = InPortB(SYSTEM_CONTROL_PORT_A);
 	UINT8 SystemControlPortB = InPortB(SYSTEM_CONTROL_PORT_B);
 
 	if(SystemControlPortA & (1 << 4)) {
-		_RT_SystemDebugPrint(L"NMI : WATCH DOG TIMER STATUS");
+		SystemDebugPrint(L"NMI : WATCH DOG TIMER STATUS");
 	}
 	if(SystemControlPortB & (1 << 6)) {
-		_RT_SystemDebugPrint(L"NMI : CHANNEL CHECK");
+		SystemDebugPrint(L"NMI : CHANNEL CHECK");
 	}
 	if(SystemControlPortB & (1 << 7)) {
-		_RT_SystemDebugPrint(L"NMI : PARITY CHECK");
+		SystemDebugPrint(L"NMI : PARITY CHECK");
 	}
 
 	// SOD(CPU_INTERRUPT_NON_MASKABLE_INTERRUPT,"NON MASKABLE INTERRUPT");
@@ -165,7 +165,7 @@ void INTH_PAGE_FAULT(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFra
 	__cli();
 	__setCR3(KeGlobalCR3);
 	struct TSS_ENTRY* CpuTSS = (struct TSS_ENTRY*)((UINT64)CpuManagementTable[0]->CpuBuffer + CPU_BUFFER_TSS_BASE);
-	_RT_SystemDebugPrint(L"TSCH : %x , INSTRUCTION : %x, IST2 : %x", SchedulerEntrySSE, InterruptFrame->IntStack.InstructionPointer, CpuTSS->ist2);
+	SystemDebugPrint(L"TSCH : %x , INSTRUCTION : %x, IST2 : %x", SchedulerEntrySSE, InterruptFrame->IntStack.InstructionPointer, CpuTSS->ist2);
 	while(1);
 	SOD(CPU_INTERRUPT_PAGE_FAULT,"PAGE FAULT");
 	__hlt();

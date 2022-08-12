@@ -74,7 +74,7 @@ void InitProcessorDescriptors(void** CpuBuffer, UINT64* CpuBufferSize){
 void CpuSetupManagementTable(UINT64 CpuCount) {
 	if (__CPU_MGMT_TBL_SETUP__) return;
 
-	CpuManagementTable = ExtendedMemoryAlloc(NULL, CpuCount << 3, 0x1000, NULL, 0);
+	CpuManagementTable = VirtualAllocateEx(NULL, CpuCount << 3, 0x1000, NULL, 0);
 	if (!CpuManagementTable) SET_SOD_MEMORY_MANAGEMENT;
 	ZeroMemory(CpuManagementTable, CpuCount << 3);
 	UINT64 CurrentProcessor = GetCurrentProcessorId();
@@ -82,7 +82,7 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 		CpuManagementTable[i] = kpalloc(CPU_MGMT_NUM_PAGES);
 		if (!CpuManagementTable[i]) SET_SOD_MEMORY_MANAGEMENT;
 		ZeroMemory(CpuManagementTable[i], sizeof(*CpuManagementTable[i]));
-		RFTHREAD_WAITING_QUEUE WaitingQueue = ExtendedMemoryAlloc(kproc->StartupThread, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES, 0x1000, NULL, 0);
+		RFTHREAD_WAITING_QUEUE WaitingQueue = VirtualAllocateEx(kproc->StartupThread, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES, 0x1000, NULL, 0);
 		ZeroMemory(WaitingQueue, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES);
 		if(i == CurrentProcessor){
 			CpuManagementTable[i]->Initialized = TRUE;
@@ -95,8 +95,8 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 		// CpuManagementTable[i]->TaskSchedulerData.cr3 = KeGlobalCR3;
 		
 
-		CpuManagementTable[i]->SystemIdleThread = CreateThread(IdleProcess, 0x1000, IdleThread, 0, NULL);
-		CpuManagementTable[i]->SystemInterruptsThread = CreateThread(SystemInterruptsProcess, 0x10000, NULL, 0, NULL);
+		CpuManagementTable[i]->SystemIdleThread = KeCreateThread(IdleProcess, 0x1000, IdleThread, 0, NULL);
+		CpuManagementTable[i]->SystemInterruptsThread = KeCreateThread(SystemInterruptsProcess, 0x10000, NULL, 0, NULL);
 		if (!CpuManagementTable[i]->SystemIdleThread || !CpuManagementTable[i]->SystemInterruptsThread) SET_SOD_PROCESS_MANAGEMENT;
 		
 
@@ -130,7 +130,7 @@ extern void SetupCPU() {
 	InitProcessorDescriptors(&CpuManagementTable[ProcessorId]->CpuBuffer, &CpuManagementTable[ProcessorId]->CpuBufferSize);
 	EnableApic();
 	SetupLocalApicTimer();
-	_RT_SystemDebugPrint(L"Processor#%d ON", ProcessorId);
+	SystemDebugPrint(L"Processor#%d ON", ProcessorId);
 	CpuManagementTable[ProcessorId]->Initialized = TRUE;
 	// CpuManagementTable[ProcessorId]->CpuId = ProcessorId;
 	CpuBootStatus = 1; // Declare successful CPU Boot
@@ -295,7 +295,7 @@ void SetupLocalApicTimer(){
 		if(!CpuBusSpeed) {
 			// We will assum a 100MHz Bus Frequency
 			CpuBusSpeed = 100000000;
-			_RT_SystemDebugPrint(L"EXTERNAL_BUS_SPEED : %d", CpuBusSpeed);
+			SystemDebugPrint(L"EXTERNAL_BUS_SPEED : %d", CpuBusSpeed);
 		}
 		UINT64 InitialCount = ((CpuBusSpeed) / 0x10 /*Divisor*/) / 0x800 /*Target clocks per second*/;
 
@@ -309,7 +309,7 @@ void SetupLocalApicTimer(){
 
 // Base Quantum = Timer Update Rate / s
 void KERNELAPI Sleep(UINT64 Milliseconds){
-	HTHREAD Thread = GetCurrentThread();
+	HTHREAD Thread = KeGetCurrentThread();
 	Thread->SleepUntil[0] = GetHighPrecisionTimeSinceBoot() + GetHighPerformanceTimerFrequency() / MILLISECONDS_PER_SECOND * Milliseconds;
 	Thread->State |= THS_SLEEP;
 	Thread->RemainingClocks = 0; // Reset remaining clocks to force scheduler to not re-run this thread
@@ -319,7 +319,7 @@ void KERNELAPI Sleep(UINT64 Milliseconds){
 
 
 void KERNELAPI MicroSleep(UINT64 Microseconds){
-	HTHREAD Thread = GetCurrentThread();
+	HTHREAD Thread = KeGetCurrentThread();
 	Thread->SleepUntil[0] = GetHighPrecisionTimeSinceBoot() + GetHighPerformanceTimerFrequency() / MICROSECONDS_PER_SECOND * Microseconds;
 	Thread->State |= THS_SLEEP;
 	Thread->RemainingClocks = 0;

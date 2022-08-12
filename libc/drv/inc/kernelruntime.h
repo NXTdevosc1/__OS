@@ -100,7 +100,7 @@ void KERNELAPI KeTaskSchedulerEnable();
 void KERNELAPI KeTaskSchedulerDisable();
 
 PVOID KERNELAPI malloc(unsigned long long Size);
-PVOID KERNELAPI KeExtendedAlloc(RFTHREAD Thread, UINT64 NumBytes, UINT32 Align, PVOID* AllocationSegment, UINT64 MaxAddress);
+LPVOID KERNELAPI VirtualAllocateEx(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, LPVOID* AllocationSegment, UINT64 MaxAddress);
 PVOID KERNELAPI free(const void* Heap);
 #define OS_SUPPORT_LNKW L"os_support.com"
 #define OS_SUPPORT_LNK "os_support.com"
@@ -118,8 +118,8 @@ enum PAGEMAP_FLAGS{
     PM_WRITE_THROUGH = 0x40 // Write in the cache and also in memory
 };
 
-BOOL KERNELAPI MapPhysicalPages(RFPROCESS Process, void* VirtualAddress, void* PhysicalAddress, UINT64 NumPages, UINT64 Flags);
-BOOL KERNELAPI KeMapMemory(void* PhysicalAddress, UINT64 NumPages, UINT64 Flags);
+int KERNELAPI KeMapProcessMemory(RFPROCESS Process, void* PhysicalAddress, void* VirtualAddress, UINT64 NumPages, UINT64 Flags);
+int KERNELAPI KeMapMemory(void* PhysicalAddress, void* VirtualAddress, UINT64 NumPages, UINT64 Flags);
 
 KERNELSTATUS KERNELAPI SystemDebugPrint(LPCWSTR Format, ...);
 

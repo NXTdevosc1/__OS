@@ -68,8 +68,8 @@ void GlobalSysEntryTableInitialize(){
 
     GlobalSyscallTable[0]   =       SysIdentify;
     GlobalSyscallTable[1]   =       SyscallDebugPrint;
-    GlobalSyscallTable[2]   =       GetCurrentProcessId;
-    GlobalSyscallTable[3]   =       GetCurrentThreadId;
+    GlobalSyscallTable[2]   =       KeGetCurrentProcessId;
+    GlobalSyscallTable[3]   =       KeGetCurrentThreadId;
     GlobalSyscallTable[4]   =       UserMalloc;
     GlobalSyscallTable[5]   =       NULL; // User Extended Memory Alloc
     GlobalSyscallTable[6]   =       NULL; // User Free
@@ -81,15 +81,16 @@ void GlobalSysEntryTableInitialize(){
     GlobalSyscallTable[12]  =       GetTotalCpuTime;
     GlobalSyscallTable[13]  =       GetThreadCpuTime;
     GlobalSyscallTable[14]  =       GetIdleCpuTime;
-    GlobalSyscallTable[15]  =       GetCurrentProcess;
-    GlobalSyscallTable[16]  =       GetCurrentThread;
+    GlobalSyscallTable[15]  =       KeGetCurrentProcess;
+    GlobalSyscallTable[16]  =       KeGetCurrentThread;
 
 }
 
 UINT64 __dbg_y = 0;
 
 void MSABI SyscallDebugPrint(const char* data){
-    data = GetPhysAddr(GetCurrentProcess(), data);
+    data = KeResolvePhysicalAddress(KeGetCurrentProcess(), data);
+    if(!data) return;
     GP_draw_sf_text(data, 0xfffff, 20, 20 + __dbg_y * 20);
     __dbg_y++;
 }
