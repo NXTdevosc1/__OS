@@ -35,7 +35,7 @@ DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT DriverObject){
         ObjZeroMemory(Ehc);
         SetDeviceExtension(Device, Ehc);
 
-        KeMapMemory(Bar0, 1, PM_MAP | PM_CACHE_DISABLE);
+        KeMapMemory(Bar0, Bar0, 1, PM_MAP | PM_CACHE_DISABLE);
         Ehc->EhciBase = Bar0;
         Ehc->CapabilityRegisters = Ehc->EhciBase;
         Ehc->OperationnalRegisters = (EHCI_OPERATIONAL_REGISTERS*)((char*)Ehc->EhciBase + Ehc->CapabilityRegisters->CapLength);

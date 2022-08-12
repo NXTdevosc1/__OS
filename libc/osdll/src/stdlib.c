@@ -142,6 +142,7 @@ extern void _Xmemset128U(void*, unsigned long long, unsigned long long);
 
 _DECL void memset(void* ptr, unsigned char val, size_t size){
     unsigned long long V = val;
+
     V |= (V << 8) | (V << 16) | (V << 24) | (V << 32) | (V << 40) | (V << 48) | (V << 56);
     if((unsigned long long)ptr & 0xF) {
         _Xmemset128U(ptr, V, size >> 4);
@@ -152,7 +153,6 @@ _DECL void memset(void* ptr, unsigned char val, size_t size){
         (char*)ptr+=(size & ~0xF);
         __memset(ptr, val, size & 0xF);
     }
-    
 }
 _DECL void _memset16(void* ptr, unsigned short val, size_t size){
     unsigned short* p = ptr;

@@ -4,6 +4,7 @@
 #include <drivectl.h>
 #include <kintrinsic.h>
 #include <assemblydef.h>
+#include <ktime.h>
 
 #define ATA_READ_DMA 0xC8 // limit of 0xff (255) Sectors
 #define ATA_WRITE_DMA 0xCA
@@ -48,13 +49,11 @@ DDKSTATUS AhciSataRead(RFAHCI_DEVICE_PORT Port, UINT64 Address, UINT64 NumBytes,
     UINT64 Remaining = NumBytes;
     RFTHREAD Thread = KeGetCurrentThread();
     while(Remaining) {
-        SystemDebugPrint(L"READ.");
         RFTHREAD* Th = Port->PendingCommands;
         for(UINT i = 0;i<Port->Ahci->MaxCommandSlots;i++, Th++) {
             // Clear all acked reads
             if(*Th == Thread && (Port->DoneCommands & (1 << i))) {
                 // Release Command Slot
-                SystemDebugPrint(L"SATA_READ : Command Done");
                 Port->DoneCommands &= ~(1 << i);
                 *Th = NULL;
             }
@@ -109,14 +108,12 @@ DDKSTATUS AhciSataRead(RFAHCI_DEVICE_PORT Port, UINT64 Address, UINT64 NumBytes,
             ThreadPending = TRUE;
             if((Port->DoneCommands & (1 << i))) {
                 // Release Command Slot
-                SystemDebugPrint(L"LAST_SATA_READ : Command Done");
                 Port->DoneCommands &= ~(1 << i);
                 *Th = NULL;
             }
         }
         if(!ThreadPending) break;
     }
-    SystemDebugPrint(L"LAST_READ");
     return KERNEL_SOK;
 }
 
@@ -310,24 +307,25 @@ DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver){
             PortsImplemented >>= 1;
         }
         
+        UINT64 TimerFrequency = GetHighPerformanceTimerFrequency();
+        UINT64 Time = 0, PostTime = 0;
         for(UINT i = 0;i<Ahci->NumPorts;i++) {
             AHCI_DEVICE_PORT* Port = &Ahci->Ports[i];
             HBA_PORT* HbaPort = Port->Port;
             if(!Port->DeviceDetected) continue;
             SystemDebugPrint(L"SATA AHCI Device Detected (Port : %x). ATAPI = %x", i, HbaPort->CommandStatus & PORTxCMDxATAPI);
             if(!Port->Atapi) {
-                SystemDebugPrint(L"Allocating...");
-                char* Sector0 = malloc(500000000);
+                char* Sector0 = malloc(0x1F400000);
                 if(!Sector0) {
                     SystemDebugPrint(L"ALLOCATION_FAILED.");
                     while(1);
                 }
-                SystemDebugPrint(L"Allocated...");
-                ZeroMemory(Sector0, 500000000);
-                SystemDebugPrint(L"Memory Zeroed");
-                SystemDebugPrint(L"Reading Data...");
-                KERNELSTATUS Status = AhciSataRead(Port, 0, 0x1000, Sector0);
+                SystemDebugPrint(L"Reading Data... (500MB)");
+                Time = GetHighPrecisionTimeSinceBoot();
+                KERNELSTATUS Status = AhciSataRead(Port, 0, 0x1F400000, Sector0);
                 // SystemDebugPrint(L"MAX_LBA : %x , WWN : %s", IdentifyDevice.Max48BitLBA, IdentifyDevice.WorldWideName);
+                PostTime = GetHighPrecisionTimeSinceBoot();
+                SystemDebugPrint(L"Read Latency : %d ms", (PostTime - Time) * 1000 / TimerFrequency);
                 SystemDebugPrint(L"STATUS = %x, SECTOR0 (%x)", Status, *(UINT64*)Sector0);
                 SystemDebugPrint(L"SECTOR 1 (%x) : %s ||| SECTOR 2 (%x)", *(UINT64*)(Sector0 + 0x200), Sector0 + 0x200, *(UINT64*)(Sector0 + 0x400), Sector0 + 0x400);
             // goto t;

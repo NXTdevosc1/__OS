@@ -79,5 +79,5 @@ void HpetInitialize(ACPI_HPET* Hpet);
 BOOL HpetConfigure();
 
 
-UINT64 GetHighPrecisionTimeSinceBoot();
-UINT64 GetHighPerformanceTimerFrequency();
+UINT64 KEXPORT KERNELAPI GetHighPrecisionTimeSinceBoot();
+UINT64 KEXPORT KERNELAPI GetHighPerformanceTimerFrequency();

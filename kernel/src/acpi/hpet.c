@@ -38,10 +38,10 @@ void HpetInterruptHandler(RFDRIVER_OBJECT Device, RFINTERRUPT_INFORMATION Interr
     Regs->GeneralConfiguration |= HPET_ENABLE;
 } 
 
-UINT64 GetHighPrecisionTimeSinceBoot() {
+UINT64 KERNELAPI GetHighPrecisionTimeSinceBoot() {
     return HpetNumClocks * HpetFrequency + Regs->MainCounterValue;
 }
-UINT64 GetHighPerformanceTimerFrequency() {
+UINT64 KERNELAPI GetHighPerformanceTimerFrequency() {
     return HpetFrequency;
 }
 
