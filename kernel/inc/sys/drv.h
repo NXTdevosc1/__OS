@@ -34,7 +34,8 @@ typedef enum _DRIVER_DEVICE_SOURCE{
     DEVICE_SOURCE_PCI = 0, // Load device driver from both PCI & PCIE
     DEVICE_SOURCE_USB = 1,
     DEVICE_SOURCE_ACPI = 2,
-    DEVICE_SOURCE_SYSTEM_RESERVED = 3 // Driven by kernel
+    DEVICE_SOURCE_SYSTEM_RESERVED = 3, // Driven by kernel
+    DEVICE_SOURCE_PARENT_CONTROLLER = 4
 } DRIVER_DEVICE_SOURCE;
 
 typedef enum _DEVICE_SEARCH_TYPE{

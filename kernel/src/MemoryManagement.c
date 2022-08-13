@@ -367,7 +367,7 @@ BOOL GetPhysicalMemoryStatus(LPMEMORYSTATUS MemoryStatus) {
 	return FALSE;
 }
 
-LPVOID KERNELAPI AllocateIoMemory(UINT64 NumPages, UINT Flags) {
+LPVOID KERNELAPI AllocateIoMemory(LPVOID PhysicalAddress, UINT64 NumPages, UINT Flags) {
 	if(!NumPages) return NULL;
 	// NumPages + 1 (Endof I/O Pool Marker to set a page fault when accessed)
 	LPVOID Mem = AllocatePoolEx(&IoSpaceMemoryThread, (NumPages + 1) << 12, 0, NULL, 0);
@@ -376,7 +376,7 @@ LPVOID KERNELAPI AllocateIoMemory(UINT64 NumPages, UINT Flags) {
 	if(Flags & IO_MEMORY_CACHE_DISABLED) MapFlags |= PM_CACHE_DISABLE;
 	if(Flags & IO_MEMORY_WRITE_THROUGH) MapFlags |= PM_WRITE_THROUGH;
 	if(Flags & IO_MEMORY_READ_ONLY) MapFlags |= PM_READWRITE;
-	MapPhysicalPages(kproc->PageMap, Mem, Mem, NumPages, MapFlags);
+	MapPhysicalPages(kproc->PageMap, Mem, PhysicalAddress, NumPages, MapFlags);
 	// Set Endof I/O Pool Marker
 	MapPhysicalPages(kproc->PageMap, (char*)Mem + (NumPages << 12), NULL, 1, 0);
 	return Mem;

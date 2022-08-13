@@ -15,8 +15,9 @@ typedef struct _DRIVER_OBJECT DRIVER_OBJECT, *RFDRIVER_OBJECT;
 
 enum DEVICE_TYPE {
 	DEVICE_TYPE_UNKNOWN = 0,
-	DEVICE_TYPE_DISK_ATA = 1,
-	DEVICE_TYPE_USB_CONTROLLER = 2
+	DEVICE_TYPE_STORAGE = 1,
+	DEVICE_TYPE_USB_CONTROLLER = 2,
+	DEVICE_TYPE_TIMER = 3
 };
 
 typedef struct _DEVICE_OBJECT {
@@ -70,8 +71,20 @@ typedef struct _DEVICE_MANAGEMENT_TABLE {
 
 #define IOPCI_CONFIGURATION(Bus, Device, Function) ((void*)(Function | (Device << 8) | (Bus << 16) | DEVICE_LEGACY_IO_FLAG))
 
+typedef enum _DEVICE_CLASS {
+    DEVICE_CLASS_ATA_DRIVE = 0x100,
+    DEVICE_CLASS_USB_DRIVE = 0x101
+} DEVICE_CLASS;
 
-RFDEVICE_OBJECT KERNELAPI InstallDevice(RFDEVICE_OBJECT ParentDevice, UINT32 DeviceSource, LPVOID DeviceConfiguration); // this is mostly done by kernel, note : device instances cannot be unregistred
+RFDEVICE_OBJECT KEXPORT KERNELAPI InstallDevice(
+RFDEVICE_OBJECT ParentDevice,
+UINT32 DeviceSource,
+UINT32 DeviceType,
+UINT32 DeviceClass,
+UINT32 DeviceSubclass,
+UINT32 VendorId,
+LPVOID DeviceConfigurationPtr // Used in PCI Configuration Space (if PCI Source then Class, Subclass are not required to be set)
+); // this is mostly done by kernel, note : device instances cannot be unregistred
 										   // Unregistring can only be done by setting device disable, the device can only be re-enabled by control process
 RFDRIVER_OBJECT KERNELAPI FindDeviceDriver(RFDEVICE_OBJECT Device);
 
@@ -87,7 +100,7 @@ BOOL KERNELAPI UnlockDeviceAccess(RFDEVICE_OBJECT Device);
 LPVOID KERNELAPI QueryDeviceInterface(RFDEVICE_OBJECT Device);
 BOOL KERNELAPI SetDeviceInterface(RFDEVICE_OBJECT Device, void* DeviceInterface);
 
-BOOL KERNELAPI SetDeviceDisplayName(RFDEVICE_OBJECT Device, LPWSTR DeviceName);
+BOOL KEXPORT KERNELAPI SetDeviceDisplayName(RFDEVICE_OBJECT Device, LPWSTR DeviceName);
 
 BOOL KERNELAPI StartDeviceIterator(PDEVICE_ITERATOR Iterator);
 RFDEVICE_OBJECT KERNELAPI GetNextDevice(PDEVICE_ITERATOR Iterator);

@@ -1,4 +1,5 @@
 #pragma once
+#include <kerneltypes.h>
 
 #ifndef __DLL_EXPORTS
 #define KERNELAPI __declspec(dllimport) __cdecl

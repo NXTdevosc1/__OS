@@ -359,10 +359,22 @@ typedef struct _AHCI_COMMAND_ADDRESS AHCI_COMMAND_ADDRESS;
 
 void AhciReset(RFAHCI_DEVICE Ahci);
 void AhciInitializePort(RFAHCI_DEVICE_PORT Port);
-KERNELSTATUS AhciHostToDevice(RFAHCI_DEVICE_PORT Port, UINT64 Lba, UINT8 Command, UINT8 Device, UINT16 Count, UINT16 NumCommandAddressDescriptors, AHCI_COMMAND_ADDRESS* CommandAddresses);
 UINT32 AhciAllocateCommand(RFAHCI_DEVICE_PORT Port);
 
-int AhciSataComReset(HBA_PORT* HbaPort);
 
 // returns Task file error copy if Error
 int AhciIssueCommand(RFAHCI_DEVICE_PORT Port, UINT CommandIndex);
+
+
+void AhciParseModelNumber(RFAHCI_DEVICE_PORT Port);
+int AhciInitAtaDevice(RFAHCI_DEVICE_PORT Port);
+int AhciInitAtapiDevice(RFAHCI_DEVICE_PORT Port);
+
+void AhciInterruptHandler(RFDRIVER_OBJECT Driver, RFINTERRUPT_INFORMATION InterruptInformation);
+
+// Read/Write ATA(PI)
+DDKSTATUS AhciSataRead(RFAHCI_DEVICE_PORT Port, UINT64 Address, UINT64 NumBytes, void* _Buffer);
+DDKSTATUS AhciSataWrite(RFDEVICE_OBJECT Device, UINT64 Address, UINT64 NumBytes, void* Buffer);
+
+DDKSTATUS AhciSatapiRead(RFDEVICE_OBJECT Device, UINT64 Address, UINT64 NumBytes, void* Buffer);
+DDKSTATUS AhciSatapiWrite(RFDEVICE_OBJECT Device, UINT64 Address, UINT64 NumBytes, void* Buffer);

@@ -123,5 +123,5 @@ typedef struct _GLOBAL_MEMORY_STATUS {
 
 extern PHYSICALMEMORYSTATUS PhysicalMemoryStatus;
 
-LPVOID KEXPORT KERNELAPI AllocateIoMemory(UINT64 NumPages, UINT Flags);
+LPVOID KEXPORT KERNELAPI AllocateIoMemory(LPVOID PhysicalAddress, UINT64 NumPages, UINT Flags);
 BOOL KEXPORT KERNELAPI FreeIoMemory(LPVOID IoMem);

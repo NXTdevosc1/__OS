@@ -39,31 +39,44 @@ RFDRIVER_OBJECT KERNELAPI FindDeviceDriver(RFDEVICE_OBJECT Device){
 	return NULL;
 }
 
-RFDEVICE_OBJECT KERNELAPI InstallDevice(RFDEVICE_OBJECT ParentDevice, UINT32 DeviceSource, LPVOID DeviceConfiguration) // this is mostly done by kernel, note : device instances cannot be unregistred
+RFDEVICE_OBJECT KEXPORT KERNELAPI InstallDevice(RFDEVICE_OBJECT ParentDevice,
+UINT32 DeviceSource,
+UINT32 DeviceType,
+UINT32 DeviceClass,
+UINT32 DeviceSubclass,
+UINT32 VendorId,
+LPVOID DeviceConfigurationPtr // Used in PCI Configuration Space (if PCI Source then Class, Subclass are not required to be set)
+) // this is mostly done by kernel, note : device instances cannot be unregistred
 {
-	if (!DeviceConfiguration) return NULL;
+	// if (!DeviceConfiguration) return NULL;
 	if (ParentDevice && !ValidateDevice(ParentDevice)) return NULL;
+
+
 	PDEVICE_LIST list = &DeviceManagementTable.DeviceList;
 	for (UINT64 ListIndex = 0;;ListIndex++) {
 		for(UINT i = 0;i<MAX_DEVICE_INDEX;i++){
 			if(list->Devices[i].Present) continue;
 			RFDEVICE_OBJECT Device = &list->Devices[i];
 			SZeroMemory(Device);
+			
 			Device->Present = 1;
+			Device->Id = i + ListIndex * MAX_DEVICE_INDEX;
 			Device->DeviceSource = DeviceSource;
 			Device->ParentDevice = ParentDevice;
-			Device->DeviceConfiguration = DeviceConfiguration;
-
-
+			Device->DeviceConfiguration = DeviceConfigurationPtr;
+			Device->DeviceType = DeviceType;
+			Device->DeviceClass = DeviceClass;
+			Device->DeviceSubclass = DeviceSubclass;
+			Device->VendorId = VendorId;
 			Device->AccessMethod = 1; // MMIO Access
 
 
 			if(DeviceSource == DEVICE_SOURCE_PCI){
-				if((UINT64)DeviceConfiguration & DEVICE_LEGACY_IO_FLAG) {
+				if((UINT64)DeviceConfigurationPtr & DEVICE_LEGACY_IO_FLAG) {
 					// Get Bus, Device, and function (DEVICE_LEGACY_IO_FLAG Automatically truncated)
-					Device->Bus = (UINT64)DeviceConfiguration >> 16;
-					Device->DeviceNumber = (UINT64)DeviceConfiguration >> 8;
-					Device->Function = (UINT64)DeviceConfiguration;
+					Device->Bus = (UINT64)DeviceConfigurationPtr >> 16;
+					Device->DeviceNumber = (UINT64)DeviceConfigurationPtr >> 8;
+					Device->Function = (UINT64)DeviceConfigurationPtr;
 
 					Device->DeviceClass = IoPciRead8(Device->Bus, Device->DeviceNumber, Device->Function, PCI_CLASS);
 					Device->DeviceSubclass = IoPciRead8(Device->Bus, Device->DeviceNumber, Device->Function, PCI_SUBCLASS);
@@ -86,20 +99,31 @@ RFDEVICE_OBJECT KERNELAPI InstallDevice(RFDEVICE_OBJECT ParentDevice, UINT32 Dev
 					Device->ProgramInterface = PciConfig->ProgramInterface;
 					Device->VendorId = PciConfig->VendorId;
 					Device->DeviceId = PciConfig->DeviceId;
-
 					SystemDebugPrint(L"PCI Express DEVICE : (%d,%d,%d) CLASS = %x, SUBCLASS = %x, PROGIF = %x", (UINT64)Device->Bus, (UINT64)Device->DeviceNumber, (UINT64)Device->Function, (UINT64)Device->DeviceClass, (UINT64)Device->DeviceSubclass, (UINT64)Device->ProgramInterface);
-
+					LPVOID IoMem = AllocateIoMemory(Device->DeviceConfiguration, 10, IO_MEMORY_CACHE_DISABLED);
+					if(!IoMem) SOD(SOD_MEMORY_MANAGEMENT, "I/O Memory Allocation Failed");
+					Device->DeviceConfiguration = IoMem;
 				}
 
 			}
-
-			RFDRIVER_OBJECT Driver = FindDeviceDriver(Device);
-			
-			if(Driver) {
+			if(DeviceSource != DEVICE_SOURCE_PARENT_CONTROLLER && DeviceSource != DEVICE_SOURCE_SYSTEM_RESERVED) {
+				RFDRIVER_OBJECT Driver = FindDeviceDriver(Device);
+				
+				if(Driver) {
+					
+					if(!ControlDevice(Driver, Device)) SOD(SOD_DEVICE_MANAGEMENT, "FAILED TO CONTROL DEVICE");
+					SystemDebugPrint(L"Driver#%d Controls Device %x", Driver->DriverId, Device);
+				}
+			} else if(ParentDevice){
+				
+				RFDRIVER_OBJECT Driver = ParentDevice->Driver;
+				
 				if(!ControlDevice(Driver, Device)) SOD(SOD_DEVICE_MANAGEMENT, "FAILED TO CONTROL DEVICE");
-				SystemDebugPrint(L"Driver#%d Controls Device %x", Driver->DriverId, Device);
+				SystemDebugPrint(L"Driver#%d Controls Sub-Device %x", Driver->DriverId, Device);
 			}
+
 			DeviceManagementTable.NumDevices++;
+			
 			return Device;
 		}
 		if (!list->Next) {
@@ -118,6 +142,8 @@ BOOL KERNELAPI ControlDevice(RFDRIVER_OBJECT DriverObject, RFDEVICE_OBJECT Devic
 		__BitRelease(&Device->DeviceMutex, 0);
 		return FALSE; // Max devices acheived
 	}
+	Device->DeviceControl = 1;
+	Device->Driver = DriverObject;
 	for(UINT i = 0;i<MAX_DRIVER_DEVICES;i++){
 		if(!DriverObject->Devices[i]) {
 			DriverObject->Devices[i] = Device;
@@ -125,6 +151,7 @@ BOOL KERNELAPI ControlDevice(RFDRIVER_OBJECT DriverObject, RFDEVICE_OBJECT Devic
 		}
 	}
 	DriverObject->NumDevices++;
+
 
 	__BitRelease(&Device->DeviceMutex, 0);
 	return TRUE;

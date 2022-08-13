@@ -23,6 +23,8 @@
 #include <pciexpressapi.h>
 #include <dci.h>
 #include <stdlib.h>
+#include <pnp.h>
+#include <kernelruntime.h>
 
 
 #define DDKENTRY __cdecl

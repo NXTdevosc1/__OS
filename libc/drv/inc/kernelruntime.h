@@ -104,7 +104,7 @@ LPVOID KERNELAPI AllocatePoolEx(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, L
 PVOID KERNELAPI free(const void* Heap);
 
 // IO_MEMORY Automatically mapped with NX(No-Execute) 
-LPVOID KERNELAPI AllocateIoMemory(UINT64 NumPages, UINT Flags);
+LPVOID KERNELAPI AllocateIoMemory(LPVOID PhysicalAddress, UINT64 NumPages, UINT Flags);
 BOOL KERNELAPI FreeIoMemory(LPVOID IoMem);
 
 #define OS_SUPPORT_LNKW L"os_support.com"

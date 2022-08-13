@@ -5,9 +5,7 @@
 #include <assemblydef.h>
 #include <ktime.h>
 
-#define ATA_READ_DMA 0xC8 // limit of 0xff (255) Sectors
-#define ATA_WRITE_DMA 0xCA
-#define ATA_READ_DMA_EX 0x25 // Make use of Count High (16 Bit Count in FIS_H2D)
+
 #define ATA_IDENTIFY_DEVICE_DMA 0xEE
 #define ATA_IDENTIFY_DEVICE 0xEC
 
@@ -34,217 +32,20 @@
 #define PORTxCMDxALPME (1 << 25)
 #define PORTxCMDxASP (1 << 26)
 #define PORTxCMDxICC 27
-typedef struct _AHCI_COMMAND_ADDRESS {
-    DWORD NumBytes;
-    void* BaseAddress;
-} AHCI_COMMAND_ADDRESS;
 
-void wr32(void* Addr, UINT32 Val) {
-    *(UINT32*)Addr = Val;
-}
-
-
-DDKSTATUS AhciSataRead(RFAHCI_DEVICE_PORT Port, UINT64 Address, UINT64 NumBytes, void* _Buffer) {
-    char* Buffer = _Buffer;
-    UINT64 Remaining = NumBytes;
-    RFTHREAD Thread = KeGetCurrentThread();
-    while(Remaining) {
-        RFTHREAD* Th = Port->PendingCommands;
-        for(UINT i = 0;i<Port->Ahci->MaxCommandSlots;i++, Th++) {
-            // Clear all acked reads
-            if(*Th == Thread && (Port->DoneCommands & (1 << i))) {
-                // Release Command Slot
-                Port->DoneCommands &= ~(1 << i);
-                *Th = NULL;
-            }
-        }
-        UINT64 ReadBytes = Remaining;
-        if(Remaining > MAX_PRDT_BYTE_COUNT) {
-            ReadBytes = MAX_PRDT_BYTE_COUNT;
-            Remaining -= MAX_PRDT_BYTE_COUNT;
-        } else {
-            Remaining = 0;
-        }
-
-        UINT32 CommandSlot = AhciAllocateCommand(Port);
-        // SystemDebugPrint(L"READ_ATTEMPT (CMD_SLOT: %d)", CommandSlot);
-        AHCI_COMMAND_LIST_ENTRY* CmdEntry = &Port->CommandList[CommandSlot];
-        AHCI_COMMAND_TABLE* CmdTbl = &Port->CommandTables[CommandSlot];
-        CmdEntry->CommandFisLength = sizeof(ATA_FIS_H2D) >> 2;
-        CmdEntry->PrdtByteCount = ReadBytes >> 9;
-        CmdEntry->PrdtLength = 1;
-        ATA_FIS_H2D* H2d = (ATA_FIS_H2D*)CmdTbl->CommandFis;
-        H2d->FisType = FIS_TYPE_H2D;
-        H2d->CommandControl = 1;
-        H2d->Command = ATA_READ_DMA;
-        H2d->Count = ReadBytes >> 9;
-        H2d->Device = AHCI_DEVICE_LBA;
-        H2d->Lba0 = Address;
-        H2d->Lba1 = Address >> 16;
-        H2d->Lba2 = Address >> 24;
-        H2d->Lba3 = Address >> 40;
-
-        CmdTbl->Prdt[0].DataBaseAddress = (UINT64)Buffer;
-        CmdTbl->Prdt[0].DataByteCount = ReadBytes - 1;
-
-        // Port->PendingCommandAccess = 1;
-        Port->PendingCommands[CommandSlot] = Thread;
-        // while(Port->Ahci->Interrupt);
-        Port->Port->CommandIssue |= (1 << CommandSlot);
-        // Port->PendingCommandAccess = 0;
-
-        Buffer += ReadBytes;
-    }
-    for(;;) {
-        
-        // Waiting until read finishes
-        RFTHREAD* Th = Port->PendingCommands;
-        BOOL ThreadPending = FALSE;
-        for(UINT i = 0;i<Port->Ahci->MaxCommandSlots;i++, Th++) {
-            // Clear all acked reads
-            if(*Th != Thread) continue;
-            INTERRUPT_INFORMATION If = {0};
-            If.Device = Port->Device;
-            ThreadPending = TRUE;
-            if((Port->DoneCommands & (1 << i))) {
-                // Release Command Slot
-                Port->DoneCommands &= ~(1 << i);
-                *Th = NULL;
-            }
-        }
-        if(!ThreadPending) break;
-    }
-    return KERNEL_SOK;
-}
-
-DDKSTATUS AhciSataWrite(RFDEVICE_OBJECT Device, UINT64 Address, UINT64 NumBytes, void* Buffer) {
-    return KERNEL_SERR;
-}
-
-DDKSTATUS AhciAtapiRead(RFDEVICE_OBJECT Device, UINT64 Address, UINT64 NumBytes, void* Buffer) {
-    return KERNEL_SERR;
-}
-
-DDKSTATUS AhciAtapiWrite(RFDEVICE_OBJECT Device, UINT64 Address, UINT64 NumBytes, void* Buffer) {
-    return KERNEL_SERR;
-}
-
-void AhciInterruptHandler(RFDRIVER_OBJECT Driver, RFINTERRUPT_INFORMATION InterruptInformation) {
-
-    RFAHCI_DEVICE Ahci = GetDeviceExtension(InterruptInformation->Device);
-    UINT32 GlobalInterruptStatus = Ahci->Hba->InterruptStatus;
-    // SystemDebugPrint(L"AHCI_INT : GS (%x)", GlobalInterruptStatus);
-
-    UINT32 HbaReceivedIntStatus = 0;
-   
-    if(!GlobalInterruptStatus) return;
-
-    Ahci->Hba->InterruptStatus = GlobalInterruptStatus;
-    
-    // Ahci->Interrupt = 1;
-    for(int i = 0;i<Ahci->NumPorts;i++) {
-        if(/*!Ahci->Ports[i].PendingCommandAccess && */(GlobalInterruptStatus & 1)) {
-            HbaReceivedIntStatus |= (1 << i);
-            HBA_PORT* HbaPort = &Ahci->HbaPorts[i];
-            AHCI_DEVICE_PORT* Port = &Ahci->Ports[i];
-            // SystemDebugPrint(L"Interrupt on PORT %d (%x)", (UINT64)i, HbaPort->PortSignature);
-            if(HbaPort->InterruptStatus.D2HRegisterFisInterrupt || HbaPort->InterruptStatus.PioSetupFisInterrupt) {
-                
-                    
-                // SystemDebugPrint(L"D2H_REG_FIS_INT (TYPE : %x) (CI : %x) (SAC : %x)", Ahci->Ports[i].ReceivedFis->D2h.FisType, HbaPort->CommandIssue, HbaPort->SataActive);
-                if(!Port->FirstD2h) Port->FirstD2h = 1;
-                DWORD CmdIssue = HbaPort->CommandIssue;
-                DWORD iCmdIssue = CmdIssue; // Initial (Recevied) CI
-                RFTHREAD* Pending = Ahci->Ports[i].PendingCommands;
-
-                for(UINT8 c = 0;c<Ahci->MaxCommandSlots;c++, Pending++) {
-                    if(*Pending && !(CmdIssue & 1)) {
-                        // SystemDebugPrint(L"AHCI : Command#%d Compeleted", c);
-                        RFTHREAD Th = *Pending;
-                        Ahci->Ports[i].DoneCommands |= (1 << c);
-                        Port->UsedCommandSlots &= ~(1 << c);
-                        IoFinish(Th); // in case that the command is synchronized
-                    }
-                    CmdIssue >>= 1;
-                }
-                // OTHERWISE WAIT FOR NEXT D2H
-            }
-            if(HbaPort->InterruptStatus.D2HRegisterFisInterrupt) {
-                HbaPort->InterruptStatus.D2HRegisterFisInterrupt = 1; // ACK INTERRUPT
-            }
-
-            // Usually by IDENTIFY_DEVICE_DATA Command
-            if(HbaPort->InterruptStatus.PioSetupFisInterrupt) {
-                SystemDebugPrint(L"PIO_SETUP");
-                // memcpy(Port->ReceivedFis.)
-                HbaPort->InterruptStatus.PioSetupFisInterrupt = 1;
-            }
-            if(HbaPort->InterruptStatus.DmaSetupFisInterrupt) {
-                SystemDebugPrint(L"DMA_SETUP_FIS");
-                HbaPort->InterruptStatus.DmaSetupFisInterrupt = 1;
-            }
-
-
-            if(HbaPort->InterruptStatus.SetDeviceBitsInterrupt) {
-                SystemDebugPrint(L"SET_DEVICE_BITS");
-                HbaPort->InterruptStatus.SetDeviceBitsInterrupt = 1;
-            }
-            if(HbaPort->InterruptStatus.UnknownFisInterrupt) {
-                SystemDebugPrint(L"UNKNOWN_FIS");
-                HbaPort->SataError.UnknownFisType = 0;
-            }
-            if(HbaPort->InterruptStatus.DescriptorProcessed) {
-                SystemDebugPrint(L"DESCRIPTOR_PROCESSED");
-                HbaPort->InterruptStatus.DescriptorProcessed = 1;
-            }
-            if(HbaPort->InterruptStatus.PortConnectChangeStatus) {
-                SystemDebugPrint(L"PORT_CONNECT_CHANGE");
-                Port->Port->SataError.Exchanged = 1;
-                Port->Port->SataControl.DeviceDetectionInitialization = 0;
-                
-            }
-            if(HbaPort->InterruptStatus.DeviceMechanicalPresenceStatus) SystemDebugPrint(L"DEVICE_MECHANICAL_PRESENCE");
-            if(HbaPort->InterruptStatus.PhyRdyChangeStatus) {
-                SystemDebugPrint(L"PHY_RDI_CHANGE");
-                Port->Port->SataError.PhyRdyChange = 1;
-                Port->FirstD2h = 1; // Some hardware does not send first D2H (instead it is detected with TaskFileData)
-            } 
-            if(HbaPort->InterruptStatus.IncorrectPortMultiplierStatus) SystemDebugPrint(L"INCORRECT_PORT_MULTIPLIER");
-            if(HbaPort->InterruptStatus.OverflowStatus) SystemDebugPrint(L"OVERFLOW");
-            if(HbaPort->InterruptStatus.InterfaceNonFatalErrorStatus) {
-                SystemDebugPrint(L"INTERFACE_NON_FATAL");
-                HbaPort->InterruptStatus.InterfaceNonFatalErrorStatus = 1;
-            }
-            if(HbaPort->InterruptStatus.InterfaceFatalErrorStatus) {
-                SystemDebugPrint(L"INTERFACE_FATAL");
-                HbaPort->InterruptStatus.InterfaceFatalErrorStatus = 1;
-            }
-            if(HbaPort->InterruptStatus.HostBusDataErrorStatus) SystemDebugPrint(L"HOST_BUS_DATA_ERROR");
-            if(HbaPort->InterruptStatus.HostBusFatalErrorStatus) SystemDebugPrint(L"HOST_BUS_FATAL_ERROR");
-            if(HbaPort->InterruptStatus.TaskFileErrorStatus) {
-                SystemDebugPrint(L"TASK_FILE_ERROR");
-                HbaPort->InterruptStatus.TaskFileErrorStatus = 1;
-            }
-            if(HbaPort->InterruptStatus.ColdPortDetectStatus) SystemDebugPrint(L"COLD_PRESENCE_DETECT");
-        
-        
-
-        }
-        GlobalInterruptStatus >>= 1;
-    }
-    // SystemDebugPrint(L"INTH_COMPLETE (Native Command Queuing : %d)", (UINT64)Ahci->Hba->HostCapabilities.SupportsNativeCommandQueuing);
-    // Ahci->Hba->InterruptStatus = HbaReceivedIntStatus;
-    // Ahci->Interrupt = 0;
-}
 
 DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver){
     // SystemDebugPrint(L"SATA AHCI Driver Startup : %d Controllers Detected", Driver->NumDevices);
-    for(UINT i = 0;i<Driver->NumDevices;i++){
-        RFDEVICE_OBJECT Device = Driver->Devices[i];
+    for(UINT ControllerIndex = 0;ControllerIndex<Driver->NumDevices;ControllerIndex++){
+        RFDEVICE_OBJECT Device = Driver->Devices[ControllerIndex];
+        SystemDebugPrint(L"Installing AHCI Controller %x ... ", Device);
         SetDeviceFeature(Device, DEVICE_FORCE_MEMORY_ALLOCATION);
         BOOL MMio = FALSE;
         // AllocatePciBaseAddress(Device, 5, AHCI_CONFIGURATION_PAGES, 0);
+        
         HBA_REGISTERS* Hba = PciGetBaseAddress(Device, 5, &MMio);
+        SystemDebugPrint(L"STAGE 2");
+
         KeMapMemory(Hba, Hba, AHCI_CONFIGURATION_PAGES, PM_MAP | PM_CACHE_DISABLE | PM_WRITE_THROUGH);
         if(!MMio) {
             WriteDeviceLogA(Device, "Device BAR is not Memory Mapped (BAR5.IO = 1)");
@@ -252,7 +53,6 @@ DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver){
             continue;
         }
 
-        
         Hba->GlobalHostControl.AhciEnable = 1;
 
         // Check if BIOS is device owner and take device ownership
@@ -269,7 +69,6 @@ DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver){
         Ahci->Driver = Driver;
         SetDeviceExtension(Device, Ahci);
         
-         
 
 
         if(Hba->ExtendedHostCapabilities.BiosOsHandoff
@@ -316,97 +115,22 @@ DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver){
             PortsImplemented >>= 1;
         }
         
-        UINT64 TimerFrequency = GetHighPerformanceTimerFrequency();
-        UINT64 Time = 0, PostTime = 0;
+        
         for(UINT i = 0;i<Ahci->NumPorts;i++) {
             AHCI_DEVICE_PORT* Port = &Ahci->Ports[i];
             HBA_PORT* HbaPort = Port->Port;
             if(!Port->DeviceDetected) continue;
             SystemDebugPrint(L"SATA AHCI Device Detected (Port : %x). ATAPI = %x", i, HbaPort->CommandStatus & PORTxCMDxATAPI);
-            if(!Port->Atapi) {
-                char* Sector0 = malloc(0x1F400000);
-                if(!Sector0) {
-                    SystemDebugPrint(L"ALLOCATION_FAILED.");
-                    while(1);
-                }
-                // SystemDebugPrint(L"MAX_LBA : %x , WWN : %s", IdentifyDevice.Max48BitLBA, IdentifyDevice.WorldWideName);
-                ATA_IDENTIFY_DEVICE_DATA* IdentifyDeviceData = &Port->IdentifyDeviceData;
-                UINT32 IdentifyCmd = AhciAllocateCommand(Port);
-                AHCI_COMMAND_LIST_ENTRY* CmdEntry = &Port->CommandList[IdentifyCmd];
-                CmdEntry->CommandFisLength = sizeof(ATA_FIS_H2D) >> 2;
-                ATA_FIS_H2D* IdentifyH2d = (ATA_FIS_H2D*)Port->CommandTables[IdentifyCmd].CommandFis;
-                IdentifyH2d->Command = ATA_IDENTIFY_DEVICE;
-                IdentifyH2d->Device = AHCI_DEVICE_HOST;
-                IdentifyH2d->FisType = FIS_TYPE_H2D;
-                IdentifyH2d->Count = 0;
-                IdentifyH2d->CommandControl = 1;
-                Port->CommandTables[IdentifyCmd].Prdt[0].DataBaseAddress = (UINT64)IdentifyDeviceData;
-                Port->CommandTables[IdentifyCmd].Prdt[0].DataByteCount = sizeof(ATA_IDENTIFY_DEVICE_DATA) - 1;
-
-                // Port->CommandList[IdentifyCmd].PrdtByteCount = sizeof(*IdentifyDeviceData) - 1;
-                Port->CommandList[IdentifyCmd].PrdtLength = 1;
-
-
-                AhciIssueCommand(Port, IdentifyCmd);
-                BOOL MMio = FALSE;
-                UINT16 PortNumber = (UINT16)(UINT64)PciGetBaseAddress(Ahci->Device, 4, &MMio);
-                SystemDebugPrint(L"BAR4 Port : %x", (UINT64)PortNumber);
-                
-                UINT16 ModelNumber[41] = {0};
-                UINT16 LastChar = 0xFF;
-                BOOL Second = 0;
-                UINT LastIndex = 0;
-                UINT LastCharIndex = 0;
-                for(UINT i = 0;i<40;i++) {
-                    
-                    UINT index = i + 1;
-                    if(Second) index = LastIndex;
-                    else LastIndex = i;
-
-                    ModelNumber[i] = IdentifyDeviceData->ModelNumber[index];
-                    LastChar = IdentifyDeviceData->ModelNumber[i];
-                    if(LastChar > 0x20) {
-                        LastCharIndex = i;
-                    }
-                    Second ^= 1;
-
-                }
-                ModelNumber[LastCharIndex + 1] = 0;
-                
-                SystemDebugPrint(L"Identify : %ls, SECTORS : %x, IDD : %x", ModelNumber, IdentifyDeviceData->UserAddressableSectors, *(UINT64*)IdentifyDeviceData);
-                
-                SystemDebugPrint(L"REMOVABLE_MEDIA : %x, SECTORS_PER_TRACK : %x, EXUSER_SECTORS : %x", IdentifyDeviceData->CommandSetSupport.RemovableMediaFeature, IdentifyDeviceData->NumSectorsPerTrack, IdentifyDeviceData->AdditionalSupported.ExtendedUserAddressableSectorsSupported);
-                
-                if(IdentifyDeviceData->AdditionalSupported.ExtendedUserAddressableSectorsSupported) {
-                    Port->DriveInfo.MaxAddress = IdentifyDeviceData->ExtendedNumberOfUserAddressableSectors;
-                } else {
-                    Port->DriveInfo.MaxAddress = IdentifyDeviceData->UserAddressableSectors;
-                }
-                SystemDebugPrint(L"%d MB, LSPS : %d", (Port->DriveInfo.MaxAddress << 9) / 0x100000, IdentifyDeviceData->PhysicalLogicalSectorSize.LogicalSectorsPerPhysicalSector);
-                // memcpy(Port->DriveInfo.DriveName, IdentifyDeviceData.prod)
-                
-                // InstallDrive(Port->Device, Port->IdentifyDeviceData.SerialNumber);
-
-                while(1);
-
-                Time = GetHighPrecisionTimeSinceBoot();
-                SystemDebugPrint(L"Reading Data... (500MB)");
-
-
-                KERNELSTATUS Status = AhciSataRead(Port, 0, 0x1F400000, Sector0);
-                
-                PostTime = GetHighPrecisionTimeSinceBoot();
-                SystemDebugPrint(L"Read Latency : %d ms", (PostTime - Time) * 1000 / TimerFrequency);
-                SystemDebugPrint(L"STATUS = %x, SECTOR0 (%x)", Status, *(UINT64*)Sector0);
-                SystemDebugPrint(L"SECTOR 1 (%x) : %s ||| SECTOR 2 (%x)", *(UINT64*)(Sector0 + 0x200), Sector0 + 0x200, *(UINT64*)(Sector0 + 0x400), Sector0 + 0x400);
-            // goto t;
-                // DRIVE_INFO* DriveInfo = malloc(sizeof(DRIVE_INFO));
-                // ObjZeroMemory(DriveInfo);
+            if(Port->Atapi) {
+                AhciInitAtapiDevice(Port);
+            } else {
+                AhciInitAtaDevice(Port);
             }
         }
 
-        // SystemDebugPrint(L"AHCI Controller Intialized.");
+        SystemDebugPrint(L"AHCI Controller Intialized.");
     }
+    
     while(1) Sleep(100000);
 }
 
@@ -435,7 +159,6 @@ void AhciReset(RFAHCI_DEVICE Ahci){
 
 #define CMD_LIST_ENTRIES 0x20
 
-#define ATAPI_SIGNATURE 
 
 void AhciInitializePort(RFAHCI_DEVICE_PORT Port){
     UINT64 NumBytes = ALIGN_VALUE(sizeof(AHCI_COMMAND_LIST_ENTRY) * Port->Ahci->MaxCommandSlots + 0x100 + sizeof(AHCI_COMMAND_TABLE) * Port->Ahci->MaxCommandSlots + 0x100, 0x1000);
@@ -500,11 +223,11 @@ void AhciInitializePort(RFAHCI_DEVICE_PORT Port){
         v |= 1 << PORTxCMDxICC;
         Port->Port->CommandStatus = v;
     }
-    wr32(&Port->Port->SataControl, 0x301);
+    BUFFERWRITE32(Port->Port->SataControl, 0x301);
 
     Sleep(5);
 
-    wr32(&Port->Port->SataControl, 0x300);
+    BUFFERWRITE32(Port->Port->SataControl, 0x300);
 
 
     UINT Countdown = 20;
@@ -571,68 +294,3 @@ void AhciInitializePort(RFAHCI_DEVICE_PORT Port){
 
 
 
-int AhciIssueCommand(RFAHCI_DEVICE_PORT Port, UINT CommandIndex) {
-    if(Port->PendingCommands[CommandIndex]) return -1; // Command slot is already in use
-    
-    Port->PendingCommands[CommandIndex] = KeGetCurrentThread();
-
-
-    SystemDebugPrint(L"AHCI : COMMAND_READY (PxIS : %x PxSERR : %x PxSCTL : %x PxSSTS : %x)", Port->Port->InterruptStatus, Port->Port->SataError, Port->Port->SataControl, Port->Port->SataStatus);
-    __SyncOr(&Port->Port->CommandIssue, CommandIndex);
-    while(!(Port->DoneCommands & (1 << CommandIndex))) IoWait();
-    
-    // Release Command Slot
-    Port->DoneCommands &= ~(1 << CommandIndex);
-    Port->PendingCommands[CommandIndex] = NULL;
-    SystemDebugPrint(L"AHCI_COMMAND_ACK_RECEIVED. (PxIS : %x PxSERR : %x PxSCTL : %x PxSSTS : %x)", Port->Port->InterruptStatus, Port->Port->SataError, Port->Port->SataControl, Port->Port->SataStatus);
-    return 0;
-}
-
-UINT32 AhciAllocateCommand(RFAHCI_DEVICE_PORT Port){
-    
-    for(;;) {
-    DWORD Mask = Port->Port->CommandIssue | Port->Port->SataActive;
-        // Spin until a free command is found
-        for(UINT i = 0;i<Port->Ahci->MaxCommandSlots;i++){
-            if(!(Mask & 1) && !(Port->UsedCommandSlots & (1 << i))) {
-                // It is a free command list
-                if(!__SyncBitTestAndSet(&Port->UsedCommandSlots, i)) continue;
-                return i;
-            }
-            Mask >>= 1;
-        }
-    }
-}
-KERNELSTATUS AhciHostToDevice(RFAHCI_DEVICE_PORT Port, UINT64 Lba, UINT8 Command, UINT8 Device, UINT16 Count, UINT16 NumCommandAddressDescriptors, AHCI_COMMAND_ADDRESS* CommandAddresses){    
-    // if(!Count) return KERNEL_SERR_INVALID_PARAMETER;
-    UINT32 CommandIndex = AhciAllocateCommand(Port);
-    AHCI_COMMAND_LIST_ENTRY* CmdEntry = &Port->CommandList[CommandIndex];
-    CmdEntry->CommandFisLength = sizeof(ATA_FIS_H2D) >> 2;
-    CmdEntry->PrdtByteCount = Count << 9;
-
-    AHCI_COMMAND_TABLE* CommandTable = &Port->CommandTables[CommandIndex];
-    ATA_FIS_H2D* Fis = (ATA_FIS_H2D*)CommandTable->CommandFis;
-    Fis->FisType = FIS_TYPE_H2D;
-    Fis->Command = Command;
-    Fis->Count = Count;
-    
-    Fis->CommandControl = 1;
-    Fis->Device = Device;
-    Fis->Lba0 = Lba;
-    Fis->Lba1 = Lba >> 16;
-    Fis->Lba2 = Lba >> 24;
-    Fis->Lba3 = Lba >> 40;
-
-
-
-    for(UINT16 i = 0;i<NumCommandAddressDescriptors;i++) {
-        // to avoid possible bugs
-        PHYSICAL_REGION_DESCRIPTOR_TABLE* Prdt = &CommandTable->Prdt[i];
-        ObjZeroMemory(Prdt);
-        Prdt->DataBaseAddress = (UINT64)CommandAddresses[i].BaseAddress;
-        Prdt->DataByteCount = CommandAddresses[i].NumBytes - 1;
-    }
-    
-    return AhciIssueCommand(Port, CommandIndex);
-
-}

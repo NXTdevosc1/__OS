@@ -57,7 +57,7 @@ void HpetInitialize(ACPI_HPET* Hpet) {
         return;
     }
     HpetDetected = 1;
-    HpetDevice = InstallDevice(NULL, DEVICE_SOURCE_SYSTEM_RESERVED, (LPVOID)HpetAddress);
+    HpetDevice = InstallDevice(NULL, DEVICE_SOURCE_ACPI, DEVICE_TYPE_TIMER, 0, 0, 0, (LPVOID)HpetAddress);
     if(!HpetDevice) SET_SOD_MEDIA_MANAGEMENT;
     SetDeviceDisplayName(HpetDevice, L"High Precision Event Timer (HPET)");
 

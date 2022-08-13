@@ -439,6 +439,7 @@ __setCR3((UINT64)kproc->PageMap);
 	if(NumPcieConfigs){
 		// Use MEMORY MAPPED Configuration
 		for(UINT64 PcieConfig = 0;PcieConfig < NumPcieConfigs;PcieConfig++){
+			
 			for(UINT Bus = 0;Bus < 8;Bus++){
 				for(UINT Device = 0;Device < 32;Device++){
 
@@ -456,7 +457,7 @@ __setCR3((UINT64)kproc->PageMap);
 						DeviceHeaderType = DeviceConfiguration->HeaderType;
 						if(DeviceHeaderType == 0xFF) continue;
 						if((DeviceHeaderType & ~(0x80)) == 0){
-							InstallDevice(NULL, DEVICE_SOURCE_PCI, DeviceConfiguration);
+							InstallDevice(NULL, DEVICE_SOURCE_PCI, 0, 0, 0, 0, DeviceConfiguration);
 						}else if((DeviceHeaderType & ~(0x80)) == 1){
 							SystemDebugPrint(L"PCI-to-PCI Bridge.");
 						}
@@ -478,7 +479,7 @@ __setCR3((UINT64)kproc->PageMap);
 					HeaderType = IoPciRead8(Bus, Device, Function, PCI_HEADER_TYPE);
 					if(HeaderType == 0xFF) continue;
 					if((HeaderType & ~(0x80)) == 0) {
-						InstallDevice(NULL, DEVICE_SOURCE_PCI, IOPCI_CONFIGURATION(Bus, Device, Function));
+						InstallDevice(NULL, DEVICE_SOURCE_PCI, 0, 0, 0, 0, IOPCI_CONFIGURATION(Bus, Device, Function));
 					}else if((HeaderType & ~(0x80)) == 1){
 							SystemDebugPrint(L"PCI-to-PCI Bridge.");
 					}
