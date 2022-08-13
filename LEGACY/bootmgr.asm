@@ -159,7 +159,7 @@ loader_start:
     jmp .halt
 ; This is the best method availaible on all PC's since 2002 (and some previous ones)
 
-BootLoaderMemory dq 0x40000 ; Used memory by bootloader (0x40000 As initialy used)
+BootLoaderMemory dq 0x100000 ; Used memory by bootloader (0x100000 As initialy used)
 
 MemapCopy:
     test byte [BiosSystemMemoryMap + 20], 1 ; Present Bit ACPI
@@ -185,7 +185,7 @@ MemapCopy:
 
     ; Check if the entry is inside system space (no need to check for kernel 0x8000-0x9000 cause they're approved in BIOS)
     mov esi, [BiosSystemMemoryMap]
-    cmp esi, 0x40000
+    cmp esi, 0x100000
     ja .FinishSystemCheck ; Jmp if above otherwise check high 32 bits
 
     mov esi, [BiosSystemMemoryMap + 4]
@@ -231,15 +231,15 @@ MemapCopy:
 .Exit:
     ret
 .UnmapSystemArea:
-    ; Check if length of region < 0x40000
+    ; Check if length of region < 0x100000
     mov esi, [BiosSystemMemoryMap + 8]
-    cmp esi, 0x40000
+    cmp esi, 0x100000
     ja .A000Valid ; BIOS Must map conventionnal memory in the <4GB area or all the memory will be lost
     jmp .SkipMap
     .A000Valid:
 
-    mov dword [BiosSystemMemoryMap], 0x40000 ; 0-0x40000 Reserved for System
-    sub dword [BiosSystemMemoryMap + 8], 0x40000
+    mov dword [BiosSystemMemoryMap], 0x100000 ; 0-0x100000 Reserved for System
+    sub dword [BiosSystemMemoryMap + 8], 0x100000
     jmp .FinishSystemCheck
     
 GetMemoryMap:
@@ -487,8 +487,12 @@ SetupVesaVBE:
  
     pusha
 
-    mov eax, 0x4F00
-    mov edi, VbeInfoBlock
+    xor ax, ax
+    mov ds, ax
+    mov es, ax
+
+    mov ax, 0x4F00
+    mov di, VbeInfoBlock
     push ds
     push es
     push gs
@@ -501,18 +505,20 @@ SetupVesaVBE:
     pop es
     pop ds
 
-    cmp eax, 0x4F ; With Status = 0
-    mov edi, VesaVbeNotSupported
+    cmp ax, 0x4F ; With Status = 0
+    mov di, VesaVbeNotSupported
     jne SetFailureMessage
 
     
     cmp dword [VbeInfoBlock.VbeSignature], 'VESA'
     jne SetFailureMessage
-    xor ebx, ebx
+    xor bx, bx
     mov bx, [VbeInfoBlock.VideoModePtr]; Count for loop
+    mov gs, [VbeInfoBlock.VideoModePtr + 2]
+    
     .loop:
         mov eax, 0x4F01
-        mov cx, [bx]
+        mov cx, [gs:bx]
         cmp cx, 0xFFFF
         je .exit
         mov word [VbeMode], cx
@@ -523,7 +529,6 @@ SetupVesaVBE:
         push fs
 
         int 0x10
-
         pop fs
         pop gs
         pop es
@@ -531,7 +536,6 @@ SetupVesaVBE:
         add bx, 2
         cmp ax, 0x4F
         jne .loop
-
         mov al, [VbeModeInfo.attributes]
         and al, 0x90
         cmp al, 0x90
@@ -552,17 +556,16 @@ SetupVesaVBE:
         cmp byte [VbeReady], 0
         je SetFailureMessage
         ; Set Mode
-        mov eax, 0x4F02
+        mov ax, 0x4F02
         mov bx, [VbeMode]
         or bx, 0x4000 ; To use the frame buffer
-        xor edi, edi
+        xor di, di
         push ds
         push es
         push gs
         push fs
 
         int 0x10
-
         pop fs
         pop gs
         pop es
@@ -860,7 +863,7 @@ AllocatePages32:
     mov edx, [ebx + 9]
     cmp edx, edi
     jae .ContinueSearch ; Resulting ram access will be < 4GB
-    ; Calculate page count as lower ram (for e.g. if page count = 0x4000000 it is considered 0)
+    ; Calculate page count as lower ram (for e.g. if page count = 0x10000000 it is considered 0)
     cmp [ebx + 1], ecx
     jb .ContinueSearch
     ; Availaible memory is found

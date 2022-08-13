@@ -1,6 +1,8 @@
 #pragma once
 #include <kerneltypes.h>
 #include <ata.h>
+#include <drivectl.h>
+
 #pragma pack(push, 1)
 
 typedef struct _HBA_REGISTERS {

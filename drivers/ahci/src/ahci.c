@@ -1,7 +1,6 @@
 #include <ddk.h>
 #include <kernelruntime.h>
 #include <ahci.h>
-#include <drivectl.h>
 #include <kintrinsic.h>
 #include <assemblydef.h>
 #include <ktime.h>
@@ -353,19 +352,41 @@ DDKSTATUS DDKENTRY DriverEntry(RFDRIVER_OBJECT Driver){
                 UINT16 PortNumber = (UINT16)(UINT64)PciGetBaseAddress(Ahci->Device, 4, &MMio);
                 SystemDebugPrint(L"BAR4 Port : %x", (UINT64)PortNumber);
                 
+                UINT16 ModelNumber[41] = {0};
+                UINT16 LastChar = 0xFF;
+                BOOL Second = 0;
+                UINT LastIndex = 0;
+                UINT LastCharIndex = 0;
+                for(UINT i = 0;i<40;i++) {
+                    
+                    UINT index = i + 1;
+                    if(Second) index = LastIndex;
+                    else LastIndex = i;
 
+                    ModelNumber[i] = IdentifyDeviceData->ModelNumber[index];
+                    LastChar = IdentifyDeviceData->ModelNumber[i];
+                    if(LastChar > 0x20) {
+                        LastCharIndex = i;
+                    }
+                    Second ^= 1;
 
-                SystemDebugPrint(L"Identify : %s , SECTORS : %x, IDD : %x", IdentifyDeviceData->SerialNumber, IdentifyDeviceData->UserAddressableSectors, *(UINT64*)IdentifyDeviceData);
+                }
+                ModelNumber[LastCharIndex + 1] = 0;
+                
+                SystemDebugPrint(L"Identify : %ls, SECTORS : %x, IDD : %x", ModelNumber, IdentifyDeviceData->UserAddressableSectors, *(UINT64*)IdentifyDeviceData);
+                
                 SystemDebugPrint(L"REMOVABLE_MEDIA : %x, SECTORS_PER_TRACK : %x, EXUSER_SECTORS : %x", IdentifyDeviceData->CommandSetSupport.RemovableMediaFeature, IdentifyDeviceData->NumSectorsPerTrack, IdentifyDeviceData->AdditionalSupported.ExtendedUserAddressableSectorsSupported);
-                SystemDebugPrint(L"%d MB, LSPS : %d", (IdentifyDeviceData->UserAddressableSectors << 9) / 0x100000, IdentifyDeviceData->PhysicalLogicalSectorSize.LogicalSectorsPerPhysicalSector);
                 
                 if(IdentifyDeviceData->AdditionalSupported.ExtendedUserAddressableSectorsSupported) {
                     Port->DriveInfo.MaxAddress = IdentifyDeviceData->ExtendedNumberOfUserAddressableSectors;
                 } else {
                     Port->DriveInfo.MaxAddress = IdentifyDeviceData->UserAddressableSectors;
                 }
+                SystemDebugPrint(L"%d MB, LSPS : %d", (Port->DriveInfo.MaxAddress << 9) / 0x100000, IdentifyDeviceData->PhysicalLogicalSectorSize.LogicalSectorsPerPhysicalSector);
                 // memcpy(Port->DriveInfo.DriveName, IdentifyDeviceData.prod)
                 
+                // InstallDrive(Port->Device, Port->IdentifyDeviceData.SerialNumber);
+
                 while(1);
 
                 Time = GetHighPrecisionTimeSinceBoot();
