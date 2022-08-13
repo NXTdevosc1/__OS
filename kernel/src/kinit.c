@@ -97,7 +97,7 @@ void KernelPagingInitialize(){
 	if(!InitData.uefi) {
 
 		// Map Kernel (BIOS Bootloader memory map is very simple and kernel memory region is not mapped)
-		MapPhysicalPages(kproc->PageMap, (char*)InitData.ImageBase, (char*)InitData.ImageBase, (InitData.ImageSize >> 12) + 0x100 , PM_MAP);
+		MapPhysicalPages(kproc->PageMap, (char*)InitData.ImageBase - 0x20000, (char*)InitData.ImageBase - 0x20000, (InitData.ImageSize >> 12) + 0x100 , PM_MAP);
 
 		// Map Low Memory & 1MB Of high memory (Not declared by LEGACY BIOS Bootloader)
 		MapPhysicalPages(kproc->PageMap, 0, 0, 0x200, PM_MAP);

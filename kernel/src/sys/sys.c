@@ -130,12 +130,7 @@ void ConfigureSystemSpace(){
         SystemSpaceBase = (void*)0xFFFF800000000000;
     } else SOD(0, "Unknown Virtual Address width");
     // on 48 bit paging processors, physical address is up to 46 bits
-    
-    
-    for (UINT64 i = 0; i < Pmgrt.NumProcessors; i++) {
-        MapPhysicalPages(kproc->PageMap, (void*)CpuManagementTable[i], (void*)CpuManagementTable[i], CPU_MGMT_NUM_PAGES, PM_MAP | PM_CACHE_DISABLE);
-    }
-    if(!InitSystemSpace(kproc)) SET_SOD_INITIALIZATION;
+
 }
 
 BOOL InitSystemSpace(RFPROCESS Process) {

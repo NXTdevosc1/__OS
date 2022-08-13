@@ -171,7 +171,7 @@ DDKIMPORT void DDKAPI IoPciWrite32(UINT8 BusNumber, UINT8 Device, UINT8 Function
 DDKIMPORT void DDKAPI IoPciWrite16(UINT8 BusNumber, UINT8 Device, UINT8 Function, UINT16 Value, UINT16 Offset);
 DDKIMPORT void DDKAPI IoPciWrite8(UINT8 BusNumber, UINT8 Device, UINT8 Function, UINT8 Value, UINT16 Offset);
 
-
+DDKIMPORT BOOL DDKAPI AllocatePciBaseAddress(RFDEVICE_OBJECT DeviceObject, UINT BaseAddressNumber, UINT64 NumPages, UINT Flags);
 
 
 #pragma section(".DRVAUTH", read)

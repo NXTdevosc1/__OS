@@ -35,7 +35,7 @@ PCLIENT AllocateClient() {
 		}
 		if (!List->Next) {
 			UINT64 NumPages = ALIGN_VALUE(sizeof(CLIENT_LIST), 0x1000) >> 12;
-			List->Next = VirtualAllocateEx(NULL, NumPages, 0x1000, NULL, 0);
+			List->Next = AllocatePoolEx(NULL, NumPages, 0x1000, NULL, 0);
 			if (!List->Next) SET_SOD_MEMORY_MANAGEMENT;
 			SZeroMemory(List->Next);
 			MapPhysicalPages(kproc->PageMap, List->Next, List->Next, NumPages, PM_MAP | PM_CACHE_DISABLE);
@@ -70,7 +70,7 @@ PCLIENT KERNELAPI IpcClientCreate(HTHREAD HostThread, UINT MessageQueueLength, U
 	UINT64 NumPages = ALIGN_VALUE(sizeof(struct _MSG_QUEUE) + sizeof(MSG_OBJECT) * (UINT64)MessageQueueLength, 0x1000) >> 12;
 
 
-	Client->InMessageQueue = VirtualAllocateEx(NULL, NumPages << 12, 0x1000, NULL, 0);
+	Client->InMessageQueue = AllocatePoolEx(NULL, NumPages << 12, 0x1000, NULL, 0);
 	if(!Client->InMessageQueue) SET_SOD_MEMORY_MANAGEMENT;
 
 	ZeroMemory(Client->InMessageQueue, NumPages << 12);

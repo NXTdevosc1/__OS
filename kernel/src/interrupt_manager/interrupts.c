@@ -165,7 +165,7 @@ void INTH_PAGE_FAULT(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFra
 	__cli();
 	__setCR3(KeGlobalCR3);
 	struct TSS_ENTRY* CpuTSS = (struct TSS_ENTRY*)((UINT64)CpuManagementTable[0]->CpuBuffer + CPU_BUFFER_TSS_BASE);
-	SystemDebugPrint(L"TSCH : %x , INSTRUCTION : %x, IST2 : %x", SchedulerEntrySSE, InterruptFrame->IntStack.InstructionPointer, CpuTSS->ist2);
+	SystemDebugPrint(L"TSCH : %x , INSTRUCTION : %x, IST2 : %x", SchedulerEntrySSE, InterruptFrame->CodeIntStack.InstructionPointer, CpuTSS->ist2);
 	while(1);
 	SOD(CPU_INTERRUPT_PAGE_FAULT,"PAGE FAULT");
 	__hlt();

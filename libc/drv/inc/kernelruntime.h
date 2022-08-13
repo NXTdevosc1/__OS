@@ -100,8 +100,13 @@ void KERNELAPI KeTaskSchedulerEnable();
 void KERNELAPI KeTaskSchedulerDisable();
 
 PVOID KERNELAPI malloc(unsigned long long Size);
-LPVOID KERNELAPI VirtualAllocateEx(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, LPVOID* AllocationSegment, UINT64 MaxAddress);
+LPVOID KERNELAPI AllocatePoolEx(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, LPVOID* AllocationSegment, UINT64 MaxAddress);
 PVOID KERNELAPI free(const void* Heap);
+
+// IO_MEMORY Automatically mapped with NX(No-Execute) 
+LPVOID KERNELAPI AllocateIoMemory(UINT64 NumPages, UINT Flags);
+BOOL KERNELAPI FreeIoMemory(LPVOID IoMem);
+
 #define OS_SUPPORT_LNKW L"os_support.com"
 #define OS_SUPPORT_LNK "os_support.com"
 

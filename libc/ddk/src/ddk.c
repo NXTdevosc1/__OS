@@ -140,9 +140,9 @@ DDKEXPORT BOOL DDKAPI SetDeviceFeature(_RFDEVICE_OBJECT Device, UINT64 DeviceFea
 DDKEXPORT void* DDKAPI AllocateDeviceMemory(_RFDEVICE_OBJECT Device, UINT64 NumBytes, UINT Alignment){
 	void* Heap = NULL;
 	if(Device->DeviceFeatures & DEVICE_64BIT_ADDRESS_ALLOCATIONS) {
-		Heap = VirtualAllocateEx(NULL, NumBytes, Alignment, NULL, 0);
+		Heap = AllocatePoolEx(NULL, NumBytes, Alignment, NULL, 0);
 	}else{
-		Heap = VirtualAllocateEx(NULL, NumBytes, Alignment, NULL, 0xFFFFFFFF - NumBytes - Alignment);
+		Heap = AllocatePoolEx(NULL, NumBytes, Alignment, NULL, 0xFFFFFFFF - NumBytes - Alignment);
 	}
 	if(Heap == NULL && Device->DeviceFeatures & DEVICE_FORCE_MEMORY_ALLOCATION) {
 		// KeSetDeathScreen(0, L"DEVICE_ALLOCATION_FAILED (FORCE_ALLOCATION ENABLED)", NULL, OS_SUPPORT_LNKW);
@@ -281,4 +281,13 @@ DDKEXPORT void DDKAPI IoPciWrite8(UINT8 BusNumber, UINT8 Device, UINT8 Function,
         Val |= ((UINT32)Value << (Advance << 3));
         OutPort(0xCFC, Val);
 	}
+}
+
+DDKEXPORT BOOL DDKAPI AllocatePciBaseAddress(struct __DEVICE_OBJECT* DeviceObject, UINT BaseAddressNumber, UINT64 NumPages, UINT Flags) {
+    if(BaseAddressNumber > 5) return FALSE;
+    LPVOID Mem = AllocateIoMemory(NumPages, Flags);
+    if(!Mem) return FALSE;
+    (UINT64)Mem |= PCI_BAR_64BIT; // 64 Bit Base Address
+    PciDeviceConfigurationWrite64(DeviceObject, (UINT64)Mem, PCI_BAR + (BaseAddressNumber << 2));
+    return TRUE;
 }

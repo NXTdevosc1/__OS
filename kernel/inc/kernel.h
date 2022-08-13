@@ -38,3 +38,9 @@ enum KeMemMapTypes{
 
 #define SYSTEM_CONTROL_PORT_A 0x92
 #define SYSTEM_CONTROL_PORT_B 0x61
+
+// KERNEL_ADDRESS_MAP
+#define SYSTEM_SPACE_IO 0xF800000000
+
+PROCESS IoSpaceMemoryProcess; // This is a (non) present process that contains the heap of the IoSpace
+THREAD IoSpaceMemoryThread;

@@ -27,8 +27,8 @@ SchedulerEntrySSE:
 
 
 
-	mov rbx, [rax + CPM_CURRENT_THREAD]
 	
+	mov rbx, [rax + CPM_CURRENT_THREAD]
 
 
 	test qword [rbx], THS_IDLE
@@ -40,7 +40,6 @@ SchedulerEntrySSE:
 	
 
 	movdqa xmm4, [rax + CPM_TOTAL_CLOCKS]
-
 	
 	mov rcx, rax
 	xor rdx, rdx
@@ -350,6 +349,12 @@ mov r11d, 0xFF ; Set highest priority number
 	
 	test rbx, rbx
 	jz .SetIdleThread
+
+	test rax, 0x8000
+	jz .b
+	mov rcx, 0xCAFE
+	jmp $
+.b:
 
 	movq rcx, mm4
 	cmp rcx, rbx

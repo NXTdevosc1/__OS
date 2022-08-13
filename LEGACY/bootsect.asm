@@ -108,7 +108,7 @@ LbaPacket:
 LbaRead:
 	; Part 1
 	mov si, LbaPacket
-	mov ah, 0x42
+	mov ax, 0x4200
 	mov dl, [BootDrive]
 	int 0x13
 	jc .err
@@ -118,7 +118,7 @@ LbaRead:
 	mov word [LbaPacket.Segment], READ_PART2_SEG
 
 	mov si, LbaPacket
-	mov ah, 0x42
+	mov ax, 0x4200
 	mov dl, [BootDrive]
 	int 0x13
 	jc .err
@@ -135,7 +135,7 @@ LbaRead:
 	mov word [LbaPacket.Segment], bx
 
 	mov si, LbaPacket
-	mov ah, 0x42
+	mov ax, 0x4200
 	mov dl, [BootDrive]
 	push cx
 	int 0x13
@@ -153,7 +153,7 @@ LbaRead:
 
 _print:
 	xor bx, bx
-	mov ah, 0x0E
+	mov ax, 0xE00
 	.loop:
 		mov al, [di]
 		test al, al

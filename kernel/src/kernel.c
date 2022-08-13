@@ -63,6 +63,9 @@ HANDLE_TABLE gSystemHandleTable = {0};
 
 RFSERVER KernelServer = NULL;
 
+PROCESS IoSpaceMemoryProcess = {0}; // This is a (non) present process that contains the heap of the IoSpace
+THREAD IoSpaceMemoryThread = {0};
+
 __declspec(allocate(_FIMPORT)) FILE_IMPORT_ENTRY FileImportTable[0x20] = {
 	{FILE_IMPORT_DATA, 0, NULL, L"$BOOTCONFIG", 0, L"OS\\System\\KeConfig\\$BOOTCONFIG"},
 	{FILE_IMPORT_DATA, 0, NULL, L"$DRVTBL", 0, L"OS\\System\\KeConfig\\$DRVTBL"},
@@ -87,7 +90,7 @@ void KERNELAPI IdleThread() {
 
 LPWSTR KernelProcessName = L"System Kernel.";
 
-extern void _start() {
+extern void __declspec(noreturn) _start() {
 	__cli();
 	EnableExtendedStates();
 	
@@ -110,6 +113,8 @@ extern void _start() {
 		#ifdef ___KERNEL_DEBUG___
 			DebugWrite("Kernel Process & Runtime Symbols Initialized.");
 		#endif
+
+	
 	// Creating Free Entries for Conventionnal Memory
 	
 	KernelHeapInitialize();
@@ -137,6 +142,14 @@ extern void _start() {
 	
 	ProcessContextIdAllocate(kproc);
 	KeGlobalCR3 = (UINT64)kproc->PageMap;
+
+	ConfigureSystemSpace();
+
+	// Setup I/O Memory process & thread
+	
+	if(!CreateMemoryTable(&IoSpaceMemoryProcess, &IoSpaceMemoryProcess.MemoryManagementTable)) SET_SOD_MEMORY_MANAGEMENT;
+	AllocateFreeHeapDescriptor(&IoSpaceMemoryProcess, NULL, (LPVOID)((UINT64)SystemSpaceBase + SYSTEM_SPACE_IO), (UINT64)-1 - ((UINT64)SystemSpaceBase + SYSTEM_SPACE_IO));
+	IoSpaceMemoryThread.Process = &IoSpaceMemoryProcess;
 
 
 	__setCR3((unsigned long long)kproc->PageMap);
@@ -232,7 +245,7 @@ extern void _start() {
 	
 
 	
-	
+	EnableApic();
 
 	// if(!IsOemLogoDrawn())
 	// 	DrawOsLogo();
@@ -246,7 +259,7 @@ extern void _start() {
 
 	UINT32 NumProcessors = AcpiGetNumProcessors();
 	CpuSetupManagementTable(NumProcessors);
-	ConfigureSystemSpace();
+	InitSystemSpace(kproc);
 	SetPriorityClass(kproc, PRIORITY_CLASS_REALTIME);
 	HTHREAD KernelThread = KeCreateThread(kproc, 0, NULL, 0, NULL);
 	if (!KernelThread) SET_SOD_INITIALIZATION;
@@ -303,7 +316,7 @@ __setCR3((UINT64)kproc->PageMap);
 		UINT64 SmpCodeSize = (UINT64)&SMP_TRAMPOLINE_END - (UINT64)SMP_TRAMPOLINE;
 		memcpy(SMP_BOOT_ADDR, SMP_TRAMPOLINE, SmpCodeSize);
 
-
+		__wbinvd();
 		for (UINT64 i = 0; i < NumProcessors; i++) {
 			if (i == KernelThread->ProcessorId) continue; // the bootstrap processor
 			if(KERNEL_ERROR(InitializeApicCpu(i)))
@@ -315,7 +328,6 @@ __setCR3((UINT64)kproc->PageMap);
 		Pmgrt.NumProcessors = 1;
 	}
 
-	Pmgrt.SystemInitialized = 1;
 
 	
 	#ifdef ___KERNEL_DEBUG___
@@ -410,6 +422,7 @@ __setCR3((UINT64)kproc->PageMap);
 	DebugWrite("Loading Essential Drivers From Kernel File Import Table.");	
 	#endif
 	
+	Pmgrt.SystemInitialized = 1;
 
 
 	RunEssentialExtensionDrivers(); // loads all drivers with type FIMPORT_DRIVER From File Import Table
@@ -501,6 +514,7 @@ __setCR3((UINT64)kproc->PageMap);
 	SetPriorityClass(kproc, PRIORITY_CLASS_IDLE);
 	UINT64 LastCSLatency = 0;
 
+	
 	// Time in Metric Units Time * Precision(ms, ns...) / Frequency
 	for(;;){
 		GP_draw_sf_text(to_stringu64(Elapsed - 1), 0, 300, 500);

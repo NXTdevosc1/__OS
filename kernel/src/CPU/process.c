@@ -185,19 +185,25 @@ DebugWrite(to_hstring64((UINT64)Thread));
     if(!Thread || Priority < THREAD_PRIORITY_MIN || Priority > THREAD_PRIORITY_MAX)
         return KERNEL_SERR_INVALID_PARAMETER;
 
+    
+
     Priority -= THREAD_PRIORITY_MIN;
     __SpinLockSyncBitTestAndSet(&Thread->ThreadControlMutex, THREAD_MUTEX_CHANGE_PRIORITY);
+   
+    // SystemDebugPrint(L"SetThreadPriority(%x, %x)", Thread->ProcessorId, Priority);
+   
     RFTHREAD_WAITING_QUEUE PreviousWaitingQueue = Thread->WaitingQueue;
     UINT PreviousWaitingQueueIndex = Thread->ThreadWaitingQueueIndex;
     CPU_MANAGEMENT_TABLE* CpuMgmt = CpuManagementTable[Thread->ProcessorId];
     if(PreviousWaitingQueue) {
-        CpuMgmt->TotalThreads[Thread->Process->PriorityClass]-= 1;
+        // TODO : Processor change will cause the false waiting queue to be changed
+        CpuMgmt->TotalThreads[Thread->Process->PriorityClass]--;
         CpuMgmt->NumReadyThreads[Thread->Process->PriorityClass]--;
     }
 
     RFTHREAD_WAITING_QUEUE WaitingQueue = CpuMgmt->ThreadQueues[Thread->Process->PriorityClass];
     Thread->ThreadPriority = Priority;
-    Thread->SchedulingQuantum = GlobalThreadPreemptionPriorities[Priority];
+    // Thread->SchedulingQuantum = GlobalThreadPreemptionPriorities[Priority];
 
 // Allocate thread in the waiting queue
     for(;;) {
@@ -344,10 +350,11 @@ RFTHREAD KEXPORT KERNELAPI KeCreateThread(RFPROCESS Process, UINT64 StackSize, T
     Thread->Process = Process;
     UINT64 ThreadProcessor = Pmgrt.NextThreadProcessor;
 
-    
-    Thread->ProcessorId = ThreadProcessor;
-    if (ThreadProcessor + 1 >= Pmgrt.NumProcessors) Pmgrt.NextThreadProcessor = 0;
-    else Pmgrt.NextThreadProcessor = ThreadProcessor + 1;
+    if(Flags & THREAD_CREATE_SYSTEM_IDLE) {
+        Thread->ProcessorId = ThreadProcessor;
+        if (ThreadProcessor + 1 >= Pmgrt.NumProcessors) Pmgrt.NextThreadProcessor = 0;
+        else Pmgrt.NextThreadProcessor = ThreadProcessor + 1;
+    }
 
 
     #ifdef  ___KERNEL_DEBUG___
@@ -371,7 +378,7 @@ RFTHREAD KEXPORT KERNELAPI KeCreateThread(RFPROCESS Process, UINT64 StackSize, T
             Thread->Stack = kpalloc(StackSize >> 12);
             if (!Thread->Stack) SET_SOD_MEMORY_MANAGEMENT;
             ZeroMemory(Thread->Stack, StackSize);
-            Thread->Registers.rsp = (UINT64)Thread->Stack + StackSize - 0x400;
+            Thread->Registers.rsp = (UINT64)Thread->Stack + StackSize - 0x100;
             Thread->Registers.rbp = (UINT64)Thread->Registers.rsp;
     }
 
@@ -400,11 +407,19 @@ RFTHREAD KEXPORT KERNELAPI KeCreateThread(RFPROCESS Process, UINT64 StackSize, T
         ThreadList = ThreadList->Next;
     }
 R0:
+
+    if(Flags & THREAD_CREATE_SYSTEM_IDLE) {
+        Thread->State |= THS_IDLE;
+    }
+    if(Flags & THREAD_CREATE_MANUAL) {
+        Thread->State |= THS_MANUAL;
+    }
+
     if(!(Flags & THREAD_CREATE_SUSPEND)){
         KeResumeThread(Thread);
     }
 
-    Thread->SchedulingQuantum = 10;
+    Thread->SchedulingQuantum = 12;
     Thread->TimeBurst = 1;
 
 

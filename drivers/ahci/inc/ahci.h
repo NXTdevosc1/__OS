@@ -331,6 +331,8 @@ typedef struct _AHCI_DEVICE_PORT {
     BOOL FirstD2h;
     BOOL PendingCommandAccess;
     BOOL Atapi;
+    ATA_IDENTIFY_DEVICE_DATA IdentifyDeviceData;
+    DRIVE_INFO DriveInfo;
 } AHCI_DEVICE_PORT, *RFAHCI_DEVICE_PORT;
 
 typedef struct _AHCI_DEVICE {

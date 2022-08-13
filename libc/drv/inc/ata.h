@@ -91,7 +91,6 @@ typedef struct _ATA_FIS_DATA {
     UINT32 Data[];
 } ATA_FIS_DATA;
 
-#pragma pack(pop)
 
 // ATA IDENTIFY DEVICE (From ata.h win32)
 
@@ -459,10 +458,12 @@ typedef struct _ATA_IDENTIFY_DEVICE_DATA {
   } TransportMajorVersion;
   UINT16 TransportMinorVersion;
   UINT16 ReservedWord224[6];
-  UINT32  ExtendedNumberOfUserAddressableSectors[2];
+  UINT64  ExtendedNumberOfUserAddressableSectors;
   UINT16 MinBlocksPerDownloadMicrocodeMode03;
   UINT16 MaxBlocksPerDownloadMicrocodeMode03;
   UINT16 ReservedWord236[19];
   UINT16 Signature : 8;
   UINT16 CheckSum : 8;
 } ATA_IDENTIFY_DEVICE_DATA, *RFATA_IDENTIFY_DEVICE_DATA;
+
+#pragma pack(pop)

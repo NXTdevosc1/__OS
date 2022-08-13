@@ -74,15 +74,15 @@ void InitProcessorDescriptors(void** CpuBuffer, UINT64* CpuBufferSize){
 void CpuSetupManagementTable(UINT64 CpuCount) {
 	if (__CPU_MGMT_TBL_SETUP__) return;
 
-	CpuManagementTable = VirtualAllocateEx(NULL, CpuCount << 3, 0x1000, NULL, 0);
+	CpuManagementTable = AllocatePoolEx(NULL, (CpuCount << 3) + 0x1000, 0x1000, NULL, 0);
 	if (!CpuManagementTable) SET_SOD_MEMORY_MANAGEMENT;
-	ZeroMemory(CpuManagementTable, CpuCount << 3);
+	ZeroMemory(CpuManagementTable, (CpuCount << 3) + 0x1000);
 	UINT64 CurrentProcessor = GetCurrentProcessorId();
 	for (UINT64 i = 0; i < CpuCount; i++) {
 		CpuManagementTable[i] = kpalloc(CPU_MGMT_NUM_PAGES);
 		if (!CpuManagementTable[i]) SET_SOD_MEMORY_MANAGEMENT;
-		ZeroMemory(CpuManagementTable[i], sizeof(*CpuManagementTable[i]));
-		RFTHREAD_WAITING_QUEUE WaitingQueue = VirtualAllocateEx(kproc->StartupThread, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES, 0x1000, NULL, 0);
+		SZeroMemory(CpuManagementTable[i]);
+		RFTHREAD_WAITING_QUEUE WaitingQueue = AllocatePoolEx(kproc->StartupThread, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES, 0x1000, NULL, 0);
 		ZeroMemory(WaitingQueue, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES);
 		if(i == CurrentProcessor){
 			CpuManagementTable[i]->Initialized = TRUE;
@@ -95,22 +95,21 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 		// CpuManagementTable[i]->TaskSchedulerData.cr3 = KeGlobalCR3;
 		
 
-		CpuManagementTable[i]->SystemIdleThread = KeCreateThread(IdleProcess, 0x1000, IdleThread, 0, NULL);
-		CpuManagementTable[i]->SystemInterruptsThread = KeCreateThread(SystemInterruptsProcess, 0x10000, NULL, 0, NULL);
+		CpuManagementTable[i]->SystemIdleThread = KeCreateThread(IdleProcess, 0x1000, IdleThread, THREAD_CREATE_SYSTEM_IDLE | THREAD_CREATE_MANUAL, NULL);
+		CpuManagementTable[i]->SystemInterruptsThread = KeCreateThread(SystemInterruptsProcess, 0x10000, NULL, THREAD_CREATE_SYSTEM_IDLE | THREAD_CREATE_MANUAL, NULL);
 		if (!CpuManagementTable[i]->SystemIdleThread || !CpuManagementTable[i]->SystemInterruptsThread) SET_SOD_PROCESS_MANAGEMENT;
 		
 
 		// Setup Idle Thread
 		HTHREAD hIdleThread = CpuManagementTable[i]->SystemIdleThread;
 		CpuManagementTable[i]->CurrentThread = hIdleThread;
-		hIdleThread->State |= THS_IDLE | THS_MANUAL;
 		hIdleThread->ProcessorId = i; // Make thread only runnable on this cpu
 		hIdleThread->SchedulingQuantum = 0;
 		hIdleThread->TimeBurst = 0;
 
+
 		// Setup Interrupts Thread
 		HTHREAD InterruptsThread = CpuManagementTable[i]->SystemInterruptsThread;
-		InterruptsThread->State |= THS_IDLE | THS_MANUAL; // Do not save registers of this thread
 		InterruptsThread->ProcessorId = i;
 		InterruptsThread->Registers.rflags = 0; // Interrupts disabled
 		InterruptsThread->TimeBurst = 0;
@@ -134,10 +133,12 @@ extern void SetupCPU() {
 	CpuManagementTable[ProcessorId]->Initialized = TRUE;
 	// CpuManagementTable[ProcessorId]->CpuId = ProcessorId;
 	CpuBootStatus = 1; // Declare successful CPU Boot
-
+	__wbinvd();
+	__pause();
+	while(!Pmgrt.SystemInitialized) __pause();
 	__sti();
 	for (;;) {
-		__hlt();
+		// __hlt();
 	}
 
 }

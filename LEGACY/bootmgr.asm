@@ -288,13 +288,92 @@ GetMemoryMap:
         mov di, FailedToGetMemoryMap
         jmp SetFailureMessage
 
-EnableA20:
-    in al, 0x92
-    or al, 2
-    out 0x92, al
+CheckA20:
+    push es
+    mov ax, 0xFFFF
+    mov es, ax
+    ; DS Must be cleared
+    ; Write address 0x100500 (0xFFFF:0x510) And 0x500
+    mov word [ds:0x500], 1
+    mov word [es:0x510], 2 ; 0x100500
+    pop es
+    cmp word [ds:0x500], 2 ; Writing to 0x100500 without A20 Will write to 0x500
+    je .Return0
+    clc ; Clear carry flag
+    ret
+.Return0:
+    stc ; Set carry flag
     ret
 
 
+EnableA20:
+    ; Testing A20 Line
+    call CheckA20
+    jc .BiosEnableA20
+    ret ; Otherwise, A20 is already enabled
+.BiosEnableA20:
+    mov ax, 0x2403
+    int 15h ; Query A20 Gate Support
+    jc .KeyboardCtlEnableA20 ; if CF Then BIOS Enabling is not supported
+    test ah, ah
+    jnz .KeyboardCtlEnableA20 ; BIOS A20 Enabling not supported
+    test bx, 2 ; Fast A20 Supported (Bit 1 of I/O Port 92h)
+    jnz .FastA20Enable
+    ; First try to enable using BIOS
+    mov ax, 0x2401
+    int 15h
+    jc .KeyboardCtlEnableA20 ; Function failed
+ 
+    call CheckA20
+    jc .KeyboardCtlEnableA20
+ 
+    ret ; A20 Successfully enabled
+.KeyboardCtlEnableA20:
+    call .A20Wait
+    mov al, 0xAD
+    out 0x64, al
+    call .A20Wait
+    mov al, 0xD0
+    out 0x64, al
+    call .A20Wait2
+    in al, 0x60
+    push eax
+    call .A20Wait
+    mov al, 0xD1
+    out 0x64, al
+    call .A20Wait
+    pop eax
+    or al, 2
+    out 0x60, al
+    call .A20Wait
+    mov al, 0xAE
+    out 0x64, al
+    call .A20Wait
+ 
+    call CheckA20
+    jc .FastA20Enable
+    ret ; A20 Enable successfully
+.A20Wait:
+    in al, 0x64
+    test al, 2
+    jnz .A20Wait
+    ret
+.A20Wait2:
+    in al, 0x64
+    test al, 1
+    jz .A20Wait2
+    ret
+.FastA20Enable:
+    in al, 0x92
+    or al, 2
+    out 0x92, al
+    call CheckA20
+    jc .A20IsNotSupported ; Final try and no A20
+    ret
+.A20IsNotSupported:
+    mov eax, 0xdeadcafe
+    hlt
+    jmp .A20IsNotSupported
 
 EnableProtectedMode:
     xor ax,ax
@@ -323,7 +402,7 @@ _print16:
     
     push ax
     push di
-    mov ah, 0x0e
+    mov ax, 0xe00
 	.loop:
 		cmp byte [di], 0
 		je .exit
@@ -530,7 +609,7 @@ RealModeEntry:
 Int13:
     pusha
     mov si, DiskLbaPacket
-    mov ah, 0x42
+    mov ax, 0x4200
     mov dl, [BootDrive]
 
     int 0x13

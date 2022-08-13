@@ -132,7 +132,7 @@ HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR*
 		}
 
 		if (!VirtualBufferLength) return -1;
-		VirtualBuffer = VirtualAllocateEx(NULL, VirtualBufferLength, 0x1000, NULL, 0);
+		VirtualBuffer = AllocatePoolEx(NULL, VirtualBufferLength, 0x1000, NULL, 0);
 		if (!VirtualBuffer) SET_SOD_MEMORY_MANAGEMENT;
 		if (!DllVirtualBase) DllVirtualBase = VirtualBuffer;
 		Section = (PE_SECTION_TABLE*)((char*)&PeImage->OptionnalHeader + PeImage->SizeofOptionnalHeader);
