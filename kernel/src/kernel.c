@@ -146,12 +146,18 @@ extern void __declspec(noreturn) _start() {
 	KeGlobalCR3 = (UINT64)kproc->PageMap;
 
 
+// Relocate the kernel
+	// Map KernelRelocate (To change CR3 With no Page-Fault)
+	MapPhysicalPages(kproc->PageMap, KernelRelocate, KernelRelocate, 1, PM_MAP);
+	// GP_draw_sf_text("Hello World", 0, 20, 20);
+	KernelRelocate(); // CR3 Will be automatically set with the new kernel one
+	// Unmap KernelRelocate
+	GP_clear_screen(0x2E0BC2);
+	while(1);
+	SystemDebugPrint(L"PSF1 : %x", InitData.start_font);
+	// MapPhysicalPages(kproc->PageMap, KernelRelocate, KernelRelocate, 1, 0);
 
-	
-	__setCR3((unsigned long long)kproc->PageMap);
 
-
-	GP_clear_screen(0x1774EA);
 	while(1) __hlt();
 
 	

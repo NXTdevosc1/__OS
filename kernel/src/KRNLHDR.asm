@@ -22,6 +22,7 @@ extern _start
 section .text
 	KrnlEntry:
 
+
 		mov rsp, _KernelStackTop
 		mov rbp, rsp
 		pushfq
@@ -58,9 +59,64 @@ section .text
 
 		.NoNX:
 
-	
 
 		jmp _start
+
+
+
+
+extern SystemSpaceBase
+extern KeGlobalCR3
+
+global KernelRelocate
+extern __KernelRelocate
+KernelRelocate:
+
+	mov rax, InitData
+
+	; Preserve address of InitData, _KernelStackTop
+	mov r8, rax
+	mov r10, __JumpToRelocatedKernel
+	mov r9, [rel KeGlobalCR3]
+	mov rax, [rax + 0x3C]
+	push rax
+	push r8
+	push r9
+	push r10
+	call __KernelRelocate
+	pop r10
+	pop r9
+	pop r8
+	pop rax
+	wbinvd
+
+
+	; Calculate new rsp
+	mov rcx, r8
+	mov rcx, [rcx + 0x3C]
+	sub rsp, rax
+	add rsp, rcx
+	
+
+	mov cr3, r9
+	
+	mov rbx, _KernelStackTop
+	mov rbp, rbx ; Base Pointer = Stack Top
+
+	mov rbx, __JumpToRelocatedKernel
+	jmp rbx
+
+global __JumpToRelocatedKernel
+
+
+__JumpToRelocatedKernel:
+	; Relocate Return Address
+	pop rdx
+	sub rdx, rax
+	add rdx, rcx
+	push rdx
+	ret
+
 
 section .GLBDSIG
 	dw 1
