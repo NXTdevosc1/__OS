@@ -20,7 +20,7 @@ typedef struct __DEVICE_OBJECT {
 	UINT32 DeviceType;
 	UINT64 VendorId;
 	UINT64 DeviceId;
-	void* DeviceConfiguration; // For ex. In PCI, this is the mmio address of the header
+	LPVOID DeviceConfiguration; // For ex. In PCI, this is the mmio address of the header
 	UINT8 Bus; // In case that Access Method is 0 (Legacy IO Access)
 	UINT8 DeviceNumber;
 	UINT8 Function;
@@ -31,6 +31,7 @@ typedef struct __DEVICE_OBJECT {
 	BOOL DeviceInitialized; // set to 1 when the relative driver completes the device initialization, the device then becomes accessible
 	UINT64 DeviceFeatures;
 	KERNELSTATUS DeviceStatus;
+	LPVOID		BARs[6]; // Virtual Addresses of the PCI Base Addresses
 } _DEVICE_OBJECT, *_RFDEVICE_OBJECT;
 
 DDKEXPORT KERNELSTATUS DDKAPI SystemDebugPrintA(const char* Text){
@@ -47,16 +48,14 @@ DDKEXPORT KERNELSTATUS DDKAPI SystemDebugPrintA(const char* Text){
     return SystemDebugPrint(WText);
 }
 DDKEXPORT void* DDKAPI PciGetBaseAddress(_RFDEVICE_OBJECT DeviceObject, unsigned char BarIndex, BOOL* MmIO /*0 = IO, 1 = MMIO*/){
-	if(BarIndex > 5) return NULL;
+	if(BarIndex > 5 || DeviceObject->DeviceSource != DEVICE_SOURCE_PCI) return NULL;
 	UINT64 Bar = PciDeviceConfigurationRead32(DeviceObject, PCI_BAR + (BarIndex << 2));
-	if(Bar & PCI_BAR_IO) {
-		*MmIO = 0;
-	}else *MmIO = 1;
-	if(Bar & PCI_BAR_64BIT){
-		Bar |= (UINT64)PciDeviceConfigurationRead32(DeviceObject, PCI_BAR + (BarIndex << 2) + 4) << 32;
-	}
-	Bar&=PCI_ADDRESS_MASK;
-	return (void*)Bar;
+	if(MmIO) {
+        if(Bar & PCI_BAR_IO) {
+            *MmIO = 0;
+        }else *MmIO = 1;
+    }
+	return (void*)DeviceObject->BARs[BarIndex];
 }
 DDKEXPORT UINT64 DDKAPI PciDeviceConfigurationRead64(_RFDEVICE_OBJECT DeviceObject, UINT16 Offset){
 	if(DeviceObject->PciAccessType == 0) {
@@ -283,11 +282,3 @@ DDKEXPORT void DDKAPI IoPciWrite8(UINT8 BusNumber, UINT8 Device, UINT8 Function,
 	}
 }
 
-DDKEXPORT BOOL DDKAPI AllocatePciBaseAddress(struct __DEVICE_OBJECT* DeviceObject, UINT BaseAddressNumber, UINT64 NumPages, UINT Flags) {
-    if(BaseAddressNumber > 5) return FALSE;
-    LPVOID Mem = AllocateIoMemory(NumPages, Flags);
-    if(!Mem) return FALSE;
-    (UINT64)Mem |= PCI_BAR_64BIT; // 64 Bit Base Address
-    PciDeviceConfigurationWrite64(DeviceObject, (UINT64)Mem, PCI_BAR + (BaseAddressNumber << 2));
-    return TRUE;
-}

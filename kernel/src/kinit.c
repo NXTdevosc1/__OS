@@ -9,8 +9,6 @@ void FirmwareControlRelease(){
 }
 
 void KernelHeapInitialize(){
-	SystemDebugPrint(L"UEFI : %x, Num Entries : %x", InitData.uefi, InitData.memory_map->count);
-    
 	// Types (BIOS & UEFI)
 	UINT16 LoaderData = EfiLoaderData;
 	UINT16 LoaderCode = EfiLoaderCode;
@@ -88,28 +86,40 @@ void KernelPagingInitialize(){
 			if (MemoryType != LoaderData && MemoryType != LoaderCode &&
 				MemoryType != ConventionalMemory) Flags |= PM_WRITE_THROUGH;
 			
-			MapPhysicalPages(kproc->PageMap, (LPVOID)InitData.memory_map->mem_desc[i].physical_start, (LPVOID)InitData.memory_map->mem_desc[i].physical_start, InitData.memory_map->mem_desc[i].pages_count, Flags);
+			// MapPhysicalPages(kproc->PageMap, (LPVOID)InitData.memory_map->mem_desc[i].physical_start, (LPVOID)InitData.memory_map->mem_desc[i].physical_start, InitData.memory_map->mem_desc[i].pages_count, Flags);
 			Flags = PM_MAP | PM_NO_CR3_RELOAD | PM_NO_TLB_INVALIDATION;
 		}
 	}
-	MapPhysicalPages(kproc->PageMap, (LPVOID)InitData.fb->FrameBufferBase, (LPVOID)InitData.fb->FrameBufferBase, (InitData.fb->FrameBufferSize + InitData.fb->HorizontalResolution * 20) >> 12, PM_MAP | PM_WRITE_THROUGH | PM_NO_CR3_RELOAD);
-
-	if(!InitData.uefi) {
-
+		// Map physical address of the frame buffer to the Kernel Space
+		InitData.fb->FrameBufferBase = AllocateIoMemory(InitData.fb->FrameBufferBase, (InitData.fb->FrameBufferSize >> 12) + 1, PM_WRITE_THROUGH);
 		// Map Kernel (BIOS Bootloader memory map is very simple and kernel memory region is not mapped)
-		MapPhysicalPages(kproc->PageMap, (char*)InitData.ImageBase - 0x20000, (char*)InitData.ImageBase - 0x20000, (InitData.ImageSize >> 12) + 0x100 , PM_MAP);
+		MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_KERNEL, (char*)InitData.ImageBase, (InitData.ImageSize >> 12) ,PM_MAP);
+		MapPhysicalPages(kproc->PageMap, (char*)InitData.ImageBase, (char*)InitData.ImageBase, (InitData.ImageSize >> 12) ,PM_MAP);
 
 		// Map Low Memory & 1MB Of high memory (Not declared by LEGACY BIOS Bootloader)
-		MapPhysicalPages(kproc->PageMap, 0, 0, 0x200, PM_MAP);
+		MapPhysicalPages(kproc->PageMap, 0, 0, 1, PM_MAP | PM_LARGE_PAGES);
 
 		// Map Allocated Memory by bootloader
-		MapPhysicalPages(kproc->PageMap, InitData.start_font, InitData.start_font, 8, PM_MAP); // 0x8000 KB For PSF1 Font
+		UINT64 DependencyOffset = 0;
+		MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset, InitData.start_font, 8, 0);
+		InitData.start_font = (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset;
+		DependencyOffset += 0x8000;
+
 		FILE_IMPORT_ENTRY* Entry = FileImportTable;
 		while(Entry->Type != FILE_IMPORT_ENDOFTABLE) {
-			MapPhysicalPages(kproc->PageMap, Entry->LoadedFileBuffer, Entry->LoadedFileBuffer, (Entry->LoadedFileSize >> 12) + 1, PM_MAP);
+			if(Entry->BaseName){
+				Entry->BaseName = wstrlen(Entry->BaseName);
+			}
+			MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset, Entry->LoadedFileBuffer, (Entry->LoadedFileSize >> 12) + 1, PM_MAP);
+			Entry->LoadedFileBuffer = (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset;
+			DependencyOffset += Entry->LoadedFileSize;
+			if(DependencyOffset & 0xFFF) {
+				DependencyOffset += 0x1000;
+				DependencyOffset &= ~0xFFF;
+			}
 			Entry++;
 		}
-	}
+
 	MapPhysicalPages(kproc->PageMap, InitData.PEDataDirectories, InitData.PEDataDirectories, 1, PM_MAP);
 }
 

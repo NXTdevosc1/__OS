@@ -26,6 +26,10 @@ LPVOID KEXPORT KERNELAPI KeResolvePhysicalAddress(RFPROCESS Process, const void*
     if(!_pdp->Present) return NULL;
     RFPAGEMAP _pd = (RFPAGEMAP)((_pdp->PhysicalAddr << 12) + (pd << 3));
     if(!_pd->Present) return NULL;
+
+    // Check if it's a 2MB Page
+    if(_pd->Size) return (void*)((_pd->PhysicalAddr << 15) + ((UINT64)VirtualAddress & 0x1FFFFF));
+
     RFPAGEMAP _pt = (RFPAGEMAP)((_pd->PhysicalAddr << 12) + (pt << 3));
     if(!_pt->Present) return NULL;
     
@@ -71,8 +75,12 @@ int MapPhysicalPages(
     if (Flags & PM_WRITE_THROUGH) ModelEntry.PageLevelWriteThrough = TRUE;
     if (Flags & PM_CACHE_DISABLE) ModelEntry.PageLevelCacheDisable = TRUE;
 
-
-    for(UINT64 i = 0;i<Count;i++, TmpPhysicalAddr++, TmpVirtualAddr++){
+    UINT64 IncVaddr = 1;
+    if(Flags & PM_LARGE_PAGES) {
+        ModelEntry.Size = 1; // 2MB Pages
+        IncVaddr = 0x200;
+    }
+    for(UINT64 i = 0;i<Count;i++, TmpPhysicalAddr+=IncVaddr, TmpVirtualAddr+=IncVaddr){
 
         PtIndex = TmpVirtualAddr & 0x1FF;
         PdIndex = (TmpVirtualAddr >> 9) & 0x1FF;
@@ -106,24 +114,29 @@ int MapPhysicalPages(
             ResetPageMap(EntryAddr);
         }else EntryAddr = (UINT64)PdpEntry[PdpIndex].PhysicalAddr << 12;
         PdEntry = (RFPAGEMAP)EntryAddr;
-        if(!PdEntry[PdIndex].Present){
-            EntryAddr = (UINT64)kpalloc(1);
-            if(!EntryAddr) SET_SOD_MEMORY_MANAGEMENT;
-            PdEntry[PdIndex].PhysicalAddr = EntryAddr >> 12;
-            PdEntry[PdIndex].Present = 1;
-            PdEntry[PdIndex].ReadWrite = 1;
-            PdEntry[PdIndex].UserSupervisor = 1;
 
-            ResetPageMap(EntryAddr);
+        if(Flags & PM_LARGE_PAGES) {
+            *&PdEntry[PdIndex] = ModelEntry;
+            PdEntry[PdIndex].PhysicalAddr = TmpPhysicalAddr;
+        } else {
+            if(!PdEntry[PdIndex].Present){
+                EntryAddr = (UINT64)kpalloc(1);
+                if(!EntryAddr) SET_SOD_MEMORY_MANAGEMENT;
+                PdEntry[PdIndex].PhysicalAddr = EntryAddr >> 12;
+                PdEntry[PdIndex].Present = 1;
+                PdEntry[PdIndex].ReadWrite = 1;
+                PdEntry[PdIndex].UserSupervisor = 1;
 
-        }else EntryAddr = (UINT64)PdEntry[PdIndex].PhysicalAddr << 12;
+                ResetPageMap(EntryAddr);
 
-        PtEntry = (RFPAGEMAP)EntryAddr;
+            }else EntryAddr = (UINT64)PdEntry[PdIndex].PhysicalAddr << 12;
 
-        *&PtEntry[PtIndex] = ModelEntry;
+            PtEntry = (RFPAGEMAP)EntryAddr;
 
-        PtEntry[PtIndex].PhysicalAddr = TmpPhysicalAddr;
+            *&PtEntry[PtIndex] = ModelEntry;
 
+            PtEntry[PtIndex].PhysicalAddr = TmpPhysicalAddr;
+        }
         // Check if paging modification is not very big
         if(Count <= 0x2000 || !(Flags & PM_NO_TLB_INVALIDATION)){
             __InvalidatePage((void*)TmpVirtualAddr);

@@ -94,11 +94,6 @@ extern void __declspec(noreturn) _start() {
 	__cli();
 	EnableExtendedStates();
 	
-	for(unsigned int i = 0;FileImportTable[i].Type != FILE_IMPORT_ENDOFTABLE;i++){
-		if(FileImportTable[i].BaseName){
-			FileImportTable[i].LenBaseName = wstrlen(FileImportTable[i].BaseName);
-		}
-	}
 	
 
 
@@ -117,12 +112,19 @@ extern void __declspec(noreturn) _start() {
 	
 	// Creating Free Entries for Conventionnal Memory
 	
-	KernelHeapInitialize();
 
 	#ifdef ___KERNEL_DEBUG___
 			DebugWrite("Memory Heaps initialized.");
 		#endif
 	
+	ConfigureSystemSpace();
+	// Setup I/O Memory process & thread
+	
+	if(!CreateMemoryTable(&IoSpaceMemoryProcess, &IoSpaceMemoryProcess.MemoryManagementTable)) SET_SOD_MEMORY_MANAGEMENT;
+	AllocateFreeHeapDescriptor(&IoSpaceMemoryProcess, NULL, (LPVOID)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_IO), ((UINT64)SystemSpaceBase + SYSTEM_SPACE48_RAM) - ((UINT64)SystemSpaceBase + SYSTEM_SPACE48_IO));
+	IoSpaceMemoryThread.Process = &IoSpaceMemoryProcess;
+
+	KernelHeapInitialize();
 	// Initialize Kernel Page tables
 	KernelPagingInitialize();
 
@@ -143,16 +145,14 @@ extern void __declspec(noreturn) _start() {
 	ProcessContextIdAllocate(kproc);
 	KeGlobalCR3 = (UINT64)kproc->PageMap;
 
-	ConfigureSystemSpace();
 
-	// Setup I/O Memory process & thread
+
 	
-	if(!CreateMemoryTable(&IoSpaceMemoryProcess, &IoSpaceMemoryProcess.MemoryManagementTable)) SET_SOD_MEMORY_MANAGEMENT;
-	AllocateFreeHeapDescriptor(&IoSpaceMemoryProcess, NULL, (LPVOID)((UINT64)SystemSpaceBase + SYSTEM_SPACE_IO), (UINT64)-1 - ((UINT64)SystemSpaceBase + SYSTEM_SPACE_IO));
-	IoSpaceMemoryThread.Process = &IoSpaceMemoryProcess;
-
-
 	__setCR3((unsigned long long)kproc->PageMap);
+
+
+	GP_clear_screen(0x1774EA);
+	while(1) __hlt();
 
 	
 

@@ -47,6 +47,7 @@ typedef struct _DEVICE_OBJECT {
 	BOOL DeviceInitialized; // set to 1 when the relative driver completes the device initialization, the device then becomes accessible
 	UINT64 DeviceFeatures;
 	KERNELSTATUS DeviceStatus;
+	LPVOID		BARs[6]; // Virtual Addresses of the PCI Base Addresses
 } DEVICE_OBJECT, * RFDEVICE_OBJECT;
 
 

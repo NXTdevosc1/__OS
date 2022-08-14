@@ -43,14 +43,6 @@ void SysLoad();
 extern void* SystemSpaceBase;
 extern void* LocalApicPhysicalAddress;
 
-#define SYSTEM_SPACE_LAPIC                0
-#define SYSTEM_SPACE_PMGRT                0x100000
-#define SYSTEM_SPACE_CPUMGMT              0x200000
-#define SYSTEM_PROCESSORS_BUFFER          0x200000000
-#define SYSTEM_READONLY_USERDATA          0xF00000000 // To avoid massive system calls and CR3 Changes (TLB Flushes)
-#define SYSTEM_SPACE_INTERRUPT_HANDLERS   0x1500000000
-#define SYSTEM_SPACE_KERNEL               0x2000000000
-
 void ConfigureSystemSpace();
 BOOL InitSystemSpace(RFPROCESS Process);
 

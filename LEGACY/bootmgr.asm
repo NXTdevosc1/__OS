@@ -705,132 +705,6 @@ NewLine db 13, 10, 0
 
 
 
-; Page Table Entry Definition : CPU/paging_defs.h
-
-;typedef struct _PAGE_TABLE_ENTRY {
-;    UINT64 Present : 1;
-;    UINT64 ReadWrite : 1;
-;     UINT64 UserSupervisor : 1;
-;     UINT64 PageLevelWriteThrough : 1;
-;     UINT64 PageLevelCacheDisable : 1;
-;     UINT64 Accessed : 1;
-;     UINT64 Dirty : 1;
-;     UINT64 Size : 1;
-;     UINT64 Global : 1;
-;     UINT64 Ignored0 : 3;
-;     UINT64 PhysicalAddr : 36;
-;     UINT64 Ignored1 : 15;
-;     UINT64 ExecuteDisable : 1;
-; } PTBLENTRY, *HPAGEMAP;
-; -------------------
-
-; ebx = address, ecx = NumPages
-; FUNCTION_REGISTERS : {[eax] = PT, [edx] = PD, [edi] = PDP, [esi] = PML4 }
-; EBP is used to address page tables, and not for stack :)
-; Return VALUE : Bootloader Halts on Failure
-; MapPages32: ; Map Phys-to-Phys Pages (no Virt-Phys translation)
-; pushad
-; .loop:
-;     test ecx, ecx    
-;     jz .Finish
-; ; Calculate Indexes
-;     ; PT INDEX
-;     mov eax, ebx
-;     shr eax, 12
-;     and eax, 0x1FF
-;     ; PD INDEX
-;     mov edx, ebx
-;     shr edx, 21
-;     and edx, 0x1FF
-;     ; PDP INDEX
-;     mov edi, ebx
-;     shr edi, 30
-;     and edi, 0x1FF
-;     ; PML4 INDEX
-;     mov esi, ebx
-;     shr esi, 39
-;     and esi, 0x1FF
-; ; Multiply indexes by 8
-;     shl eax, 3
-;     shl edx, 3
-;     shl edi, 3
-;     shl esi, 3
-; ; PML4 Allocation
-;     lea ebp, [PageTable + esi]
-;     test dword [ebp], 1 ; Present
-;     jz .AllocatePml4
-;     .retpml4alloc:
-; ; PDP Allocation
-;     mov ebp, [ebp]
-;     and ebp, ~(0xFFF)
-;     lea ebp, [ebp + edi]
-;     test dword [ebp], 1
-;     jz .AllocatePdp
-;     .retpdpalloc:
-; ; PD Allocation
-;     mov ebp, [ebp]
-;     and ebp, ~(0xFFF)
-;     lea ebp, [ebp + edx]
-;     test dword [ebp], 1
-;     jz .AllocatePd
-;     .retpdalloc:
-; ; PT Setup
-;     mov ebp, [ebp]
-;     and ebp, ~(0xFFF)
-;     lea ebp, [ebp + eax]
-;     mov eax, 3 ; Present Bit
-;     or eax, ebx
-;     mov [ebp], eax
-; ; Continue Loop
-;     add ebx, 0x1000
-;     dec ecx
-;     jmp .loop
-; .Finish:
-    
-;     popad
-;     ret
-; .AllocatePml4:
-;     call .AllocatePageTableEntry
-;     jmp .retpml4alloc
-; .AllocatePdp:
-;     call .AllocatePageTableEntry
-;     jmp .retpdpalloc
-; .AllocatePd:
-;     call .AllocatePageTableEntry
-;     jmp .retpdalloc
-; .AllocatePageTableEntry:
-;     push eax
-;     push ecx
-;     mov ecx, 1
-;     call AllocatePages32
-;     test eax, eax
-;     jz .err
-
-;     ; Clear Memory
-;     push eax
-;     push edi
-;     mov edi, eax
-;     xor eax, eax
-;     mov ecx, 0x400 ; 0x400 DWORDS
-;     rep stosd
-;     pop edi
-;     pop eax
-
-;     mov ecx, 3 ; Set present & read write bit
-;     or ecx, eax
-;     mov [ebp], ecx
-;     pop ecx
-;     pop eax
-;     ret
-
-; .err:
-;     mov di, NoEnoughMemory
-;     call _print
-;     cli
-;     jmp halt
-
-
-
 halt:
     hlt
     jmp halt
@@ -943,15 +817,16 @@ times 511 dq 0
 .Pdp:
 dq .Pd + 3
 times 511 dq 0
-.Pd:
-dq .Pt + 3
+.Pd: ; Map low 4MB
+dq 0x83
+dq 0x200083
 times 511 dq 0
-.Pt:
-%assign i 0
-%rep 512
-dq i + 3 ; Physical Address of Page | 3 (Present & R/W)
-%assign i i + 0x1000
-%endrep
+; .Pt:
+; %assign i 0
+; %rep 512
+; dq i + 3 ; Physical Address of Page | 3 (Present & R/W)
+; %assign i i + 0x1000
+; %endrep
 
 align 0x10
 ClusterChainSector times 0x200 db 0

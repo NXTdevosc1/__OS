@@ -39,8 +39,27 @@ enum KeMemMapTypes{
 #define SYSTEM_CONTROL_PORT_A 0x92
 #define SYSTEM_CONTROL_PORT_B 0x61
 
-// KERNEL_ADDRESS_MAP
-#define SYSTEM_SPACE_IO 0xF800000000
+
+/*Kernel Space (48-BIT) :
+16 TB : APIC & Cpu Management Tables
+8 TB : Kernel & Dependencies
+8 TB : Processor Tables (GDT, IDT...)
+32 TB : I/O Space
+64 TB : RAM
+*/
+// Kernel 48-BIT Address Map (Offset from System Space Base)
+#define SYSTEM_SPACE48_LAPIC            0
+#define SYSTEM_SPACE48_PMGRT            0x20000
+#define SYSTEM_SPACE48_CPU_MGMT         0x200000
+#define SYSTEM_SPACE48_KERNEL           0x100000000000
+#define SYSTEM_SPACE48_DEPENDENCIES     0x120000000000
+#define SYSTEM_SPACE48_INTERRUPT_CODE   0x140000000000
+#define SYSTEM_SPACE48_PROCESSOR_TABLES 0x180000000000
+#define SYSTEM_SPACE48_IO               0x200000000000
+#define SYSTEM_SPACE48_RAM              0x400000000000
+
+
+
 
 PROCESS IoSpaceMemoryProcess; // This is a (non) present process that contains the heap of the IoSpace
 THREAD IoSpaceMemoryThread;

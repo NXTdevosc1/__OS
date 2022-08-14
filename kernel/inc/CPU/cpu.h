@@ -17,12 +17,13 @@ void _enable(void);
 #include <interrupt_manager/idt.h>
 #include <CPU/cpuid.h>
 #include <sys/sys.h>
+#include <kernel.h>
 
 // Intrinsic used in MSVC CL (directly inserted in code without function call)
 
 #define SMP_BOOT_ADDR (void*)0x8000
 #define LAPIC_PAGE_COUNT 120
-#define LAPIC_ADDRESS ((UINT64)SystemSpaceBase + SYSTEM_SPACE_LAPIC)
+#define LAPIC_ADDRESS ((UINT64)SystemSpaceBase + SYSTEM_SPACE48_LAPIC)
 #define LAPIC_TSC_DEADLINE_MODE_SUPPORT (1<<24)
 #define LAPIC_TIMER_ONESHOT_MODE (0 << 17)
 #define LAPIC_TIMER_PERIODIC_MODE (1<<17)

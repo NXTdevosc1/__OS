@@ -20,7 +20,8 @@ enum PAGEMAP_FLAGS {
     PM_CACHE_DISABLE = 0x20,
     PM_WRITE_THROUGH = 0x40, // Write in the cache and also in memory,
     PM_NO_CR3_RELOAD = 0x80, // for e.g. used on the kernel initialization to not reload CR3 or paging structures
-    PM_NO_TLB_INVALIDATION = 0x100 // also used on kernel initialization
+    PM_NO_TLB_INVALIDATION = 0x100, // also used on kernel initialization
+    PM_LARGE_PAGES         = 0x200 // Map to 2MB Pages (Count value specifies number of 2mb blocks)
 };
 
 typedef struct _PAGE_TABLE_ENTRY {
