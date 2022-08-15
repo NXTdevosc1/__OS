@@ -122,6 +122,7 @@ int MapPhysicalPages(
             if(!PdEntry[PdIndex].Present){
                 EntryAddr = (UINT64)kpalloc(1);
                 if(!EntryAddr) SET_SOD_MEMORY_MANAGEMENT;
+
                 PdEntry[PdIndex].PhysicalAddr = EntryAddr >> 12;
                 PdEntry[PdIndex].Present = 1;
                 PdEntry[PdIndex].ReadWrite = 1;

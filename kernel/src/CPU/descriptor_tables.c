@@ -6,7 +6,6 @@
 
 void GlobalCpuDescriptorsInitialize(void* CpuBuffer)
 {
-
 	// load gdt
 	struct GDT* CpuGdt = (struct GDT*)(CpuBuffer);
 	struct TSS_ENTRY* CpuTSS = (struct TSS_ENTRY*)((UINT64)CpuBuffer + CPU_BUFFER_TSS_BASE);

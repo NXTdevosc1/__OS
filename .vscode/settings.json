@@ -19,6 +19,7 @@
         "xtree": "c",
         "xutility": "c",
         "pciexpressapi.h": "c",
-        "descriptor_tables.h": "c"
+        "descriptor_tables.h": "c",
+        "paging.h": "c"
     }
 }

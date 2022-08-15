@@ -30,10 +30,11 @@ void InitProcessorDescriptors(void** CpuBuffer, UINT64* CpuBufferSize){
 	UINT64 _CpuBufferNumPages = 20 + TSS_IST1_NUMPAGES + TSS_IST2_NUMPAGES + TSS_IST3_NUMPAGES + SYSENTRY_STACK_NUMPAGES;
 	void* _CpuBuffer = kpalloc(_CpuBufferNumPages);
 	if (!_CpuBuffer) SET_SOD_MEMORY_MANAGEMENT;
+	return;
 	ZeroMemory(_CpuBuffer, _CpuBufferNumPages << 12);
-	GlobalCpuDescriptorsInitialize(_CpuBuffer);
-	GlobalInterruptDescriptorLoad();
-	InitSysEntry(_CpuBuffer);
+	// GlobalCpuDescriptorsInitialize(_CpuBuffer);
+	// GlobalInterruptDescriptorLoad();
+	// InitSysEntry(_CpuBuffer);
 
 	*CpuBuffer = _CpuBuffer;
 	*CpuBufferSize = _CpuBufferNumPages << 12;

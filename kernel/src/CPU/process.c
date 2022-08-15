@@ -81,16 +81,17 @@ static inline int KERNELAPI SetProcess(
         }
         
     }
-    else {
-        Process->ProcessName = ProcessName;
-    }
+
     
     return 0;
 }
-
+UINT16* __UnkownProcessName = L"Unnamed Process.";
 RFPROCESS KEXPORT KERNELAPI KeCreateProcess(RFPROCESS ParentProcess, LPWSTR ProcessName, UINT64 Subsystem, UINT16 OperatingMode){
 
-    if (!ProcessName || !OperatingMode || Subsystem > SUBSYSTEM_MAX || (OperatingMode != KERNELMODE_PROCESS && OperatingMode != USERMODE_PROCESS)) return NULL;
+    if (!OperatingMode || Subsystem > SUBSYSTEM_MAX || (OperatingMode != KERNELMODE_PROCESS && OperatingMode != USERMODE_PROCESS)) return NULL;
+    
+    if(!ProcessName) ProcessName = __UnkownProcessName;
+
     UINT16 len = wstrlen(ProcessName);
     if(!len || len > PNAME_CHARSZ_MAX) return NULL;
 

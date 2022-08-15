@@ -93,14 +93,11 @@ LPWSTR KernelProcessName = L"System Kernel.";
 extern void __declspec(noreturn) _start() {
 	__cli();
 	EnableExtendedStates();
-	
-	
-
 
 	Pmgrt.NumProcessors = 1;
 
-	if (!InitializeRuntimeSymbols()) SET_SOD_INITIALIZATION;
-	kproc = KeCreateProcess(NULL,KernelProcessName, SUBSYSTEM_NATIVE, KERNELMODE_PROCESS);
+	// if (!InitializeRuntimeSymbols()) SET_SOD_INITIALIZATION;
+	kproc = KeCreateProcess(NULL, NULL, SUBSYSTEM_NATIVE, KERNELMODE_PROCESS);
 	if(!kproc) SET_SOD_INITIALIZATION;
 
 	
@@ -128,6 +125,7 @@ extern void __declspec(noreturn) _start() {
 	// Initialize Kernel Page tables
 	KernelPagingInitialize();
 
+	KeGlobalCR3 = (UINT64)kproc->PageMap;	
 	
 
 	#ifdef ___KERNEL_DEBUG___
@@ -136,30 +134,33 @@ extern void __declspec(noreturn) _start() {
 	void* CpuBuffer = NULL;
 	UINT64 CpuBufferSize = 0;
 	
-	GlobalInterruptDescriptorInitialize();
-	GlobalSysEntryTableInitialize();
-
-
-	InitProcessorDescriptors(&CpuBuffer, &CpuBufferSize);
 	
-	ProcessContextIdAllocate(kproc);
-	KeGlobalCR3 = (UINT64)kproc->PageMap;
+	// GlobalInterruptDescriptorInitialize();
 
 
 // Relocate the kernel
 	// Map KernelRelocate (To change CR3 With no Page-Fault)
-	MapPhysicalPages(kproc->PageMap, KernelRelocate, KernelRelocate, 1, PM_MAP);
-	// GP_draw_sf_text("Hello World", 0, 20, 20);
+	void* __KeReloc = KernelRelocate;
+	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 1, PM_MAP);
 	KernelRelocate(); // CR3 Will be automatically set with the new kernel one
 	// Unmap KernelRelocate
+	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 1, 0);
+
+	kproc->ProcessName = KernelProcessName;
+
+	GlobalSysEntryTableInitialize();
+
+
+	InitProcessorDescriptors(&CpuBuffer, &CpuBufferSize);
 	GP_clear_screen(0x2E0BC2);
-	while(1);
-	SystemDebugPrint(L"PSF1 : %x", InitData.start_font);
-	// MapPhysicalPages(kproc->PageMap, KernelRelocate, KernelRelocate, 1, 0);
-
-
+	GP_draw_sf_text("Hello World", 0xffffff, 20, 20);
 	while(1) __hlt();
+	
+	ProcessContextIdAllocate(kproc);
 
+	
+
+	
 	
 
 #ifdef ___KERNEL_DEBUG___
@@ -186,6 +187,7 @@ extern void __declspec(noreturn) _start() {
 	OutPortB(0x70, InPortB(0x70) & 0x7F);
     InPortB(0x71);
 
+
 	// Enable Parity/Channel Check
 	UINT8 ControlPortB = InPortB(SYSTEM_CONTROL_PORT_B);
 	ControlPortB |= (3 << 2);
@@ -198,7 +200,6 @@ extern void __declspec(noreturn) _start() {
 			DebugWrite("Initializing System Tables...");
 		#endif
 
-	
 	
 	if(InitData.uefi) {
 		for(UINT64 i = 0;i<InitData.NumConfigurationTables;i++){

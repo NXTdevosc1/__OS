@@ -132,6 +132,7 @@ void GlobalInterruptDescriptorInitialize()
 	OutPortB(0xA1, 0xFF);
 	OutPortB(0x21, 0xFF);
 
+	
 }
 
 void GlobalInterruptDescriptorLoad() {

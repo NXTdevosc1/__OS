@@ -61,9 +61,10 @@ void KernelHeapInitialize(){
 	
 }
 
+#include <CPU/paging.h>
+
 void KernelPagingInitialize(){
-	kproc->PageMap = (RFPAGEMAP)0x9000; // To be easily accessible by SMP
-	SZeroMemory(kproc->PageMap);
+	kproc->PageMap = (RFPAGEMAP)CreatePageMap(); // To be easily accessible by SMP
 
 	KeGlobalCR3 = (UINT64)kproc->PageMap;
 	
@@ -102,26 +103,26 @@ void KernelPagingInitialize(){
 
 		// Map Allocated Memory by bootloader
 		UINT64 DependencyOffset = 0;
-		MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset, InitData.start_font, 0x100, PM_MAP);
+		MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset, InitData.start_font, 8, PM_MAP);
 		InitData.start_font = (void*)((char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset);
-		DependencyOffset += 0x80000;
+		DependencyOffset += 0x8000;
 
-	// 	FILE_IMPORT_ENTRY* Entry = FileImportTable;
-	// 	while(Entry->Type != FILE_IMPORT_ENDOFTABLE) {
-	// 		if(Entry->BaseName){
-	// 			Entry->LenBaseName = wstrlen(Entry->BaseName);
-	// 		}
-	// 		MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset, Entry->LoadedFileBuffer, (Entry->LoadedFileSize >> 12) + 1, PM_MAP);
-	// 		Entry->LoadedFileBuffer = (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset;
-	// 		DependencyOffset += Entry->LoadedFileSize;
-	// 		if(DependencyOffset & 0xFFF) {
-	// 			DependencyOffset += 0x1000;
-	// 			DependencyOffset &= ~0xFFF;
-	// 		}
-	// 		Entry++;
-	// 	}
+		FILE_IMPORT_ENTRY* Entry = FileImportTable;
+		while(Entry->Type != FILE_IMPORT_ENDOFTABLE) {
+			if(Entry->BaseName){
+				Entry->LenBaseName = wstrlen(Entry->BaseName);
+			}
+			MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset, Entry->LoadedFileBuffer, (Entry->LoadedFileSize >> 12) + 1, PM_MAP);
+			Entry->LoadedFileBuffer = (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset;
+			DependencyOffset += Entry->LoadedFileSize;
+			if(DependencyOffset & 0xFFF) {
+				DependencyOffset += 0x1000;
+				DependencyOffset &= ~0xFFF;
+			}
+			Entry++;
+		}
 
-	// MapPhysicalPages(kproc->PageMap, InitData.PEDataDirectories, InitData.PEDataDirectories, 1, PM_MAP);
+	MapPhysicalPages(kproc->PageMap, InitData.PEDataDirectories, InitData.PEDataDirectories, 1, PM_MAP);
 }
 
 void __KernelRelocate() {
@@ -146,7 +147,13 @@ void __KernelRelocate() {
 			*TargetRebase = RawAddress;
 		}
 	}
+
+	UINT64 RelocatedKernelProcess = (UINT64)kproc;
+	RelocatedKernelProcess -= (UINT64)InitData.ImageBase;
+	RelocatedKernelProcess += (UINT64)ImageBase;
+	kproc = (void*)RelocatedKernelProcess;
 	InitData.ImageBase = (char*)SystemSpaceBase + SYSTEM_SPACE48_KERNEL;
+
 }
 
 void InitFeatures(){

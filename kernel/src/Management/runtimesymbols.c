@@ -52,7 +52,6 @@ KERNELSTATUS KERNELAPI SystemDebugPrint(LPWSTR Format, ...){
     __cli();
     // if(Process != SystemInterruptsProcess || Process != kproc) // May set a permanent spinlock on system interrupts
     //     __SpinLockSyncBitTestAndSet(&__DEBUGPRINT_MUTEX, 0);
-
     
     UINT   StackOff = 0;
     UINT8   FormatIndex = 0;
