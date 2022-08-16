@@ -11,7 +11,7 @@
 #include <IO/pcidef.h>
 #include <IO/pci.h>
 
-struct IDTR idtr = { 0 };
+__declspec(align(0x10)) struct IDTR idtr = { 0 };
 __declspec(align(0x1000)) struct INTERRUPT_DESCRIPTOR_TABLE KERNEL_IDT = { 0 };
 static inline void IDT_set_offset(struct IDT_ENTRY* entry, uint64_t handler){
 	entry->offset_low = handler;
@@ -136,6 +136,7 @@ void GlobalInterruptDescriptorInitialize()
 }
 
 void GlobalInterruptDescriptorLoad() {
+	SystemDebugPrint(L"IDTR : %x, IDT : %x", &idtr, &KERNEL_IDT);
 	__lidt(&idtr);
 }
 

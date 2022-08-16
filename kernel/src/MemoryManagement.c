@@ -147,15 +147,15 @@ PFREE_HEAP_DESCRIPTOR KERNELAPI AllocateFreeHeapDescriptor(
 	NextList:
 		if (!List->Next) {
 			UINT64 ListBytes = sizeof(FREE_MEMORY_LIST) + 0x100;
-			PMEMORY_HEAP_DESCRIPTOR ListHeap = NULL;
-			List = AllocatePoolEx(NULL, ListBytes, 0, &ListHeap, 0);
+			// PMEMORY_HEAP_DESCRIPTOR ListHeap = NULL;
+			List = AllocatePoolEx(NULL, ListBytes, 0x1000,  0);
 			
-			if (!List || !ListHeap) SET_SOD_MEMORY_MANAGEMENT;
+			if (!List) SET_SOD_MEMORY_MANAGEMENT;
 			SZeroMemory(List);
 
 			List->Next = Process->MemoryManagementTable.FreeMemory;
 			Process->MemoryManagementTable.FreeMemory = List;
-			ListHeap->Present |= 2; // Set Private Heap Flag
+			// ListHeap->Present |= 2; // Set Private Heap Flag
 			PFREE_HEAP_DESCRIPTOR Descriptor = &List->Heaps[0];
 
 
@@ -219,14 +219,22 @@ LPVOID KERNELAPI HeapCreate(MEMORY_MANAGEMENT_TABLE* MemoryTable, UINT64* NumByt
 	return NULL;
 }
 
-LPVOID KERNELAPI AllocatePoolEx(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, LPVOID* AllocationSegment, UINT64 MaxAddress){
+LPVOID KERNELAPI AllocatePoolEx(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, UINT64 Flags){
 	if (!NumBytes) return NULL;
 	RFPROCESS Process = NULL;
 	if (Thread) Process = Thread->Process;
 	else Process = KeGetCurrentProcess();
 	PFREE_HEAP_DESCRIPTOR SourceHeap = NULL;
 	if (Process->OperatingMode == KERNELMODE_PROCESS) Process = kproc;
-
+	UINT64 MaxAddress = 0;
+	if(!(Flags & ALLOCATE_POOL_PHYSICAL)) {
+		// Virtual pool must be Page Aligned
+		if((NumBytes & 0xFFF) || Align != 0x1000) return NULL;
+	}
+	if(Flags & ALLOCATE_POOL_LOW_4GB) {
+		if(NumBytes >= 0xFFFFFFFF) return NULL;
+		MaxAddress = 0xFFFFFFFF - NumBytes;
+	}
 	LPVOID Heap = HeapCreate(&Process->MemoryManagementTable, &NumBytes, Align, &SourceHeap, MaxAddress);
 	if (!Heap) {
 		if (Process == kproc) SET_SOD_MEMORY_MANAGEMENT;// Kernel mode process
@@ -237,23 +245,32 @@ LPVOID KERNELAPI AllocatePoolEx(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, L
 	PMEMORY_HEAP_DESCRIPTOR Descriptor = AllocateHeapDescriptor(&Process->MemoryManagementTable,
 		Thread, SourceHeap, Heap, NumBytes
 	);
-	Process->MemoryManagementTable.UsedMemory += NumBytes;
-
-	if(AllocationSegment) *AllocationSegment = Descriptor;
+	if(!(Flags & ALLOCATE_POOL_NOT_RAM)) {
+		Process->MemoryManagementTable.UsedMemory += NumBytes;
+	}
+	if(!(Flags & ALLOCATE_POOL_PHYSICAL)) {
+		LPVOID VirtualAllocated = AllocatePoolEx(&VirtualRamThread, NumBytes, 0, ALLOCATE_POOL_PHYSICAL | ALLOCATE_POOL_NOT_RAM);
+		if(!VirtualAllocated) {
+			free(Heap, Process);
+			return NULL;
+		}
+		KeMapMemory(Heap, VirtualAllocated, NumBytes >> 12, PM_MAP);
+		Heap = VirtualAllocated;
+	}
 
 
 	return Heap;
 }
 
 LPVOID KERNELAPI malloc(UINT64 NumBytes) {
-	return AllocatePoolEx(KeGetCurrentThread(), NumBytes, 0x10, NULL, 0);
+	return AllocatePoolEx(KeGetCurrentThread(), NumBytes, 0, ALLOCATE_POOL_PHYSICAL);
 }
 
 LPVOID kmalloc(UINT64 NumBytes) {
-	return AllocatePoolEx(NULL, NumBytes, 0x10, NULL, 0);
+	return AllocatePoolEx(NULL, NumBytes, 0, ALLOCATE_POOL_PHYSICAL);
 }
 LPVOID KERNELAPI kpalloc(UINT64 NumPages) {
-	return AllocatePoolEx(NULL, NumPages << 12, 0x1000, NULL, 0);
+	return AllocatePoolEx(NULL, NumPages << 12, 0x1000, 0);
 }
 
 LPVOID KERNELAPI FastFree(LPVOID AllocationSegment, RFPROCESS Process) {
@@ -289,9 +306,15 @@ LPVOID KERNELAPI UserMalloc(UINT64 NumBytes) {
 	return NULL;
 }
 
+
 LPVOID KERNELAPI free(LPVOID Heap, RFPROCESS Process) {
 	ALLOCATED_MEMORY_LIST* List = Process->MemoryManagementTable.AllocatedMemory;
 	ALLOCATED_MEMORY_LIST* LastList = List;
+	if(!Heap) return NULL;
+	if((UINT64)Heap & (UINT64)CANONICAL_SIGN_EXTEND48) {
+		Heap = KeResolvePhysicalAddress(Process, Heap);
+		if(!Heap) return NULL;
+	}
 	for (;;) {
 		if (!List->HeapCount) {
 			// Unlink List And Lower memory usage
@@ -339,27 +362,28 @@ LPVOID KERNELAPI kfree(LPVOID Heap) {
 
 LPVOID KERNELAPI CurrentProcessMalloc(unsigned long long HeapSize) {
 	HTHREAD Thread = KeGetCurrentThread();
-	return AllocatePoolEx(Thread, HeapSize, 0, NULL, 0);
+	return AllocatePoolEx(Thread, HeapSize, 0, 0);
 }
 LPVOID KERNELAPI CurrentProcessFree(LPVOID Heap) {
 	return free(Heap, KeGetCurrentProcess());
 }
 
 LPVOID KERNELAPI AllocateUserHeapSpace(RFPROCESS Process, UINT64 NumBytes) {
-	if (!Process || Process->OperatingMode != USERMODE_PROCESS) return NULL;
-	if (!NumBytes) NumBytes = 0x1000;
+	// if (!Process || Process->OperatingMode != USERMODE_PROCESS) return NULL;
+	// if (!NumBytes) NumBytes = 0x1000;
 
-	if (NumBytes % 0x1000) NumBytes += 0x1000 - (NumBytes % 0x1000);
-	PMEMORY_HEAP_DESCRIPTOR SourceHeap = NULL;
-	LPVOID Buffer = AllocatePoolEx(NULL, NumBytes, 0x1000, (LPVOID*)&SourceHeap, 0);
-	if (!Buffer || !SourceHeap) SET_SOD_MEMORY_MANAGEMENT;
+	// if (NumBytes % 0x1000) NumBytes += 0x1000 - (NumBytes % 0x1000);
+	// PMEMORY_HEAP_DESCRIPTOR SourceHeap = NULL;
+	// LPVOID Buffer = AllocatePoolEx(NULL, NumBytes, 0x1000, (LPVOID*)&SourceHeap, 0);
+	// if (!Buffer || !SourceHeap) SET_SOD_MEMORY_MANAGEMENT;
 
 	
-	PFREE_HEAP_DESCRIPTOR Heap = AllocateFreeHeapDescriptor(Process, SourceHeap, (LPVOID)(USER_HEAP_BASE + Process->MemoryManagementTable.AvailaibleMemory), SourceHeap->HeapLength);
-	if (!Heap) SET_SOD_MEMORY_MANAGEMENT;
-	MapPhysicalPages(Process->PageMap, (LPVOID)(USER_HEAP_BASE + Process->MemoryManagementTable.AvailaibleMemory), Buffer, NumBytes >> 12, PM_UMAP);
-	Process->MemoryManagementTable.AvailaibleMemory += SourceHeap->HeapLength;
-	return Buffer;
+	// PFREE_HEAP_DESCRIPTOR Heap = AllocateFreeHeapDescriptor(Process, SourceHeap, (LPVOID)(USER_HEAP_BASE + Process->MemoryManagementTable.AvailaibleMemory), SourceHeap->HeapLength);
+	// if (!Heap) SET_SOD_MEMORY_MANAGEMENT;
+	// MapPhysicalPages(Process->PageMap, (LPVOID)(USER_HEAP_BASE + Process->MemoryManagementTable.AvailaibleMemory), Buffer, NumBytes >> 12, PM_UMAP);
+	// Process->MemoryManagementTable.AvailaibleMemory += SourceHeap->HeapLength;
+	// return Buffer;
+	return NULL;
 }
 
 
@@ -370,7 +394,7 @@ BOOL GetPhysicalMemoryStatus(LPMEMORYSTATUS MemoryStatus) {
 LPVOID KERNELAPI AllocateIoMemory(LPVOID PhysicalAddress, UINT64 NumPages, UINT Flags) {
 	if(!NumPages) return NULL;
 	// NumPages + 1 (Endof I/O Pool Marker to set a page fault when accessed)
-	LPVOID Mem = AllocatePoolEx(&IoSpaceMemoryThread, (NumPages + 1) << 12, 0, NULL, 0);
+	LPVOID Mem = AllocatePoolEx(&IoSpaceMemoryThread, (NumPages ) << 12, 0, ALLOCATE_POOL_PHYSICAL | ALLOCATE_POOL_NOT_RAM);
 	if(!Mem) return NULL;
 	UINT MapFlags = PM_MAP | PM_NX;
 	if(Flags & IO_MEMORY_CACHE_DISABLED) MapFlags |= PM_CACHE_DISABLE;
@@ -378,7 +402,7 @@ LPVOID KERNELAPI AllocateIoMemory(LPVOID PhysicalAddress, UINT64 NumPages, UINT 
 	if(Flags & IO_MEMORY_READ_ONLY) MapFlags |= PM_READWRITE;
 	MapPhysicalPages(kproc->PageMap, Mem, PhysicalAddress, NumPages, MapFlags);
 	// Set Endof I/O Pool Marker
-	MapPhysicalPages(kproc->PageMap, (char*)Mem + (NumPages << 12), NULL, 1, 0);
+	// MapPhysicalPages(kproc->PageMap, (char*)Mem + (NumPages << 12), NULL, 1, 0);
 	return Mem;
 }
 

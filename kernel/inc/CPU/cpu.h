@@ -56,6 +56,12 @@ void _enable(void);
 
 #define CPU_MGMT_BITSHIFT 15
 #define CPU_MGMT_NUM_PAGES ((1 << CPU_MGMT_BITSHIFT) >> 12)
+
+
+// Processor defines
+#define CANONICAL_SIGN_EXTEND48 ((void*)((UINT64)0xFFFF8 << 48))
+
+
 void ApicThermalSensorInt(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME Isf);
 void ApicPerformanceMonitorCountersInt(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME Isf);
 void ApicLint0Int(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME Isf);

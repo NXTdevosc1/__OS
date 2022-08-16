@@ -135,19 +135,23 @@ void ConfigureSystemSpace(){
 
 BOOL InitSystemSpace(RFPROCESS Process) {
     if (!Process) return FALSE;
-    // LAPIC Does not need caching because its embedded in the processor chip which means that access to it is fast
-    MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_LAPIC), LocalApicPhysicalAddress, 1, PM_MAP);
-    // Other processors will write to this, so ready or incrementing (Scheduler Cpu Time) will have a false value
+    char* Source = (char*)kproc->PageMap + 0x800;
+    char* Dest = (char*)Process->PageMap + 0x800;
+    // Map high 128TB
+    memcpy(Dest, Source, 0x800);
+    // // LAPIC Does not need caching because its embedded in the processor chip which means that access to it is fast
+    // MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_LAPIC), LocalApicPhysicalAddress, LAPIC_PAGE_COUNT, PM_MAP);
+    // // Other processors will write to this, so ready or incrementing (Scheduler Cpu Time) will have a false value
     
-    MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_PMGRT), (void*)&Pmgrt, 0x10, PM_MAP | PM_CACHE_DISABLE);
-    UINT64 NumProcessors = AcpiGetNumProcessors();
-    if(!NumProcessors) return FALSE;
-    for (UINT64 i = 0; i < NumProcessors; i++) {
-        MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_PROCESSOR_TABLES + (i << CPU_MGMT_BITSHIFT)), (void*)CpuManagementTable[i], CPU_MGMT_NUM_PAGES, PM_MAP);
-    }
-    for (UINT64 i = 0; i < 0xff; i++) {
-        MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_INTERRUPT_CODE + (i << 0xf)), GlobalWrapperPointer[i], 8, PM_MAP);
-    }
-    MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_KERNEL), InitData.ImageBase, InitData.ImageSize >> 12, PM_MAP);
+    // MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_PMGRT), (void*)&Pmgrt, 0x10, PM_MAP | PM_CACHE_DISABLE);
+    // UINT64 NumProcessors = AcpiGetNumProcessors();
+    // if(!NumProcessors) return FALSE;
+    // for (UINT64 i = 0; i < NumProcessors; i++) {
+    //     MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_PROCESSOR_TABLES + (i << CPU_MGMT_BITSHIFT)), (void*)CpuManagementTable[i], CPU_MGMT_NUM_PAGES, PM_MAP);
+    // }
+    // for (UINT64 i = 0; i < 0xff; i++) {
+    //     MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_INTERRUPT_CODE + (i << 0xf)), GlobalWrapperPointer[i], 8, PM_MAP);
+    // }
+    // MapPhysicalPages(Process->PageMap, (void*)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_KERNEL), InitData.ImageBase, InitData.ImageSize >> 12, PM_MAP);
     return TRUE;
 }

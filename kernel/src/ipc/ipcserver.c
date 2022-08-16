@@ -2,6 +2,8 @@
 #include <MemoryManagement.h>
 #include <interrupt_manager/SOD.h>
 #include <stdlib.h>
+#include <preos_renderer.h>
+
 __declspec(align(0x1000)) SERVER_LIST ServerList = { 0 };
 
 KERNELSTATUS KERNELAPI		 IpcServerCreate(HTHREAD Thread, UINT64 ServerIpAddress, LPWSTR ServerPassword, QWORD AccessPolicy, RFSERVER* PRFServer){
@@ -24,8 +26,10 @@ KERNELSTATUS KERNELAPI		 IpcServerCreate(HTHREAD Thread, UINT64 ServerIpAddress,
 			if (!List->Servers[i].Present) {
 				RFSERVER Server = &List->Servers[i];
 				Server->Present = TRUE;
-				Server->Host = IpcClientCreate(Thread, 0, 0);
 				
+				IpcClientCreate(Thread, 0, 0);
+				GP_clear_screen(0xffff);
+				while(1);
 				Server->ServerId = ListId * UNITS_PER_LIST + i;
 				Server->ServerAddress = ServerIpAddress;
 				Server->ServerHandle = OpenHandle(Thread->Process->Handles, Thread, 0, HANDLE_SERVER, (void*)Server, NULL);

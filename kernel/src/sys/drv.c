@@ -13,7 +13,7 @@ DRIVER_OBJECT* DriverObjects = NULL;
 
 void RunEssentialExtensionDrivers(){
 	DRIVER_TABLE* DriverTable = FileImportTable[FIMPORT_DRVTBL].LoadedFileBuffer;
-	DriverObjects = AllocatePoolEx(NULL, sizeof(DRIVER_OBJECT) * DriverTable->TotalDrivers, 0x1000, NULL, 0);
+	DriverObjects = AllocatePoolEx(NULL, sizeof(DRIVER_OBJECT) * DriverTable->TotalDrivers, 0x1000, 0);
 	if(!DriverObjects) SET_SOD_MEMORY_MANAGEMENT;
 
 	ZeroMemory(DriverObjects, sizeof(DRIVER_OBJECT) * DriverTable->TotalDrivers);

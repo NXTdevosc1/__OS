@@ -26,15 +26,20 @@ __declspec(align(0x1000)) UINT64 ApicTimerClockCounter = 0; /*CACHE Will be disa
 UINT64 __DMP[0xFFF] = {0};
 UINT64 TimerClocksPerSecond = 0; // will get divided until to the right value (in microseconds)
 UINT32 TimerIncrementerCpuId = 0;
+
+UINT64 ProcessorTablesOffset = 0;
+
 void InitProcessorDescriptors(void** CpuBuffer, UINT64* CpuBufferSize){
 	UINT64 _CpuBufferNumPages = 20 + TSS_IST1_NUMPAGES + TSS_IST2_NUMPAGES + TSS_IST3_NUMPAGES + SYSENTRY_STACK_NUMPAGES;
-	void* _CpuBuffer = kpalloc(_CpuBufferNumPages);
-	if (!_CpuBuffer) SET_SOD_MEMORY_MANAGEMENT;
-	return;
+	void* _CpuBuffer = (char*)SystemSpaceBase + SYSTEM_SPACE48_PROCESSOR_TABLES + ProcessorTablesOffset;
+	void* __Allocated = kpalloc(_CpuBufferNumPages);
+	if(!__Allocated) SOD(SOD_PROCESSOR_INITIALIZATION, "Failed to allocate Processor Tables, Please Upgrade your RAM");
+	MapPhysicalPages(kproc->PageMap, _CpuBuffer, __Allocated, _CpuBufferNumPages, PM_MAP);
 	ZeroMemory(_CpuBuffer, _CpuBufferNumPages << 12);
-	// GlobalCpuDescriptorsInitialize(_CpuBuffer);
-	// GlobalInterruptDescriptorLoad();
-	// InitSysEntry(_CpuBuffer);
+	ProcessorTablesOffset += _CpuBufferNumPages << 12;
+	GlobalCpuDescriptorsInitialize(_CpuBuffer);
+	GlobalInterruptDescriptorLoad();
+	InitSysEntry(_CpuBuffer);
 
 	*CpuBuffer = _CpuBuffer;
 	*CpuBufferSize = _CpuBufferNumPages << 12;
@@ -75,15 +80,19 @@ void InitProcessorDescriptors(void** CpuBuffer, UINT64* CpuBufferSize){
 void CpuSetupManagementTable(UINT64 CpuCount) {
 	if (__CPU_MGMT_TBL_SETUP__) return;
 
-	CpuManagementTable = AllocatePoolEx(NULL, (CpuCount << 3) + 0x1000, 0x1000, NULL, 0);
+	CpuManagementTable = AllocatePoolEx(NULL, (CpuCount << 3) + 0x1000, 0x1000, ALLOCATE_POOL_PHYSICAL);
 	if (!CpuManagementTable) SET_SOD_MEMORY_MANAGEMENT;
 	ZeroMemory(CpuManagementTable, (CpuCount << 3) + 0x1000);
 	UINT64 CurrentProcessor = GetCurrentProcessorId();
-	for (UINT64 i = 0; i < CpuCount; i++) {
-		CpuManagementTable[i] = kpalloc(CPU_MGMT_NUM_PAGES);
+	UINT64 CPU_MGMT_OFFSET = 0;
+	for (UINT64 i = 0; i < CpuCount; i++, CPU_MGMT_OFFSET+=0x8000) {
+		CpuManagementTable[i] = AllocatePoolEx(NULL, CPU_MGMT_NUM_PAGES << 12, 0x1000, ALLOCATE_POOL_LOW_4GB);
 		if (!CpuManagementTable[i]) SET_SOD_MEMORY_MANAGEMENT;
 		SZeroMemory(CpuManagementTable[i]);
-		RFTHREAD_WAITING_QUEUE WaitingQueue = AllocatePoolEx(kproc->StartupThread, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES, 0x1000, NULL, 0);
+		CPU_MANAGEMENT_TABLE* __CpuMgmt = CpuManagementTable[i];
+		KeMapMemory(__CpuMgmt, (char*)SystemSpaceBase + SYSTEM_SPACE48_CPU_MGMT + CPU_MGMT_OFFSET, 8, PM_MAP);
+
+		RFTHREAD_WAITING_QUEUE WaitingQueue = AllocatePoolEx(kproc->StartupThread, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES, 0x1000, 0);
 		ZeroMemory(WaitingQueue, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES);
 		if(i == CurrentProcessor){
 			CpuManagementTable[i]->Initialized = TRUE;
@@ -96,7 +105,7 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 		// CpuManagementTable[i]->TaskSchedulerData.cr3 = KeGlobalCR3;
 		
 
-		CpuManagementTable[i]->SystemIdleThread = KeCreateThread(IdleProcess, 0x1000, IdleThread, THREAD_CREATE_SYSTEM_IDLE | THREAD_CREATE_MANUAL, NULL);
+		CpuManagementTable[i]->SystemIdleThread = KeCreateThread(IdleProcess, 0x1000, NULL, THREAD_CREATE_SYSTEM_IDLE | THREAD_CREATE_MANUAL, NULL);
 		CpuManagementTable[i]->SystemInterruptsThread = KeCreateThread(SystemInterruptsProcess, 0x10000, NULL, THREAD_CREATE_SYSTEM_IDLE | THREAD_CREATE_MANUAL, NULL);
 		if (!CpuManagementTable[i]->SystemIdleThread || !CpuManagementTable[i]->SystemInterruptsThread) SET_SOD_PROCESS_MANAGEMENT;
 		

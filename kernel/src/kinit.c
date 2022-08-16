@@ -92,10 +92,8 @@ void KernelPagingInitialize(){
 			Flags = PM_MAP | PM_NO_CR3_RELOAD | PM_NO_TLB_INVALIDATION;
 		}
 	}
-		// Map physical address of the frame buffer to the Kernel Space
-		InitData.fb->FrameBufferBase = AllocateIoMemory(InitData.fb->FrameBufferBase, (InitData.fb->FrameBufferSize >> 12) + 1, PM_WRITE_THROUGH);
 		// Map Kernel (BIOS Bootloader memory map is very simple and kernel memory region is not mapped)
-		MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_KERNEL, (char*)InitData.ImageBase, (InitData.ImageSize >> 12) + 1, PM_MAP);
+		MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_KERNEL, (char*)InitData.ImageBase, (InitData.ImageSize >> 12), PM_MAP);
 		// MapPhysicalPages(kproc->PageMap, (char*)InitData.ImageBase, (char*)InitData.ImageBase, (InitData.ImageSize >> 12) + 1, PM_MAP);
 
 		// Map Low Memory & 1MB Of high memory (Not declared by LEGACY BIOS Bootloader)
@@ -112,13 +110,13 @@ void KernelPagingInitialize(){
 			if(Entry->BaseName){
 				Entry->LenBaseName = wstrlen(Entry->BaseName);
 			}
-			MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset, Entry->LoadedFileBuffer, (Entry->LoadedFileSize >> 12) + 1, PM_MAP);
+			if(Entry->LoadedFileSize & 0xFFF) {
+				Entry->LoadedFileSize += 0x1000;
+				Entry->LoadedFileSize &= ~0xFFF;
+			}
+			MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset, Entry->LoadedFileBuffer, (Entry->LoadedFileSize >> 12), PM_MAP);
 			Entry->LoadedFileBuffer = (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset;
 			DependencyOffset += Entry->LoadedFileSize;
-			if(DependencyOffset & 0xFFF) {
-				DependencyOffset += 0x1000;
-				DependencyOffset &= ~0xFFF;
-			}
 			Entry++;
 		}
 
@@ -152,6 +150,7 @@ void __KernelRelocate() {
 	RelocatedKernelProcess -= (UINT64)InitData.ImageBase;
 	RelocatedKernelProcess += (UINT64)ImageBase;
 	kproc = (void*)RelocatedKernelProcess;
+	
 	InitData.ImageBase = (char*)SystemSpaceBase + SYSTEM_SPACE48_KERNEL;
 
 }

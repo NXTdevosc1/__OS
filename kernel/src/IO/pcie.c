@@ -111,7 +111,7 @@ void PciExpressInit(ACPI_SDT* Sdt){
 			NumPages &= ~(0xfff);
 		}
 		NumPages <<= 8; // Shift left by 20 then shift right by 12 to get num pages
-		MapPhysicalPages(kproc->PageMap,(LPVOID)DeviceConfiguration->BaseAddress,(LPVOID)DeviceConfiguration->BaseAddress, NumPages, PM_MAP | PM_WRITE_THROUGH | PM_NX);
+		// MapPhysicalPages(kproc->PageMap,(LPVOID)DeviceConfiguration->BaseAddress,(LPVOID)DeviceConfiguration->BaseAddress, NumPages, PM_MAP | PM_WRITE_THROUGH | PM_NX);
 	}
 	PcieCompatible = TRUE;
 }

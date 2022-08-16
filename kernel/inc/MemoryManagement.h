@@ -95,7 +95,13 @@ PFREE_HEAP_DESCRIPTOR KERNELAPI AllocateFreeHeapDescriptor(
 
 LPVOID KERNELAPI HeapCreate(MEMORY_MANAGEMENT_TABLE* MemoryTable, UINT64* NumBytes, UINT32 Align, PFREE_HEAP_DESCRIPTOR* SourceHeap, UINT64 MaxAddress); // Search for a heap
 
-LPVOID KEXPORT KERNELAPI AllocatePoolEx(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, LPVOID* AllocationSegment, UINT64 MaxAddress);
+typedef enum _ALLOCATE_POOL_FLAGS {
+	ALLOCATE_POOL_LOW_4GB = 1,
+	ALLOCATE_POOL_PHYSICAL = 2, // Returns the Physical Address of the Allocated Pool instead of its Virtual Address
+	ALLOCATE_POOL_NOT_RAM = 4 // Prevents decrementing RAM When allocating IO Pool Or Virtual RAM Space POOL
+} ALLOCATE_POOL_FLAGS;
+
+LPVOID KEXPORT KERNELAPI AllocatePoolEx(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, UINT64 Flags);
 
 
 LPVOID KEXPORT KERNELAPI malloc(UINT64 NumBytes);

@@ -20,6 +20,7 @@
         "xutility": "c",
         "pciexpressapi.h": "c",
         "descriptor_tables.h": "c",
-        "paging.h": "c"
+        "paging.h": "c",
+        "sod.h": "c"
     }
 }

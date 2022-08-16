@@ -820,7 +820,7 @@ times 511 dq 0
 .Pd: ; Map low 4MB
 dq 0x83
 dq 0x200083
-times 511 dq 0
+times 510 dq 0
 ; .Pt:
 ; %assign i 0
 ; %rep 512

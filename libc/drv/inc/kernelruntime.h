@@ -100,10 +100,18 @@ void KERNELAPI KeTaskSchedulerEnable();
 void KERNELAPI KeTaskSchedulerDisable();
 
 PVOID KERNELAPI malloc(unsigned long long Size);
-LPVOID KERNELAPI AllocatePoolEx(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, LPVOID* AllocationSegment, UINT64 MaxAddress);
+
+LPVOID KERNELAPI AllocatePoolEx(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, UINT64 Flags);
 PVOID KERNELAPI free(const void* Heap);
 
 // IO_MEMORY Automatically mapped with NX(No-Execute) 
+
+typedef enum _ALLOCATE_POOL_FLAGS {
+	ALLOCATE_POOL_LOW_4GB = 1,
+	ALLOCATE_POOL_PHYSICAL = 2, // Returns the Physical Address of the Allocated Pool instead of its Virtual Address
+	ALLOCATE_POOL_NOT_RAM = 4 // Prevents decrementing RAM When allocating IO Pool Or Virtual RAM Space POOL
+} ALLOCATE_POOL_FLAGS;
+
 LPVOID KERNELAPI AllocateIoMemory(LPVOID PhysicalAddress, UINT64 NumPages, UINT Flags);
 BOOL KERNELAPI FreeIoMemory(LPVOID IoMem);
 

@@ -80,13 +80,15 @@ __declspec(allocate(_FIMPORT)) FILE_IMPORT_ENTRY FileImportTable[0x20] = {
 	// {FILE_IMPORT_DRIVER, 0, NULL, L"eodx.sys", 0, L"OS\\System\\eodx.sys"},
 	{0}, // End of table
 };
-void KERNELAPI IdleThread() {
-	for(;;) {
-		__hlt();
+
+void th() {
+	while(1) {
+		GP_draw_rect(80, 80, 200, 200, 0xFFFF);
+		Sleep(500);
+		GP_draw_rect(80, 80, 200, 200, 0);
+		Sleep(500);
 	}
 }
-
-
 
 LPWSTR KernelProcessName = L"System Kernel.";
 
@@ -115,11 +117,7 @@ extern void __declspec(noreturn) _start() {
 		#endif
 	
 	ConfigureSystemSpace();
-	// Setup I/O Memory process & thread
 	
-	if(!CreateMemoryTable(&IoSpaceMemoryProcess, &IoSpaceMemoryProcess.MemoryManagementTable)) SET_SOD_MEMORY_MANAGEMENT;
-	AllocateFreeHeapDescriptor(&IoSpaceMemoryProcess, NULL, (LPVOID)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_IO), ((UINT64)SystemSpaceBase + SYSTEM_SPACE48_RAM) - ((UINT64)SystemSpaceBase + SYSTEM_SPACE48_IO));
-	IoSpaceMemoryThread.Process = &IoSpaceMemoryProcess;
 
 	KernelHeapInitialize();
 	// Initialize Kernel Page tables
@@ -145,19 +143,39 @@ extern void __declspec(noreturn) _start() {
 	KernelRelocate(); // CR3 Will be automatically set with the new kernel one
 	// Unmap KernelRelocate
 	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 1, 0);
+	
+	// Setup I/O Memory process & thread
+	
+	if(!CreateMemoryTable(&IoSpaceMemoryProcess, &IoSpaceMemoryProcess.MemoryManagementTable)) SET_SOD_MEMORY_MANAGEMENT;
+	AllocateFreeHeapDescriptor(&IoSpaceMemoryProcess, NULL, (LPVOID)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_IO), ((UINT64)SystemSpaceBase + SYSTEM_SPACE48_RAM) - ((UINT64)SystemSpaceBase + SYSTEM_SPACE48_IO));
+	IoSpaceMemoryThread.Process = &IoSpaceMemoryProcess;
+
+	// Setup RAM process & thread
+	
+	if(!CreateMemoryTable(&VirtualRamProcess, &VirtualRamProcess.MemoryManagementTable)) SET_SOD_MEMORY_MANAGEMENT;
+	AllocateFreeHeapDescriptor(&VirtualRamProcess, NULL, (LPVOID)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_RAM), ((UINT64)-1) - ((UINT64)SystemSpaceBase + SYSTEM_SPACE48_RAM));
+	VirtualRamThread.Process = &VirtualRamProcess;
 
 	kproc->ProcessName = KernelProcessName;
 
+	// Relocate kernel memory table
+	kproc->MemoryManagementTable.Process = kproc;
+	kproc->MemoryManagementTable.AllocatedMemory = &kproc->MemoryManagementTable.AllocatedMemoryList;
+	kproc->MemoryManagementTable.FreeMemory = &kproc->MemoryManagementTable.FreeMemoryList;
+
+	// Map physical address of the frame buffer to the Kernel Space
+	InitData.fb->FrameBufferBase = AllocateIoMemory(InitData.fb->FrameBufferBase, (InitData.fb->FrameBufferSize >> 12) + 1, PM_WRITE_THROUGH);
+		
+
+	GlobalInterruptDescriptorInitialize();
 	GlobalSysEntryTableInitialize();
 
 
 	InitProcessorDescriptors(&CpuBuffer, &CpuBufferSize);
-	GP_clear_screen(0x2E0BC2);
-	GP_draw_sf_text("Hello World", 0xffffff, 20, 20);
-	while(1) __hlt();
 	
 	ProcessContextIdAllocate(kproc);
 
+	
 	
 
 	
@@ -200,6 +218,8 @@ extern void __declspec(noreturn) _start() {
 			DebugWrite("Initializing System Tables...");
 		#endif
 
+
+	
 	
 	if(InitData.uefi) {
 		for(UINT64 i = 0;i<InitData.NumConfigurationTables;i++){
@@ -249,8 +269,7 @@ extern void __declspec(noreturn) _start() {
 	}
 
 
-	
-
+	KeMapMemory(LocalApicPhysicalAddress, SystemSpaceBase, LAPIC_PAGE_COUNT, PM_MAP | PM_WRITE_THROUGH);
 	
 	EnableApic();
 
@@ -266,7 +285,6 @@ extern void __declspec(noreturn) _start() {
 
 	UINT32 NumProcessors = AcpiGetNumProcessors();
 	CpuSetupManagementTable(NumProcessors);
-	InitSystemSpace(kproc);
 	SetPriorityClass(kproc, PRIORITY_CLASS_REALTIME);
 	HTHREAD KernelThread = KeCreateThread(kproc, 0, NULL, 0, NULL);
 	if (!KernelThread) SET_SOD_INITIALIZATION;
@@ -288,6 +306,7 @@ InitFeatures();
 // Reload CR3
 __setCR3((UINT64)kproc->PageMap);
 
+	
 #ifdef ___KERNEL_DEBUG___
 			DebugWrite("Setting Up LAPIC Timer...");
 		#endif
@@ -315,13 +334,18 @@ __setCR3((UINT64)kproc->PageMap);
 
 	SetupLocalApicTimer();
 
+
+
 	// TaskSchedulerDisable();
 
 	if(!BootConfiguration->DisableMultiProcessors){
 		Pmgrt.NumProcessors = NumProcessors;
 		MapPhysicalPages(kproc->PageMap, SMP_BOOT_ADDR, SMP_BOOT_ADDR, 1, PM_MAP);
 		UINT64 SmpCodeSize = (UINT64)&SMP_TRAMPOLINE_END - (UINT64)SMP_TRAMPOLINE;
+		SystemDebugPrint(L"SMP Trampoline Size : %x", SmpCodeSize);
 		memcpy(SMP_BOOT_ADDR, SMP_TRAMPOLINE, SmpCodeSize);
+
+		*(UINT64*)0x120000 = (UINT64)kproc->PageMap;
 
 		__wbinvd();
 		for (UINT64 i = 0; i < NumProcessors; i++) {
@@ -331,6 +355,7 @@ __setCR3((UINT64)kproc->PageMap);
 				SOD(SOD_PROCESSOR_INITIALIZATION, "PROCESSOR INITIALIZATION");
 			}
 		}
+		*(UINT64*)0x120000 = 0; // Zero Attack-Target :)
 	}else{
 		Pmgrt.NumProcessors = 1;
 	}
@@ -342,10 +367,8 @@ __setCR3((UINT64)kproc->PageMap);
 	#endif
 
 
-	
-
-	if(KERNEL_ERROR(IpcServerCreate(KernelThread, IPC_MAKEADDRESS(0, 0, 0, 1), NULL, 0, &KernelServer)))
-		SET_SOD_INITIALIZATION;
+	// if(KERNEL_ERROR(IpcServerCreate(KernelThread, IPC_MAKEADDRESS(0, 0, 0, 1), NULL, 0, &KernelServer)))
+	// 	SET_SOD_INITIALIZATION;
 
 	KeResumeThread(KernelThread);
 	#ifdef ___KERNEL_DEBUG___
@@ -354,10 +377,17 @@ __setCR3((UINT64)kproc->PageMap);
 
 
 
-	MapPhysicalPages(kproc->PageMap, 0, 0, 1, 0 /*Unmap first page (temporarely to prevent bugs and write to address 0*/);
+	// MapPhysicalPages(kproc->PageMap, 0, 0, 1, 0 /*Unmap first page (temporarely to prevent bugs and write to address 0*/);
 
 	
+	__sti();
+	GP_draw_sf_text("Hello World", 0xffffff, 20, 20);
+	for(UINT i = 0;i<0x1000;i++) {
+		SystemDebugPrint(L"%x", kpalloc(1));
+	}
+	// KeCreateThread(kproc, 0x1000, th, 0, NULL);
 	
+	while(1) __hlt();
 	
 	
 
@@ -408,6 +438,7 @@ __setCR3((UINT64)kproc->PageMap);
 		}
 	}
 
+	
 	if(NumKexDrivers != DriverTable->NumKernelExtensionDrivers ||
 	Num3rdPartyDrivers != DriverTable->NumThirdPartyDrivers
 	) {

@@ -8,7 +8,17 @@
 #include <CPU/paging.h>
 #include <CPU/cpu.h>
 
-void* GlobalSyscallTable[100] = { 0 };
+void* GlobalSyscallTable[MAX_SYSCALL + 1] = {
+    SysIdentify,
+    SyscallDebugPrint,
+    KeGetCurrentProcessId,
+    KeGetCurrentThreadId,
+    UserMalloc,
+    NULL,
+    NULL,
+    GetPhysicalMemoryStatus,
+    TerminateCurrentProcess
+};
 
 //void* __GlobalSyscallTable[] = {
 //    SysIdentify, SyscallDebugPrint, GetCurrentProcessId, GetCurrentThreadId,
@@ -65,24 +75,6 @@ void GlobalSysEntryTableInitialize(){
     _syscall_max = MAX_SYSCALL;
     
     GlobalUserSystemConfig.PreferredSysenterMethod = 0; // SYSENTER = 0, SYSCALL = 8
-
-    GlobalSyscallTable[0]   =       SysIdentify;
-    GlobalSyscallTable[1]   =       SyscallDebugPrint;
-    GlobalSyscallTable[2]   =       KeGetCurrentProcessId;
-    GlobalSyscallTable[3]   =       KeGetCurrentThreadId;
-    GlobalSyscallTable[4]   =       UserMalloc;
-    GlobalSyscallTable[5]   =       NULL; // User Extended Memory Alloc
-    GlobalSyscallTable[6]   =       NULL; // User Free
-    GlobalSyscallTable[7]   =       GetPhysicalMemoryStatus;
-    GlobalSyscallTable[8]   =       TerminateCurrentProcess;
-    GlobalSyscallTable[9]   =       TerminateCurrentThread;
-    GlobalSyscallTable[10]  =       TerminateProcess;
-    GlobalSyscallTable[11]  =       TerminateThread;
-    GlobalSyscallTable[12]  =       GetTotalCpuTime;
-    GlobalSyscallTable[13]  =       GetThreadCpuTime;
-    GlobalSyscallTable[14]  =       GetIdleCpuTime;
-    GlobalSyscallTable[15]  =       KeGetCurrentProcess;
-    GlobalSyscallTable[16]  =       KeGetCurrentThread;
 
 }
 

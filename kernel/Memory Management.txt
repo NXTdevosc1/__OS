@@ -1,0 +1,81 @@
+Needs :
+- Contiguous Page BitMap (Virtual System Space RAM)
+- Free and allocated heap block (array of contiguous used pages) array
+- To promote (ALLOCATE_POOL_BELOW_4GB), Memory is allocated from the top of the Heaps.
+- SSE & AVX Optimization
+- Free Memory Multilevel Classes & Cache {
+	Level 0 : Free memory below 256 bytes,
+	Level 1 : Free memory below 4096 bytes,
+	Level 2 : Free memory below 1 Mega Bytes,
+	Level 3 : Free memory above 10 Mega Bytes
+}
+
+- When a block is allocated (in user mode), it is not delivered until it is accessed
+
+
+Freeing Memory :
+Multilevel free memory (like page tables)
+	Find the source memory, search a heap with end address = source memory start address, or two heaps with start and end address reliable for e.g. 
+HEAP 0 : SA = 0x100, SE = 0x800
+HEAP 1 : SA = 0x2000, SE = 0x3000
+HEAP 2 : SA = 0x800, SE = 0x2000
+
+if(Heap2.SA == Heap0.SE) LinkHeaps (Heap0->FreeMemoryOffset = Heap2.SA)
+
+
+structures :
+
+MEMORY_TABLE {
+	UINT64 AvailableMemory;
+	UINT64 UsedMemory;
+	struct {
+		UINT64 NumSegments;
+		MEMORY_CACHE_LINE CacheLine; // Initialized if there is free memory in the level of this cache line
+	} CacheLines[4]; // Multilevel Cache lines
+	AVAILABLE_MEMORY_QUEUE AvailableMemoryQueue;
+	FREE_MEMORY_QUEUE FreeMemoryQueue;
+	// Act like page tables to make access to memory queues faster
+	AVAILABLE_MEMORY_ACCESS_MAP AvailableMemoryAccessMap;
+	FREE_MEMORY_ACCESS_MAP FreeMemoryAccessMap;
+	// Block Buffer specifies pages melted in a heap
+	BLOCK_BUFFER BlockBuffer;
+}
+
+MEMORY_CACHE_LINE {
+	MEMORY_SEGMENT* CachedMemory[80];
+}
+MEMORY_QUEUE {
+	MEMORY_SEGMENT MemorySegments[120]
+	MEMORY_QUEUE* NextQueue;
+}
+BLOCK_BUFFER {
+	MEMORY_BLOCKS Blocks[120]
+	BLOCK_BUFFER* BufferCountinuation;
+}
+
+MEMORY_ACCESS_MAP {
+	MEMORY_ACCESS_MAP[]	
+}
+
+MEMORY_SEGMENT {
+	UINT Flags;
+	RFPROCESS Process;
+	UINT64 BlockAddress;
+	UINT64 BlockSize;
+}
+
+
+
+
+Functions:
+	InitMemoryManagementSubsystem()
+	QueryAllocatedBlockSegment(void* BlockAddress)
+	QueryFreeBlockSegment(void* BlockAddress)
+	AllocatePool(UINT64 NumBytes)
+	AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flags)
+	FreePool(void* BlockAddress)
+	PageOutPool(RFPROCESS Process)
+	LoadPagedPool(RFPROCESS Process, void* VirtualAddress)
+	
+	
+	

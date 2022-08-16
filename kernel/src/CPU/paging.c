@@ -28,7 +28,7 @@ LPVOID KEXPORT KERNELAPI KeResolvePhysicalAddress(RFPROCESS Process, const void*
     if(!_pd->Present) return NULL;
 
     // Check if it's a 2MB Page
-    if(_pd->Size) return (void*)((_pd->PhysicalAddr << 15) + ((UINT64)VirtualAddress & 0x1FFFFF));
+    if(_pd->Size) return (void*)((_pd->PhysicalAddr << 0x15) + ((UINT64)VirtualAddress & 0x1FFFFF));
 
     RFPAGEMAP _pt = (RFPAGEMAP)((_pd->PhysicalAddr << 12) + (pt << 3));
     if(!_pt->Present) return NULL;
@@ -89,7 +89,7 @@ int MapPhysicalPages(
 
 
         if(!Pml4Entry[Pml4Index].Present){
-            EntryAddr = (UINT64)kpalloc(1);
+            EntryAddr = (UINT64)AllocatePoolEx(NULL, 0x1000, 0x1000, ALLOCATE_POOL_PHYSICAL);
             if(!EntryAddr) SET_SOD_MEMORY_MANAGEMENT;
             Pml4Entry[Pml4Index].PhysicalAddr = EntryAddr >> 12;
             Pml4Entry[Pml4Index].Present = 1;
@@ -103,7 +103,7 @@ int MapPhysicalPages(
         PdpEntry = (RFPAGEMAP)EntryAddr;
 
         if(!PdpEntry[PdpIndex].Present){
-            EntryAddr = (UINT64)kpalloc(1);
+            EntryAddr = (UINT64)AllocatePoolEx(NULL, 0x1000, 0x1000, ALLOCATE_POOL_PHYSICAL);
             if(!EntryAddr) SET_SOD_MEMORY_MANAGEMENT;
 
             PdpEntry[PdpIndex].PhysicalAddr = EntryAddr >> 12;
@@ -120,7 +120,7 @@ int MapPhysicalPages(
             PdEntry[PdIndex].PhysicalAddr = TmpPhysicalAddr;
         } else {
             if(!PdEntry[PdIndex].Present){
-                EntryAddr = (UINT64)kpalloc(1);
+                EntryAddr = (UINT64)AllocatePoolEx(NULL, 0x1000, 0x1000, ALLOCATE_POOL_PHYSICAL);
                 if(!EntryAddr) SET_SOD_MEMORY_MANAGEMENT;
 
                 PdEntry[PdIndex].PhysicalAddr = EntryAddr >> 12;
@@ -159,7 +159,7 @@ int KERNELAPI KeMapProcessMemory(RFPROCESS Process, void* PhysicalAddress, void*
 }
 
 RFPAGEMAP CreatePageMap(){
-    RFPAGEMAP PageMap = kpalloc(1);
+    RFPAGEMAP PageMap = AllocatePoolEx(NULL, 0x1000, 0x1000, ALLOCATE_POOL_PHYSICAL);
     if(!PageMap) SET_SOD_MEMORY_MANAGEMENT;
     ResetPageMap(PageMap);
     return PageMap;

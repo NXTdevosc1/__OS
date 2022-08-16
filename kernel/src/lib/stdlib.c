@@ -1,13 +1,13 @@
 #include <stdlib.h>
 #include <MemoryManagement.h>
-size_t strlen(const char* x){
-	size_t length = 0;
-	while(*x) {
-        x++;
-        length++;
-    }
-	return length;
-}
+// size_t strlen(const char* x){
+// 	size_t length = 0;
+// 	while(*x) {
+//         x++;
+//         length++;
+//     }
+// 	return length;
+// }
 
 uint16_t F_SW(uint16_t x){
 	return (x >> 8) | (x << 8);
@@ -81,33 +81,33 @@ wchar_t* wstrcat(const wchar_t* x, const wchar_t* y){
 	return ret;
 }
 
-char* strcat(char* x, const char* y) {
-	size_t sizex = strlen(x);
-	size_t sizey = strlen(y);
-	char* buffer = kmalloc(sizex + sizey + 1);
+// char* strcat(char* x, const char* y) {
+// 	size_t sizex = strlen(x);
+// 	size_t sizey = strlen(y);
+// 	char* buffer = kmalloc(sizex + sizey + 1);
 
-	char* ret = buffer;
-	if (!ret) return NULL;
-	for (size_t i = 0; i < sizex; i++) {
-		*buffer = x[i];
-		buffer++;
-	}
-	for (size_t i = 0; i < sizey; i++) {
-		*buffer = y[i];
-		buffer++;
-	}
-	*buffer = 0;
-	return ret;
-}
+// 	char* ret = buffer;
+// 	if (!ret) return NULL;
+// 	for (size_t i = 0; i < sizex; i++) {
+// 		*buffer = x[i];
+// 		buffer++;
+// 	}
+// 	for (size_t i = 0; i < sizey; i++) {
+// 		*buffer = y[i];
+// 		buffer++;
+// 	}
+// 	*buffer = 0;
+// 	return ret;
+// }
 
-int strcmp(const char* x, const char* y) {
-	while (*x && *y) {
-		if (*x != *y) return 0;
-		x++;
-		y++;
-	}
-	return 1;
-}
+// int strcmp(const char* x, const char* y) {
+// 	while (*x && *y) {
+// 		if (*x != *y) return 0;
+// 		x++;
+// 		y++;
+// 	}
+// 	return 1;
+// }
 
 unsigned short* itoaw(long long _Value, unsigned short* _Buffer, int _Radix){
     if (_Radix == RADIX_DECIMAL) { // Base 10 : Decimal

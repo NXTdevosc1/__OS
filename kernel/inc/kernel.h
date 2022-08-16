@@ -7,6 +7,7 @@
 #include <ipc/ipcserver.h>
 #define __DECLARE_FLT extern int _fltused = 0
 
+
 FILE_IMPORT_ENTRY FileImportTable[]; // Contains all default drivers, modules and files to run the Operating System
 
 extern UINT64 KeGlobalCR3;
@@ -63,3 +64,5 @@ enum KeMemMapTypes{
 
 PROCESS IoSpaceMemoryProcess; // This is a (non) present process that contains the heap of the IoSpace
 THREAD IoSpaceMemoryThread;
+PROCESS VirtualRamProcess; // This is a (non) present process that contains the heap of the System Virtual RAM Space
+THREAD VirtualRamThread;

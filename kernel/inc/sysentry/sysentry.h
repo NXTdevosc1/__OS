@@ -11,7 +11,7 @@ void MSABI SyscallDebugPrint(const char* data);
 void InitSysEntry(void* CpuBuffer);
 void GlobalSysEntryTableInitialize();
 
-extern void* GlobalSyscallTable[100];
+extern void* GlobalSyscallTable[MAX_SYSCALL + 1];
 extern long long __FastSysEntry();
 extern long long _SyscallEntry();
 extern UINT64 _syscall_max;

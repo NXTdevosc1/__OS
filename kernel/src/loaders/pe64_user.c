@@ -72,7 +72,7 @@ KERNELSTATUS Pe64LoadUserApplication(LPWSTR path){
         free(buffer, kproc);
         return -5;
     }
-    char* VirtualBuffer = AllocatePoolEx(NULL, VirtualBufferLength, 0x1000, NULL, 0);
+    char* VirtualBuffer = AllocatePoolEx(NULL, VirtualBufferLength, 0x1000, 0);
     if (!VirtualBuffer) SET_SOD_MEMORY_MANAGEMENT;
 
     for (UINT16 i = 0; i < image->NumSections; i++, Section++) {

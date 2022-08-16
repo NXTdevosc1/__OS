@@ -14,7 +14,9 @@ GLOBAL_GDTR equ 0x8008
 
 ; External Functions
 
-KERNEL_PAGE_TABLE equ 0x9000
+KERNEL_PAGE_TABLE_POINTER equ 0x120000 ; As long as SMP are booting:
+                                       ; This address contains the pointer to the page table
+                                       ; After that it is cleared
 
 SMP_INITIALIZATION_DATA equ SMP_TRAMPOLINE_END - SMP_TRAMPOLINE + 0x8000
 
@@ -30,25 +32,24 @@ align 0x1000
 SMP_TRAMPOLINE:
     cli
     cld
-    
-    mov esp, 0x8A00
+    xor ax, ax
+    mov ds, ax
+    mov ss, ax
+    mov es, ax
+    mov gs, ax
+    mov fs, ax
+
+    mov esp, 0xE800
     mov ebp, esp
 
-
-    
-
-    
-
-    ;mov eax, cr4
     mov eax, (1 << 5) | (1 << 7) ; Physical Addess Extension & Page Global Enable
     mov cr4, eax
 
-    mov eax, cr0
-    and eax, ~(1 << 31) ; Clear PG Bit
+    xor eax, eax
     mov cr0, eax
 
     ; Set Page Table
-    mov eax, KERNEL_PAGE_TABLE
+    mov eax, PT_BASE
     mov cr3, eax
 
     mov ecx, 0xC0000080
@@ -57,11 +58,10 @@ SMP_TRAMPOLINE:
 
     or eax, 1 << 8 ; Set long mode enable
     wrmsr
-
-
-    ;mov eax, cr0
+    
     mov eax, 1 | (1 << 31) ; Protected Mode Enable & Set Paging Enable Bit
     mov cr0, eax
+
 
 
     xor eax, eax
@@ -123,7 +123,7 @@ SmpEntry:
     mov gs, ax
     mov fs, ax
    
-    mov rsp, 0x8A00
+    mov rsp, 0xE800
     mov rbp, rsp
 
     ; Setup Initial CPU Requirements
@@ -162,7 +162,7 @@ SmpEntry:
 
 
 
-    mov rax, KERNEL_PAGE_TABLE
+    mov rax, [KERNEL_PAGE_TABLE_POINTER]
     mov cr3, rax
 
     mov rcx, 10 ; 40K Stack Memory
@@ -172,7 +172,7 @@ SmpEntry:
     je .ResetSystem
     ; No Allocation Check
 
-    add rax, 0x8000 ; 2 K Padding for protection
+    add rax, 0x800 ; 2 K Padding for protection
     mov rsp, rax
     mov rbp, rax
    
@@ -193,5 +193,19 @@ SmpEntry:
         push 0
         retfq
     
-align 0x10
+align 0x1000
+PageTable:
+PT_BASE equ 0x8000 + (PageTable - SMP_TRAMPOLINE)
+; map to a 2MB Address space
+.PML4:
+    dq 0x3 + PT_BASE + 0x1000
+    times 511 dq 0
+.PDP:
+    dq 0x3 + PT_BASE + 0x2000
+    times 511 dq 0
+.PD:
+    dq 0x83 ; 2 MB Page
+    times 511 dq 0
+
+align 0x1000
 SMP_TRAMPOLINE_END:
