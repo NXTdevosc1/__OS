@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <CPU/paging.h>
 
-int ThreadWrapperInit(HTHREAD Thread, void* EntryPoint){
+int ThreadWrapperInit(RFTHREAD Thread, void* EntryPoint){
     if(!Thread || !Thread->State) return -1;
 
     Thread->Registers.rax = (UINT64)EntryPoint;

@@ -10,7 +10,7 @@ char ttf_maxp_parse(void* maxp, struct FONT_TABLE* font_table, struct TTF_TABLE_
 
     font_table->num_glyphs = SWAPWORD(*(uint16_t*)((char*)maxp + 4));
 
-    font_table->glyphs_ptr_array = kmalloc(font_table->num_glyphs * 8); // ptr list
+    font_table->glyphs_ptr_array = AllocatePool(font_table->num_glyphs * 8); // ptr list
     if(!font_table->glyphs_ptr_array) SET_SOD_OUT_OF_RESOURCES;
     memset64(font_table->glyphs_ptr_array,0,font_table->num_glyphs); // set all pointers to 0
 

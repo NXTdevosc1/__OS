@@ -7,7 +7,7 @@ char ttf_name_parse(void* name, struct FONT_TABLE* font_table, struct TTF_TABLE_
     hdr->format = SWAPWORD(hdr->format);
     if(hdr->format != 1 && hdr->format != 0) return 0;
     
-    font_table->name_table = kmalloc(record->table_length);
+    font_table->name_table = AllocatePool(record->table_length);
     
     // memcpy 8 byte alignment
     memcpy64(font_table->name_table,(void*)((uint64_t)font_table->font_file + record->offset),record->table_length/8);

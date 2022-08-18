@@ -40,10 +40,10 @@ static inline int KERNELAPI SetProcess(
     Process->ProcessId = ProcessId;
     Process->Subsystem = Subsystem;
    
-    CreateMemoryTable(Process, &Process->MemoryManagementTable);
+    // CreateMemoryTable(Process, &Process->MemoryManagementTable);
 
     if (kproc) {
-        LPWSTR NameCpy = kmalloc((NameLength << 1) + 2);
+        LPWSTR NameCpy = AllocatePool((NameLength << 1) + 2);
         memcpy16(NameCpy, ProcessName, NameLength);
         NameCpy[NameLength] = 0;
         Process->ProcessName = NameCpy;
@@ -95,31 +95,19 @@ RFPROCESS KEXPORT KERNELAPI KeCreateProcess(RFPROCESS ParentProcess, LPWSTR Proc
     UINT16 len = wstrlen(ProcessName);
     if(!len || len > PNAME_CHARSZ_MAX) return NULL;
 
-    HPLIST current = &Pmgrt.ProcessList;
-    UINT64 i = 0;
-
-    
-    for(;;i++){
-        PROCESS* Process = current->processes;
-        for(UINT64 c = 0;c<PENTRIES_PER_LIST;c++, Process++){
-            if(!Process->Set) {
-                
-                SetProcess(Process,
-                c + i*PENTRIES_PER_LIST, ParentProcess,
+    RFPROCESS Process = Pmgrt.ProcessList;
+    for(UINT i = 0;i<MAX_PROCESSES;i++, Process++) {
+        if(!Process->Set) {
+            if(!__SyncBitTestAndSet(&Process->Set, 0)) continue;
+            SetProcess(Process,
+                i, ParentProcess,
                 OperatingMode, ProcessName, len, Subsystem
                 );
                 return Process;
-            }
         }
-        if(!current->Next) break;
-        current = current->Next;
     }
-    i++;
-    current->Next = kmalloc(sizeof(PLIST));
-    if(!current->Next) SET_SOD_PROCESS_MANAGEMENT;
-    SZeroMemory(current->Next);
-    SetProcess(&current->processes[0], i * PENTRIES_PER_LIST, ParentProcess, OperatingMode, ProcessName, len, Subsystem);
-    return &current->processes[0];
+
+    return NULL;
 }
 
 BOOL KEXPORT KERNELAPI KeSuspendThread(RFTHREAD Thread) {
@@ -146,31 +134,20 @@ BOOL SetThreadProcessor(RFTHREAD Thread, UINT ProcessorId) {
 }
 
 RFPROCESS KERNELAPI GetProcessById(UINT64 ProcessId){
-    HPLIST current = &Pmgrt.ProcessList;
-    uint64_t npid = ProcessId;
-    for(;;){
-        if(npid >= PENTRIES_PER_LIST) {
-            npid-=PENTRIES_PER_LIST;
-            if(!current->Next) return NULL;
-            current = current->Next;
-            continue;
-        }
-        if(current->processes[npid].Set) return &current->processes[npid];
-        return NULL;
-    }
-    return NULL;
+    if(ProcessId >= 0x400 || !Pmgrt.ProcessList[ProcessId].Set) return NULL;
+    return &Pmgrt.ProcessList[ProcessId];
 }
 
 BOOL KERNELAPI SetProcessName(RFPROCESS Process, LPWSTR ProcessName) {
     if (!Process || !ProcessName) return FALSE;
     UINT16 len = wstrlen(ProcessName);
     if (!len || len > PNAME_CHARSZ_MAX) return FALSE;
-    LPWSTR copy = kmalloc(len + 2);
+    LPWSTR copy = AllocatePool(len + 2);
     if (!copy) SET_SOD_MEMORY_MANAGEMENT;
     memcpy16(copy, ProcessName, len);
     copy[len] = 0;
 
-    free(Process->ProcessName, kproc);
+    RemoteFreePool(kproc, Process->ProcessName);
     Process->ProcessName = copy;
     return TRUE;
 }
@@ -231,7 +208,7 @@ DebugWrite(to_hstring64((UINT64)Thread));
             __BitRelease(&WaitingQueue->Mutex, 0);
         }
         if(!WaitingQueue->NextQueue) {
-            WaitingQueue->NextQueue = malloc(sizeof(THREAD_WAITING_QUEUE));
+            WaitingQueue->NextQueue = AllocatePool(sizeof(THREAD_WAITING_QUEUE));
             SZeroMemory(WaitingQueue->NextQueue);
         }
         WaitingQueue = WaitingQueue->NextQueue;
@@ -290,7 +267,7 @@ static inline void KERNELAPI SetupThreadRegisters(RFTHREAD thread) {
 
     thread->Registers.cr3 = (UINT64)process->PageMap;
     
-    thread->Registers.Xsave = kpalloc(1);
+    thread->Registers.Xsave = AllocatePoolEx(kproc, 0x1000, 0, ALLOCATE_POOL_PHYSICAL);
     if (!thread->Registers.Xsave) SET_SOD_PROCESS_MANAGEMENT;
     ZeroMemory(thread->Registers.Xsave, 0x1000);
 
@@ -324,7 +301,7 @@ static inline RFTHREAD KERNELAPI AllocateThread(RFPROCESS Process, UINT64* LpThr
             }
         }
         if (!ThreadList->Next){
-            ThreadList->Next = kmalloc(sizeof(*ThreadList));
+            ThreadList->Next = AllocatePool(sizeof(*ThreadList));
             if(!ThreadList->Next) SET_SOD_MEMORY_MANAGEMENT;
             SZeroMemory(ThreadList->Next);
         }
@@ -365,7 +342,7 @@ RFTHREAD KEXPORT KERNELAPI KeCreateThread(RFPROCESS Process, UINT64 StackSize, T
     if(!StackSize) StackSize = THREAD_DEFAULT_STACK_SIZE;
     if(StackSize % 0x1000) StackSize += 0x1000 - (StackSize % 0x1000);
     if(Process->OperatingMode != KERNELMODE_PROCESS){
-        Thread->Stack = kpalloc(StackSize >> 12);
+        Thread->Stack = AllocatePoolEx(kproc, StackSize, 0x1000, ALLOCATE_POOL_PHYSICAL);
         if (!Thread->Stack) SET_SOD_MEMORY_MANAGEMENT;
         ZeroMemory(Thread->Stack, StackSize);
 
@@ -376,7 +353,7 @@ RFTHREAD KEXPORT KERNELAPI KeCreateThread(RFPROCESS Process, UINT64 StackSize, T
     }
     else {
         // Kernel Processes shares the same page table with the kernel
-            Thread->Stack = kpalloc(StackSize >> 12);
+            Thread->Stack = AllocatePoolEx(kproc, StackSize, 0x1000, ALLOCATE_POOL_PHYSICAL);
             if (!Thread->Stack) SET_SOD_MEMORY_MANAGEMENT;
             ZeroMemory(Thread->Stack, StackSize);
             Thread->Registers.rsp = (UINT64)Thread->Stack + StackSize - 0x100;
@@ -402,7 +379,7 @@ RFTHREAD KEXPORT KERNELAPI KeCreateThread(RFPROCESS Process, UINT64 StackSize, T
             }
         }
         if(!ThreadList->Next) {
-            ThreadList->Next = malloc(sizeof(PROCESS_THREAD_LIST));
+            ThreadList->Next = AllocatePool(sizeof(PROCESS_THREAD_LIST));
             SZeroMemory(ThreadList->Next);
         }
         ThreadList = ThreadList->Next;
@@ -469,14 +446,14 @@ int KERNELAPI TerminateThread(RFTHREAD thread, int ExitCode){
 //                 TerminateProcess(process, exit_code);
 //             }
 //         }
-//         free(dataptr, kproc);
+//         FreePool(dataptr, kproc);
 //         dataptr = dataptr->next;
 //         if(!dataptr) break;
         
 //     }
 
-//     free(process->page_table, kproc);
-//     free(process.)
+//     FreePool(process->page_table, kproc);
+//     FreePool(process.)
 //     while(1);
 // }
 

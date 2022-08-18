@@ -6,7 +6,7 @@
 
 __declspec(align(0x1000)) SERVER_LIST ServerList = { 0 };
 
-KERNELSTATUS KERNELAPI		 IpcServerCreate(HTHREAD Thread, UINT64 ServerIpAddress, LPWSTR ServerPassword, QWORD AccessPolicy, RFSERVER* PRFServer){
+KERNELSTATUS KERNELAPI		 IpcServerCreate(RFTHREAD Thread, UINT64 ServerIpAddress, LPWSTR ServerPassword, QWORD AccessPolicy, RFSERVER* PRFServer){
 	if (!Thread || !PRFServer) {
 		*PRFServer = NULL;
 		return KERNEL_SERR_INVALID_PARAMETER;
@@ -40,7 +40,7 @@ KERNELSTATUS KERNELAPI		 IpcServerCreate(HTHREAD Thread, UINT64 ServerIpAddress,
 				
 				if (ServerPassword) {
 					
-					LPWSTR PasswordCopy = kmalloc((PasswordLength + 1) << 1);
+					LPWSTR PasswordCopy = AllocatePool((PasswordLength + 1) << 1);
 					if (!PasswordCopy) SET_SOD_MEMORY_MANAGEMENT;
 					memcpy(PasswordCopy, ServerPassword, PasswordLength << 1);
 					PasswordCopy[PasswordLength] = 0;
@@ -56,7 +56,7 @@ KERNELSTATUS KERNELAPI		 IpcServerCreate(HTHREAD Thread, UINT64 ServerIpAddress,
 			}
 		}
 		if (!List->Next) {
-			List->Next = kmalloc(sizeof(SERVER_LIST));
+			List->Next = AllocatePool(sizeof(SERVER_LIST));
 			SZeroMemory(List->Next);
 		}
 		List = List->Next;
@@ -187,7 +187,7 @@ RFSERVER KERNELAPI		 IpcServerConnect(UINT64 ServerIpAddress, PCLIENT Client, LP
 			}
 		}
 		if (!List->Next) {
-			List->Next = kmalloc(sizeof(SERVER_CLIENT_LIST));
+			List->Next = AllocatePool(sizeof(SERVER_CLIENT_LIST));
 			SZeroMemory(List->Next);
 		}
 		List = List->Next;

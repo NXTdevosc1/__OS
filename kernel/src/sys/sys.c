@@ -26,7 +26,7 @@ void SysLoad(){
     if (!sysconfig) CANNOT_FIND_SYSCONFIG;
 
     if(!FileInformation.FileSize || FileInformation.FileSize % 8) THROW_INVALID_SYSCONFIG;
-    struct SYS_CONFIG_HDR* chdr = kmalloc(FileInformation.FileSize);
+    struct SYS_CONFIG_HDR* chdr = AllocatePool(FileInformation.FileSize);
     if(!chdr) SET_SOD_MEMORY_MANAGEMENT;
     if (KERNEL_ERROR(ReadFile(sysconfig, 0, NULL, chdr))) SET_SOD_MEDIA_MANAGEMENT;
 
@@ -62,7 +62,7 @@ void SysLoad(){
     //             FILE DriverImage = OpenFile(entry->path, FILE_OPEN_READ, &FileInfo);
     //             if(!DriverImage) THROW_INVALID_SYSCONFIG;
 
-    //             void* ImageBuffer = kmalloc(FileInfo.FileSize);
+    //             void* ImageBuffer = AllocatePool(FileInfo.FileSize);
     //             if(KERNEL_ERROR(ReadFile(DriverImage, 0, &FileInfo.FileSize, ImageBuffer))) THROW_INVALID_SYSCONFIG;
     //             if (KERNEL_ERROR(Pe64LoadNativeApplication(ImageBuffer, entry->path, entry->path))) SET_SOD_INITIALIZATION;
     //             flags |= 2;

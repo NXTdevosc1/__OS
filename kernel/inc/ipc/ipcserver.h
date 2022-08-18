@@ -43,7 +43,7 @@ enum _IPC_SERVER_ACCESS_POLICY {
 	IPC_SERVER_PRIVATE = 8, // Only accessible by the process itself or the processes that gets assigned by the host
 };
 
-KERNELSTATUS KERNELAPI		 IpcServerCreate(HTHREAD Thread, UINT64 ServerIpAddress, LPWSTR ServerPassword, QWORD AccessPolicy, RFSERVER* PRFServer);
+KERNELSTATUS KERNELAPI		 IpcServerCreate(RFTHREAD Thread, UINT64 ServerIpAddress, LPWSTR ServerPassword, QWORD AccessPolicy, RFSERVER* PRFServer);
 BOOL KERNELAPI		 IpcServerDestroy(RFSERVER Server);
 
 RFSERVER KERNELAPI		 IpcServerConnect(UINT64 ServerIpAddress, PCLIENT Client, LPWSTR ServerPassword);

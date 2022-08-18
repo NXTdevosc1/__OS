@@ -20,6 +20,16 @@ extern UINT64 _krnlbase, _krnlend;
 void KERNELAPI IdleThread();
 RFSERVER KernelServer;
 
+UINT ExtensionLevel;
+
+typedef enum _EXTENSION_LEVELS {
+    EXTENSION_LEVEL_SSE = 0,
+    EXTENSION_LEVEL_AVX = 1,
+    EXTENSION_LEVEL_AVX512 = 2,
+    EXTENSION_LEVEL_HI16_ZMM = 4,
+    EXTENSION_LEVEL_OPMASK = 8
+} EXTENSION_LEVELS;
+
 enum KeMemMapTypes{
     KeAllocatedMemory = 0x8000
 };

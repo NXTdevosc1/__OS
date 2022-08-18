@@ -3,11 +3,11 @@ mkdir x86_64\
 mkdir x86_64\Assembly
 mkdir x86_64\fs\fat32
 FOR /R "src" %%S IN (*.asm) DO (
-	nasm %%S -f win64 -o x86_64/Assembly/%%~nS.s.obj
+	nasm "%%S" -f win64 -o "x86_64/Assembly/%%~nS.s.obj"
 
 )
 
-set srcfiles=src/*.c src/smbios/*.c src/acpi/*.c src/acpi/aml/*.c src/CPU/*.c src/dsk/*.c src/input/*.c src/interrupt_manager/*.c src/IO/*.c src/ipc/*.c src/lib/*.c src/loaders/*.c src/Management/*.c src/sys/*.c src/sysentry/*.c src/typography/*.c src/utils/*.c src/timedate/*.c
+set srcfiles=src/*.c "src/Memory Management/*.c" src/smbios/*.c src/acpi/*.c src/acpi/aml/*.c src/CPU/*.c src/dsk/*.c src/input/*.c src/interrupt_manager/*.c src/IO/*.c src/ipc/*.c src/lib/*.c src/loaders/*.c src/Management/*.c src/sys/*.c src/sysentry/*.c src/typography/*.c src/utils/*.c src/timedate/*.c
 set COMPILE=cl /DEFAULTLIB:no /nologo /KERNEL 
 set CFLAGS=/GS- /Ilib /I../libc/drv/inc /I../UEFI/gnu-efi/inc /I../UEFI/gnu-efi/inc/x86_64 /Iinc /Ilib
 

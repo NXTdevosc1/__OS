@@ -7,14 +7,16 @@
 
 #define KEXPORT __declspec(dllexport)
 
-#define OPTAPI __stdcall
-#define __OPTAPI __stdcall
 
 #define UNITS_PER_LIST 120
 
 #define MULTIBIT_TEST(Value, Mask) ((Value & Mask) == Mask)
 
 #define __KERNEL
+
+#define _IN
+#define _OUT
+#define _OPT
 
 typedef int HRESULT;
 
@@ -61,7 +63,10 @@ typedef UINT64 UINTPTR;
 
 #define TRUE 1
 #define FALSE 0
+
+#ifndef NULL
 #define NULL (void*)0
+#endif
 
 #define KERNEL_SOK 0
 #define KERNEL_SOK_NOSTATUS 1

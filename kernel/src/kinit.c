@@ -10,53 +10,53 @@ void FirmwareControlRelease(){
 }
 
 void KernelHeapInitialize(){
-	// Types (BIOS & UEFI)
-	UINT16 LoaderData = EfiLoaderData;
-	UINT16 LoaderCode = EfiLoaderCode;
-	UINT16 ConventionalMemory = EfiConventionalMemory;
-	if(!InitData.uefi) {
-		LoaderData = -1; // BIOS May set 0xFF (who knows ??)
-		LoaderCode = -1;
-		ConventionalMemory = 1; // BIOS 'SMAP' Conventional Memory Entry
-	}
+	// // Types (BIOS & UEFI)
+	// UINT16 LoaderData = EfiLoaderData;
+	// UINT16 LoaderCode = EfiLoaderCode;
+	// UINT16 ConventionalMemory = EfiConventionalMemory;
+	// if(!InitData.uefi) {
+	// 	LoaderData = -1; // BIOS May set 0xFF (who knows ??)
+	// 	LoaderCode = -1;
+	// 	ConventionalMemory = 1; // BIOS 'SMAP' Conventional Memory Entry
+	// }
 	
-	for(UINT64 i = 0;i<InitData.memory_map->count;i++){
-		UINT16 Type = InitData.memory_map->mem_desc[i].type;
-		if(Type == LoaderData ||
-		Type == LoaderCode
-		){
+	// for(UINT64 i = 0;i<InitData.MemoryMap->count;i++){
+	// 	UINT16 Type = InitData.MemoryMap->MemoryDescriptors[i].Type;
+	// 	if(Type == LoaderData ||
+	// 	Type == LoaderCode
+	// 	){
 			
-			PhysicalMemoryStatus.TotalMemory+=InitData.memory_map->mem_desc[i].pages_count << 12;
-			PhysicalMemoryStatus.AllocatedMemory+=InitData.memory_map->mem_desc[i].pages_count << 12;
-		}
-		if(InitData.memory_map->mem_desc[i].type != ConventionalMemory
-        ) continue;
+	// 		PhysicalMemoryStatus.TotalMemory+=InitData.MemoryMap->MemoryDescriptors[i].pages_count << 12;
+	// 		PhysicalMemoryStatus.AllocatedMemory+=InitData.MemoryMap->MemoryDescriptors[i].pages_count << 12;
+	// 	}
+	// 	if(InitData.MemoryMap->MemoryDescriptors[i].Type != ConventionalMemory
+    //     ) continue;
 
 
 			
-		PhysicalMemoryStatus.TotalMemory+=InitData.memory_map->mem_desc[i].pages_count << 12;
+	// 	PhysicalMemoryStatus.TotalMemory+=InitData.MemoryMap->MemoryDescriptors[i].pages_count << 12;
 		
-		// Physical Start Of memory may be zero
+	// 	// Physical Start Of memory may be zero
 
 
-		if (!InitData.memory_map->mem_desc[i].physical_start) {
-			/*
-				Some hardware, VMs like VBOX's conventionnal memory starts at Address 0
-				And that will make the os thinks of a memory allocation issue
-			*/
-			InitData.memory_map->mem_desc[i].physical_start += 0x1000;
-			InitData.memory_map->mem_desc[i].pages_count--;
-			PhysicalMemoryStatus.AllocatedMemory += 0x1000;
-		}
-		if (!InitData.memory_map->mem_desc[i].pages_count) continue;
-		PFREE_HEAP_DESCRIPTOR HeapDesc = AllocateFreeHeapDescriptor(
-			kproc, NULL,
-			(LPVOID)InitData.memory_map->mem_desc[i].physical_start,
-			InitData.memory_map->mem_desc[i].pages_count << 12
-		);
+	// 	if (!InitData.MemoryMap->MemoryDescriptors[i].PhysicalStart) {
+	// 		/*
+	// 			Some hardware, VMs like VBOX's conventionnal memory starts at Address 0
+	// 			And that will make the os thinks of a memory allocation issue
+	// 		*/
+	// 		InitData.MemoryMap->MemoryDescriptors[i].PhysicalStart += 0x1000;
+	// 		InitData.MemoryMap->MemoryDescriptors[i].pages_count--;
+	// 		PhysicalMemoryStatus.AllocatedMemory += 0x1000;
+	// 	}
+	// 	if (!InitData.MemoryMap->MemoryDescriptors[i].pages_count) continue;
+	// 	PFREE_HEAP_DESCRIPTOR HeapDesc = AllocateFreeHeapDescriptor(
+	// 		kproc, NULL,
+	// 		(LPVOID)InitData.MemoryMap->MemoryDescriptors[i].PhysicalStart,
+	// 		InitData.MemoryMap->MemoryDescriptors[i].pages_count << 12
+	// 	);
 
-		if (!HeapDesc) SET_SOD_MEMORY_MANAGEMENT;
-	}
+	// 	if (!HeapDesc) SET_SOD_MEMORY_MANAGEMENT;
+	// }
 
 	
 }
@@ -80,15 +80,15 @@ void KernelPagingInitialize(){
 	}
 	{
 		UINT64 Flags = PM_MAP | PM_NO_CR3_RELOAD | PM_NO_TLB_INVALIDATION;
-		for (UINT64 i = 0; i < InitData.memory_map->count; i++) {
-			UINT16 MemoryType = InitData.memory_map->mem_desc[i].type;
+		for (UINT64 i = 0; i < InitData.MemoryMap->Count; i++) {
+			UINT16 MemoryType = InitData.MemoryMap->MemoryDescriptors[i].Type;
 			if(MemoryType == UnusableMemory) continue;
 			// Check if its a conventionnal memory, if not then the page writing
 			//  should not be cached (page must be writting in memory not only in cache)
 			if (MemoryType != LoaderData && MemoryType != LoaderCode &&
 				MemoryType != ConventionalMemory) Flags |= PM_WRITE_THROUGH;
 			
-			MapPhysicalPages(kproc->PageMap, (LPVOID)InitData.memory_map->mem_desc[i].physical_start, (LPVOID)InitData.memory_map->mem_desc[i].physical_start, InitData.memory_map->mem_desc[i].pages_count, Flags);
+			MapPhysicalPages(kproc->PageMap, (LPVOID)InitData.MemoryMap->MemoryDescriptors[i].PhysicalStart, (LPVOID)InitData.MemoryMap->MemoryDescriptors[i].PhysicalStart, InitData.MemoryMap->MemoryDescriptors[i].PageCount, Flags);
 			Flags = PM_MAP | PM_NO_CR3_RELOAD | PM_NO_TLB_INVALIDATION;
 		}
 	}

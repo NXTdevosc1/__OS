@@ -57,7 +57,6 @@ RFPROCESS IdleProcess = NULL;
 RFPROCESS SystemInterruptsProcess = NULL;
 UINT64 KeGlobalCR3 = 0;
 
-HTHREAD ThAnother = NULL;
 
 HANDLE_TABLE gSystemHandleTable = {0};
 
@@ -65,6 +64,9 @@ RFSERVER KernelServer = NULL;
 
 PROCESS IoSpaceMemoryProcess = {0}; // This is a (non) present process that contains the heap of the IoSpace
 THREAD IoSpaceMemoryThread = {0};
+
+UINT ExtensionLevel = 0;
+
 
 __declspec(allocate(_FIMPORT)) FILE_IMPORT_ENTRY FileImportTable[0x20] = {
 	{FILE_IMPORT_DATA, 0, NULL, L"$BOOTCONFIG", 0, L"OS\\System\\KeConfig\\$BOOTCONFIG"},
@@ -97,6 +99,21 @@ extern void __declspec(noreturn) _start() {
 	EnableExtendedStates();
 
 	Pmgrt.NumProcessors = 1;
+	CPUID_INFO CpuIdInfo = {0};
+	__cpuid(&CpuIdInfo, 1);
+	if(CpuIdInfo.ecx & CPUID1_ECX_AVX) {
+		ExtensionLevel = EXTENSION_LEVEL_AVX;
+	}
+	__cpuid(&CpuIdInfo, 0x0D);
+	if(CpuIdInfo.eax & (1 << 6)) {
+		ExtensionLevel = EXTENSION_LEVEL_AVX512;
+		if(CpuIdInfo.eax & (1 << 7)) {
+			ExtensionLevel |= EXTENSION_LEVEL_HI16_ZMM;
+		}
+		if(CpuIdInfo.eax & (1 << 5)) {
+			ExtensionLevel |= EXTENSION_LEVEL_OPMASK;
+		}
+	}
 
 	// if (!InitializeRuntimeSymbols()) SET_SOD_INITIALIZATION;
 	kproc = KeCreateProcess(NULL, NULL, SUBSYSTEM_NATIVE, KERNELMODE_PROCESS);
@@ -146,22 +163,22 @@ extern void __declspec(noreturn) _start() {
 	
 	// Setup I/O Memory process & thread
 	
-	if(!CreateMemoryTable(&IoSpaceMemoryProcess, &IoSpaceMemoryProcess.MemoryManagementTable)) SET_SOD_MEMORY_MANAGEMENT;
-	AllocateFreeHeapDescriptor(&IoSpaceMemoryProcess, NULL, (LPVOID)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_IO), ((UINT64)SystemSpaceBase + SYSTEM_SPACE48_RAM) - ((UINT64)SystemSpaceBase + SYSTEM_SPACE48_IO));
-	IoSpaceMemoryThread.Process = &IoSpaceMemoryProcess;
+	// if(!CreateMemoryTable(&IoSpaceMemoryProcess, &IoSpaceMemoryProcess.MemoryManagementTable)) SET_SOD_MEMORY_MANAGEMENT;
+	// AllocateFreeHeapDescriptor(&IoSpaceMemoryProcess, NULL, (LPVOID)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_IO), ((UINT64)SystemSpaceBase + SYSTEM_SPACE48_RAM) - ((UINT64)SystemSpaceBase + SYSTEM_SPACE48_IO));
+	// IoSpaceMemoryThread.Process = &IoSpaceMemoryProcess;
 
-	// Setup RAM process & thread
+	// // Setup RAM process & thread
 	
-	if(!CreateMemoryTable(&VirtualRamProcess, &VirtualRamProcess.MemoryManagementTable)) SET_SOD_MEMORY_MANAGEMENT;
-	AllocateFreeHeapDescriptor(&VirtualRamProcess, NULL, (LPVOID)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_RAM), ((UINT64)-1) - ((UINT64)SystemSpaceBase + SYSTEM_SPACE48_RAM));
-	VirtualRamThread.Process = &VirtualRamProcess;
+	// if(!CreateMemoryTable(&VirtualRamProcess, &VirtualRamProcess.MemoryManagementTable)) SET_SOD_MEMORY_MANAGEMENT;
+	// AllocateFreeHeapDescriptor(&VirtualRamProcess, NULL, (LPVOID)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_RAM), ((UINT64)-1) - ((UINT64)SystemSpaceBase + SYSTEM_SPACE48_RAM));
+	// VirtualRamThread.Process = &VirtualRamProcess;
 
 	kproc->ProcessName = KernelProcessName;
 
 	// Relocate kernel memory table
-	kproc->MemoryManagementTable.Process = kproc;
-	kproc->MemoryManagementTable.AllocatedMemory = &kproc->MemoryManagementTable.AllocatedMemoryList;
-	kproc->MemoryManagementTable.FreeMemory = &kproc->MemoryManagementTable.FreeMemoryList;
+	// kproc->MemoryManagementTable.Process = kproc;
+	// kproc->MemoryManagementTable.AllocatedMemory = &kproc->MemoryManagementTable.AllocatedMemoryList;
+	// kproc->MemoryManagementTable.FreeMemory = &kproc->MemoryManagementTable.FreeMemoryList;
 
 	// Map physical address of the frame buffer to the Kernel Space
 	InitData.fb->FrameBufferBase = AllocateIoMemory(InitData.fb->FrameBufferBase, (InitData.fb->FrameBufferSize >> 12) + 1, PM_WRITE_THROUGH);
@@ -286,7 +303,7 @@ extern void __declspec(noreturn) _start() {
 	UINT32 NumProcessors = AcpiGetNumProcessors();
 	CpuSetupManagementTable(NumProcessors);
 	SetPriorityClass(kproc, PRIORITY_CLASS_REALTIME);
-	HTHREAD KernelThread = KeCreateThread(kproc, 0, NULL, 0, NULL);
+	RFTHREAD KernelThread = KeCreateThread(kproc, 0, NULL, 0, NULL);
 	if (!KernelThread) SET_SOD_INITIALIZATION;
 
 	SetThreadPriority(KernelThread, THREAD_PRIORITY_BELOW_NORMAL);
@@ -383,7 +400,7 @@ __setCR3((UINT64)kproc->PageMap);
 	__sti();
 	GP_draw_sf_text("Hello World", 0xffffff, 20, 20);
 	for(UINT i = 0;i<0x1000;i++) {
-		SystemDebugPrint(L"%x", kpalloc(1));
+		SystemDebugPrint(L"%x", AllocatePoolEx(kproc, 0x1000, 0x1000, ALLOCATE_POOL_PHYSICAL));
 	}
 	// KeCreateThread(kproc, 0x1000, th, 0, NULL);
 	

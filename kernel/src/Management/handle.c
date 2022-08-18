@@ -8,10 +8,10 @@
 
 HANDLE_TABLE* CreateHandleTable() {
 
-	HANDLE_TABLE* tbl = kmalloc(sizeof(HANDLE_TABLE));
+	HANDLE_TABLE* tbl = AllocatePool(sizeof(HANDLE_TABLE));
 	if (!tbl) SET_SOD_MEMORY_MANAGEMENT;
 	SZeroMemory(tbl);
-	tbl->HandleIterator.Lists[0] = kmalloc(sizeof(HANDLE_LIST));
+	tbl->HandleIterator.Lists[0] = AllocatePool(sizeof(HANDLE_LIST));
 	if (!tbl->HandleIterator.Lists[0]) SET_SOD_MEMORY_MANAGEMENT;
 	SZeroMemory(tbl->HandleIterator.Lists[0]);
 	OpenHandle(tbl, NULL, HANDLE_FLAG_FREE_ON_EXIT, HANDLE_KERNEL_ALLOCATE, tbl, NULL); // Create a handle to free this list
@@ -65,7 +65,7 @@ HANDLE OpenHandle(HANDLE_TABLE* HandleTable, LPVOID Thread, UINT64 Flags, UINT64
 				}
 			}
 			else if (!Iterator->Lists[i]) {
-				Iterator->Lists[i] = kmalloc(sizeof(HANDLE_LIST));
+				Iterator->Lists[i] = AllocatePool(sizeof(HANDLE_LIST));
 				if (!Iterator->Lists[i]) SET_SOD_MEMORY_MANAGEMENT;
 				SZeroMemory(Iterator->Lists[i]);
 				OpenHandle(HandleTable, Thread, HANDLE_FLAG_FREE_ON_EXIT, HANDLE_KERNEL_ALLOCATE, Iterator->Lists[i], NULL); // Create a handle to free this list
@@ -73,10 +73,10 @@ HANDLE OpenHandle(HANDLE_TABLE* HandleTable, LPVOID Thread, UINT64 Flags, UINT64
 			}
 		}
 		if (!Iterator->Next) {
-			Iterator->Next = kmalloc(sizeof(HANDLE_ITERATOR));
+			Iterator->Next = AllocatePool(sizeof(HANDLE_ITERATOR));
 			if (!Iterator->Next) SET_SOD_MEMORY_MANAGEMENT;
 			SZeroMemory(Iterator->Next);
-			Iterator->Lists[0] = kmalloc(sizeof(HANDLE_LIST));
+			Iterator->Lists[0] = AllocatePool(sizeof(HANDLE_LIST));
 			if (!Iterator->Lists[0]) SET_SOD_MEMORY_MANAGEMENT;
 			SZeroMemory(Iterator->Lists[0]);
 			OpenHandle(HandleTable, Thread, HANDLE_FLAG_FREE_ON_EXIT, HANDLE_KERNEL_ALLOCATE, Iterator->Next, NULL); // Create a handle to free this list
@@ -94,7 +94,7 @@ HRESULT CloseHandle(HANDLE Handle) {
 	if (!Handle) return -1;
 	if (!(Handle->Flags & HANDLE_FLAG_PRESENT)) return FALSE;
 	if (Handle->Flags & HANDLE_FLAG_FREE_ON_EXIT) {
-		free(Handle->Data, kproc);
+		RemoteFreePool(kproc, Handle->Data);
 	}
 	if (Handle->Flags & HANDLE_FLAG_CLOSE_FILE_ON_EXIT) {
 		CloseFile(Handle->Data);

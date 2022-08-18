@@ -169,8 +169,8 @@ void init_ps2_mouse(){
 	// mouse_icon_prev_x = mouse_icon_x;
 	// mouse_icon_prev_y = mouse_icon_y;
 	KeControlIrq((KEIRQ_ROUTINE)INTH_mouse, 0xC, IRQ_DELIVERY_NORMAL, 0);
-	previous_buffer = kpalloc(1);
-	memset64(previous_buffer,0,512);
+	previous_buffer = AllocatePoolEx(kproc, 0x200, 0, 0);
+	memset(previous_buffer,0,512);
 	_HandleMouseInput = TRUE;
 
 	OutPortB(0x64,0xA8); // Enable ps2 mouse

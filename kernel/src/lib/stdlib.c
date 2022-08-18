@@ -65,7 +65,7 @@ unsigned char wstrcmp(const wchar_t* x, const wchar_t* y, size_t size)
 wchar_t* wstrcat(const wchar_t* x, const wchar_t* y){
 	uint16_t sizex = wstrlen(x);
 	uint16_t sizey = wstrlen(y);
-	wchar_t* buffer = kmalloc((sizex+sizey)*2 + (2 /*end character code*/));
+	wchar_t* buffer = AllocatePool((sizex+sizey)*2 + (2 /*end character code*/));
 	wchar_t* ret = buffer;
 	if(!ret) return NULL;
 	unsigned int index = 0;
@@ -84,7 +84,7 @@ wchar_t* wstrcat(const wchar_t* x, const wchar_t* y){
 // char* strcat(char* x, const char* y) {
 // 	size_t sizex = strlen(x);
 // 	size_t sizey = strlen(y);
-// 	char* buffer = kmalloc(sizex + sizey + 1);
+// 	char* buffer = AllocatePool(sizex + sizey + 1);
 
 // 	char* ret = buffer;
 // 	if (!ret) return NULL;

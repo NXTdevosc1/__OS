@@ -41,7 +41,7 @@
 // 	UINT NumProcedures;
 // 	UINT NumRegisteredProcedures;
 // 	RFPROCESS CallerProcess; // Caller Process For Current Procedure
-// 	HTHREAD CallerThread;
+// 	RFTHREAD CallerThread;
 // 	RFDCI_PROCEDURE_OBJECT CallerProcedureObject;
 // 	UINT64 CallerPacketLength;
 // 	void* CallerPacket;

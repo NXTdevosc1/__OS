@@ -19,11 +19,11 @@ int MSABI FsReleaseDirList(RFPROCESS process, DIRECTORY_FILE_LIST* dirls){
         if(!current) break;
         for(uint16_t i = 0;i<MAX_FILES_PER_DIRLS_LIST;i++){
             if(current->Files[i].FileName)
-                free(current->Files[i].FileName,dirls->Process);
+                RemoteFreePool(dirls->Process, current->Files[i].FileName);
         }
         void* tmp = current->Next;
-        free(current,process);
         SZeroMemory(current);
+        RemoteFreePool(process, current);
         current = tmp;
     }
     SZeroMemory(dirls);

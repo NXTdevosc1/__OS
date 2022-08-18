@@ -74,8 +74,17 @@ Functions:
 	AllocatePool(UINT64 NumBytes)
 	AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flags)
 	FreePool(void* BlockAddress)
+	InitPagingFile(RFPARTITION_INSTANCE Partition)
 	PageOutPool(RFPROCESS Process)
 	LoadPagedPool(RFPROCESS Process, void* VirtualAddress)
+	CacheBlock(void* BlockAddress)
+
+Internal:
+	InitMemoryManagementSubsystem() Chooses SSE, AVX or AVX512 Functions and Maps Physical Memory
+	__(SSE/AVX/AVX512)_(FunctionName)
+	
+
+QueryAllocatedBlockSegment:
 	
 	
 	

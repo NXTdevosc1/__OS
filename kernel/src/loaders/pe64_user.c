@@ -21,7 +21,7 @@ KERNELSTATUS Pe64LoadUserApplication(LPWSTR path){
     if(!executable_file) return -1;
     UINT16 FileName[MAX_FILE_NAME] = {0};
     GetFileInfo(executable_file, &FileInfo, FileName);
-    char* buffer = kmalloc(FileInfo.FileSize);
+    char* buffer = AllocatePool(FileInfo.FileSize);
     if(!buffer) return -1;
     if(KERNEL_ERROR(ReadFile(executable_file, 0, NULL, buffer))) {
         CloseFile(executable_file);
@@ -30,13 +30,13 @@ KERNELSTATUS Pe64LoadUserApplication(LPWSTR path){
     unsigned int __pe_hdr_off = GetPEhdrOffset(buffer);
     if(__pe_hdr_off == -1 || FileInfo.FileSize + USER_IMAGE_BASE > USER_MAIN_IMAGE_LIMIT) {
         CloseFile(executable_file);
-        free(buffer, kproc);
+        RemoteFreePool(kproc, buffer);
         return -2;
     }
     PE_IMAGE_HDR* image = (PE_IMAGE_HDR*)((UINT64)buffer + __pe_hdr_off);
     if (!PeCheckFileHeader(image)) {
         CloseFile(executable_file);
-        free(buffer, kproc);
+        RemoteFreePool(kproc, buffer);
     }
 
     if (image->ThirdHeader.Subsystem == SUBSYSTEM_NATIVE) return KERNEL_SERR;
@@ -45,7 +45,7 @@ KERNELSTATUS Pe64LoadUserApplication(LPWSTR path){
     RFPROCESS Process = KeCreateProcess(NULL, FileName, image->ThirdHeader.Subsystem, USERMODE_PROCESS);
     if(!Process){
         CloseFile(executable_file);
-        free(buffer, kproc);
+        RemoteFreePool(kproc, buffer);
         return -4;
     }
     OpenHandle(Process->Handles, NULL, HANDLE_FLAG_FREE_ON_EXIT, 0, buffer, NULL);
@@ -69,7 +69,7 @@ KERNELSTATUS Pe64LoadUserApplication(LPWSTR path){
 
     if (!VirtualBufferLength) {
         CloseFile(executable_file);
-        free(buffer, kproc);
+        RemoteFreePool(kproc, buffer);
         return -5;
     }
     char* VirtualBuffer = AllocatePoolEx(NULL, VirtualBufferLength, 0x1000, 0);
@@ -108,7 +108,7 @@ KERNELSTATUS Pe64LoadUserApplication(LPWSTR path){
 
     Process->ImageHandle = image;
 
-    HTHREAD MainThread = KeCreateThread(Process, image->ThirdHeader.StackReserve, (THREAD_START_ROUTINE)(ImageBase + image->OptionnalHeader.EntryPointAddr), THREAD_CREATE_SUSPEND, NULL);
+    RFTHREAD MainThread = KeCreateThread(Process, image->ThirdHeader.StackReserve, (THREAD_START_ROUTINE)(ImageBase + image->OptionnalHeader.EntryPointAddr), THREAD_CREATE_SUSPEND, NULL);
 
     if (!MainThread) SET_SOD_PROCESS_MANAGEMENT;
 
@@ -117,19 +117,19 @@ KERNELSTATUS Pe64LoadUserApplication(LPWSTR path){
     if (!AllocationSize) AllocationSize = PROCESS_DEFAULT_HEAP_SIZE;
     if (AllocationSize % 0x1000) AllocationSize += 0x1000 - (AllocationSize % 0x1000);
 
-    if (!AllocateUserHeapSpace(Process, AllocationSize)) SET_SOD_PROCESS_MANAGEMENT;
+    // if (!AllocateUserHeapSpace(Process, AllocationSize)) SET_SOD_PROCESS_MANAGEMENT;
     
     if (image->OptionnalDataDirectories.BaseRelocationTable.VirtualAddress) {
         if (FAILED(Pe64RelocateImage(image, buffer, VirtualBuffer, (void*)USER_IMAGE_BASE))) {
             CloseFile(executable_file);
-            free(buffer, kproc);
+            RemoteFreePool(kproc, buffer);
             return -5;
         }
     }
     if (image->OptionnalDataDirectories.ImportAddressTable.VirtualAddress) {
         if(FAILED(Pe64ResolveImports(VirtualBuffer, buffer, image, Process))) {
             CloseFile(executable_file);
-            free(buffer, kproc);
+            RemoteFreePool(kproc, buffer);
             return -5;
         }
     }

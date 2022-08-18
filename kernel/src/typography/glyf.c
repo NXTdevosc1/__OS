@@ -10,7 +10,7 @@ uint16_t x_glyf = 0, y_glyph = 0;
 char ttf_glyf_parse(void* glyf, struct FONT_TABLE* font_table, struct TTF_TABLE_RECORD* record){
     GP_clear_screen(0);
     struct TTF_GLYF* glyph_table = glyf;
-    struct TTF_SIMPLE_GLYPH_TABLE_COMPONENT* tbl = kmalloc(sizeof(struct TTF_SIMPLE_GLYPH_TABLE_COMPONENT));
+    struct TTF_SIMPLE_GLYPH_TABLE_COMPONENT* tbl = AllocatePool(sizeof(struct TTF_SIMPLE_GLYPH_TABLE_COMPONENT));
     if(!tbl) SET_SOD_OUT_OF_RESOURCES;
     for(uint16_t _glyph_index = 0;_glyph_index<font_table->num_glyphs;_glyph_index++){
     glyph_table->xmin = SWAPWORD(glyph_table->xmin);
@@ -63,7 +63,7 @@ char ttf_glyf_parse(void* glyf, struct FONT_TABLE* font_table, struct TTF_TABLE_
         tbl->instruction_length = SWAPWORD(*(uint16_t*)(glyph_data + (glyph_table->number_of_contours * 2)));
         tbl->instructions = (uint8_t*)(glyph_data + (glyph_table->number_of_contours * 2) + 2);
         uint8_t* flags = (uint8_t*)(((uint64_t)tbl->instructions + tbl->instruction_length));
-        struct GLYPH_DESCRIPTOR* gcd = kmalloc(sizeof(struct GLYPH_DESCRIPTOR) + ((SWAPWORD(tbl->end_pts_of_contours[glyph_table->number_of_contours - 1]) + 1)*sizeof(struct GLYPH_CORDINATE_ENTRY)));
+        struct GLYPH_DESCRIPTOR* gcd = AllocatePool(sizeof(struct GLYPH_DESCRIPTOR) + ((SWAPWORD(tbl->end_pts_of_contours[glyph_table->number_of_contours - 1]) + 1)*sizeof(struct GLYPH_CORDINATE_ENTRY)));
         if(!gcd) SET_SOD_OUT_OF_RESOURCES;
         *(struct GLYPH_DESCRIPTOR**)((char*)font_table->glyphs_ptr_array + (_glyph_index * 8)) = gcd;
         ZeroMemory(gcd, sizeof (struct GLYPH_DESCRIPTOR) + ((SWAPWORD(tbl->end_pts_of_contours[glyph_table->number_of_contours - 1]) + 1) * sizeof(struct GLYPH_CORDINATE_ENTRY)));
@@ -89,7 +89,7 @@ char ttf_glyf_parse(void* glyf, struct FONT_TABLE* font_table, struct TTF_TABLE_
 
             continue;
         }
-        gcd->flags = kmalloc(gcd->num_cordinates);
+        gcd->flags = AllocatePool(gcd->num_cordinates);
         if(!gcd->flags) SET_SOD_OUT_OF_RESOURCES;
 
         char* ptr = flags;
@@ -196,7 +196,7 @@ char ttf_glyf_parse(void* glyf, struct FONT_TABLE* font_table, struct TTF_TABLE_
 
     }
     }
-    free(tbl,kproc);
+    RemoteFreePool(kproc, tbl);
     
     while(1);
     
@@ -213,9 +213,9 @@ char DrawGlyph(struct FONT_TABLE* font_table, uint16_t glyph_index, uint32_t x_o
         int16_t last_y = 0;
         int16_t last_x = 0;
         int16_t last_vy = 0;
-        int16_t* cords_descx = kmalloc(gcd->num_cordinates * 2);
-        int16_t* cords_descy = kmalloc(gcd->num_cordinates * 2);
-        uint32_t* buffer = kmalloc(120*120*4);
+        int16_t* cords_descx = AllocatePool(gcd->num_cordinates * 2);
+        int16_t* cords_descy = AllocatePool(gcd->num_cordinates * 2);
+        uint32_t* buffer = AllocatePool(120*120*4);
         if(!buffer || !cords_descx || !cords_descy) SET_SOD_OUT_OF_RESOURCES;
         memset32(buffer,0,120*120);
         

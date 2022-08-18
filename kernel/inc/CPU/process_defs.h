@@ -186,7 +186,7 @@ typedef struct _PROCESS_CONTROL_BLOCK{
     UINT32 PriorityClass;
     UINT8 Subsystem;
     UINT64 TokenPrivileges;
-    MEMORY_MANAGEMENT_TABLE MemoryManagementTable;
+    PROCESS_MEMORY_TABLE MemoryManagementTable;
     UINT64 StackSize;
     UINT64 NumThreads;
     UINT64 CpuTime;
@@ -251,14 +251,14 @@ enum PRIORITY_CLASS_LIST_INDEX {
     PRIORITY_CLASS_INDEX_COUNT = 7
 };
 
-
+#define MAX_PROCESSES 1024
 
 typedef struct __PROCESS_MANAGER_TABLE {
     BOOL SchedulerEnable;
     BOOL CpuTimeCalculation; // Set when calculating cpu time <illegal for scheduller to increment cpu time>
     UINT64 NumProcessors;
     THREADLIST ThreadList;
-    PLIST ProcessList;
+    PROCESS ProcessList[MAX_PROCESSES];
     BOOL SystemInitialized;
     UINT64 NextThreadProcessor; // Used by create thread to chose the threads start processor
     BOOL BroadCastIpi;

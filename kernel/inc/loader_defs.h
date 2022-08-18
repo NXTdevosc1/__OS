@@ -74,19 +74,20 @@ typedef struct _FRAME_BUFFER_DESCRIPTOR{
 	FRAME_BUFFER_DESCRIPTOR* Next;
 } FRAME_BUFFER_DESCRIPTOR;
 
+typedef struct _MEMORY_DESCRIPTOR {
+	unsigned char Type;
+	unsigned long long PageCount;
+	unsigned long long PhysicalStart;
+} MEMORY_DESCRIPTOR;
 
-struct MEMORY_MAP{
-	unsigned long long count;
-	struct {
-	unsigned char type;
-	unsigned long long pages_count;
-	unsigned long long physical_start;
-	} mem_desc[1];
-};
+typedef struct _MEMORY_MAP{
+	unsigned long long Count;
+	MEMORY_DESCRIPTOR MemoryDescriptors[];
+} MEMORY_MAP;
 
 
 typedef struct _KERNEL_INITIALISATION_DATA {
-	struct MEMORY_MAP* memory_map;
+	MEMORY_MAP* MemoryMap;
 	UINT64 NumFrameBuffers; // Number of display Frame Buffers
 	FRAME_BUFFER_DESCRIPTOR* fb;
 	struct PSF1_FONT* start_font;

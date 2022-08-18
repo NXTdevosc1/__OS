@@ -1,73 +1,51 @@
 #pragma once
 #include <krnltypes.h>
 #include <mem.h>
-typedef struct _MEMORY_MANAGEMENT_TABLE MEMORY_MANAGEMENT_TABLE;
 
-typedef struct _MEMORYSTATUS {
-	UINT16 MemoryLoad;
-	UINT64 VirtualMemoryLoad;
-	UINT64 TotalPhys;
-	UINT64 AvailaiblePhys;
-	UINT64 TotalPageFile;
-	UINT64 AvailaiblePageFile;
-	UINT64 TotalVirtual;
-	UINT64 RemainingVirtual;
-} MEMORYSTATUS, * LPMEMORYSTATUS;
+#define ZeroMemory(Memory, Size) memset(Memory, 0, Size)
+#define SZeroMemory(Memory) memset(Memory, 0, sizeof(*Memory))
 
-typedef struct _MEMORY_HEAP_DESCRIPTOR MEMORY_HEAP_DESCRIPTOR, * PMEMORY_HEAP_DESCRIPTOR;
+#pragma pack(push, 1)
+
+typedef struct _PROCESS_CONTROL_BLOCK *RFPROCESS;
+
+typedef struct _PAGE_ALLOCATION_TABLE {
+    union {
+        struct {
+            UINT64 Used : 1;
+            UINT64 Paged : 1;
+            UINT64 NumHeaps : 9; // 0-256
+            UINT64 Reserved : 1;
+            UINT64 PhysicalAddress : 52;
+        } State;
+        UINT64 Raw; // Uncleared at startup
+    } State;
+    
+    UINT64 NextPage;
+} PAGE_ALLOCATION_TABLE;
+
+extern PAGE_ALLOCATION_TABLE* PageAllocationTable;
+
+typedef struct _MEMORY_SEGMENT MEMORY_SEGMENT, *RFMEMORY_SEGMENT;
+
+#define MEMORY_BLOCK_CACHE_COUNT 4
+#define MEMORY_BLOCK_CACHE_SIZE 0x40
 
 
-typedef struct _FREE_MEMORY_LIST FREE_MEMORY_LIST;
-typedef struct _ALLOCATED_MEMORY_LIST ALLOCATED_MEMORY_LIST;
+typedef struct _MEMORY_BLOCK_CACHE_LINE{
+    UINT CacheLineSize;
+    UINT Reserved[3]; // to keep 16 Byte alignment
+    RFMEMORY_SEGMENT CachedMemorySegments[MEMORY_BLOCK_CACHE_SIZE];
+} MEMORY_BLOCK_CACHE_LINE;
 
-typedef struct _FREE_HEAP_DESCRIPTOR {
-	BOOL Present;
-	UINT Index;
-	FREE_MEMORY_LIST* ParentList;
-	PMEMORY_HEAP_DESCRIPTOR PhysicalHeap;
-	UINTPTR Address;
-	UINT64 HeapLength;
-	UINT64 UsedMemory;
-} FREE_HEAP_DESCRIPTOR, * PFREE_HEAP_DESCRIPTOR;
+#define MEMORY_LIST_HEAD_SIZE 0x40
+#define DEFAULT_MEMORY_ALIGNMENT 0x10
 
-typedef struct _MEMORY_HEAP_DESCRIPTOR {
-	BOOL Present; // Present == 3 Means that it's a private heap
-	UINT Index;
-	LPVOID Thread;
-	ALLOCATED_MEMORY_LIST* ParentList;
+typedef enum _MEMORY_SEGMENT_FLAGS {
+    MEMORY_SEGMENT_PRESENT = 1,
+    MEMORY_SEGMENT_SWAPPING_UNALLOWED = 2, // Prevents memory manager from paging out memory in this segment
 
-	PFREE_HEAP_DESCRIPTOR SourceHeap; // When heap slices in user process, it maybe unrecoverable on free until process is terminated
-	UINTPTR Address;
-	UINT64 HeapLength;
-} MEMORY_HEAP_DESCRIPTOR, * PMEMORY_HEAP_DESCRIPTOR;
-
-typedef struct _FREE_MEMORY_LIST {
-	UINT SearchMax;
-	UINT HeapCount;
-	FREE_HEAP_DESCRIPTOR Heaps[UNITS_PER_LIST];
-	FREE_MEMORY_LIST* Next;
-} FREE_MEMORY_LIST;
-
-typedef struct _ALLOCATED_MEMORY_LIST {
-	UINT SearchMax;
-	UINT HeapCount;
-	MEMORY_HEAP_DESCRIPTOR Heaps[UNITS_PER_LIST];
-	ALLOCATED_MEMORY_LIST* Next;
-} ALLOCATED_MEMORY_LIST;
-
-typedef struct _MEMORY_MANAGEMENT_TABLE {
-	LPVOID Process;
-	UINT64 PhysicalUsedMemory; // AvailaibleMemory + PrivateBytes
-	UINT64 AvailaibleMemory;
-	UINT64 UsedMemory;
-	ALLOCATED_MEMORY_LIST* AllocatedMemory; // Last Allocated mem list
-	FREE_MEMORY_LIST* FreeMemory; // last free mem list
-	ALLOCATED_MEMORY_LIST AllocatedMemoryList;
-	FREE_MEMORY_LIST FreeMemoryList;
-} MEMORY_MANAGEMENT_TABLE;
-
-typedef struct _PROCESS_CONTROL_BLOCK PROCESS, *RFPROCESS;
-typedef struct _THREAD_CONTROL_BLOCK THREAD, *HTHREAD;
+} MEMORY_SEGMENT_FLAGS;
 
 typedef enum _IO_MEMORY_FLAGS {
 	IO_MEMORY_CACHE_DISABLED,
@@ -75,59 +53,90 @@ typedef enum _IO_MEMORY_FLAGS {
 	IO_MEMORY_READ_ONLY
 } IO_MEMORY_FLAGS;
 
-BOOL KERNELAPI CreateMemoryTable(RFPROCESS Process, MEMORY_MANAGEMENT_TABLE* MemoryTable);
+typedef struct _MEMORY_SEGMENT {
+    UINT16 Flags;
+    UINT16 ProcessId;
+    void* BlockAddress;
+    UINT64 BlockSize;
+    UINT64 PageAllocationTableStart;
+} MEMORY_SEGMENT;
 
-PMEMORY_HEAP_DESCRIPTOR KERNELAPI AllocateHeapDescriptor(
-	MEMORY_MANAGEMENT_TABLE* MemoryTable,
-	HTHREAD Thread, 
-	PFREE_HEAP_DESCRIPTOR SourceHeap,
-	LPVOID Address,
-	UINT64 HeapLength
-);
+typedef struct _MEMORY_SEGMENT_LIST_HEAD MEMORY_SEGMENT_LIST_HEAD, *RFMEMORY_SEGMENT_LIST_HEAD;
 
 
-PFREE_HEAP_DESCRIPTOR KERNELAPI AllocateFreeHeapDescriptor(
-	RFPROCESS Process,
-	PMEMORY_HEAP_DESCRIPTOR PhysicalHeap, 
-	LPVOID Address, 
-	UINT64 HeapLength
-);
 
-LPVOID KERNELAPI HeapCreate(MEMORY_MANAGEMENT_TABLE* MemoryTable, UINT64* NumBytes, UINT32 Align, PFREE_HEAP_DESCRIPTOR* SourceHeap, UINT64 MaxAddress); // Search for a heap
+typedef struct _MEMORY_SEGMENT_LIST_HEAD {
+    MEMORY_SEGMENT MemorySegments[MEMORY_LIST_HEAD_SIZE];
+    RFMEMORY_SEGMENT_LIST_HEAD NextList;
+} MEMORY_SEGMENT_LIST_HEAD;
+
+#define UNALLOCATED_MEMORY_SEGMENT_CACHE_SIZE 0x100
+
+#define NUM_FREE_MEMORY_LEVELS 4
+
+
+typedef struct _MEMORY_MANAGEMENT_TABLE {
+    
+    UINT64 AvailableMemory; // Physical Memory + Paging File Size
+    UINT64 UsedMemory;
+    UINT64 PagingFileSize;
+    UINT64 PagedMemory;
+    UINT64 UnpageableMemory;
+    UINT64 IoMemory;
+    UINT64 PageAllocationTableSize; // In Number of entries
+    UINT64 Reserved0; // To keep 0x10 Bytes alignment
+    MEMORY_BLOCK_CACHE_LINE UnallocatedSegmentCache;
+    PAGE_ALLOCATION_TABLE* PageAllocationTable;
+    MEMORY_SEGMENT_LIST_HEAD AllocatedMemory;
+    struct {
+        MEMORY_SEGMENT_LIST_HEAD SegmentListHead;
+    } FreeMemoryLevels[4];
+} MEMORY_MANAGEMENT_TABLE;
+
+extern MEMORY_MANAGEMENT_TABLE MemoryManagementTable;
+
+
+typedef struct _PROCESS_MEMORY_TABLE {
+    UINT64 AvailableMemory;
+    UINT64 UsedMemory;
+    UINT64 PagedMemory;
+    UINT64 UnpageableMemory;
+    MEMORY_BLOCK_CACHE_LINE UnallocatedSegmentCache; // for Allocated Memory
+    MEMORY_SEGMENT_LIST_HEAD AllocatedMemory;
+    struct {
+        MEMORY_BLOCK_CACHE_LINE UnallocatedSegmentCache; // for Free Memory
+        MEMORY_SEGMENT_LIST_HEAD SegmentListHead;
+    } FreeMemoryLevels[4];
+} PROCESS_MEMORY_TABLE;
+
+#pragma pack(pop)
+
+void InitMemoryManagementSubsystem();
+RFMEMORY_SEGMENT QueryAllocatedBlockSegment(void* BlockAddress);
+RFMEMORY_SEGMENT QueryFreeBlockSegment(void* BlockAddress);
+RFMEMORY_SEGMENT AllocateMemorySegment(MEMORY_SEGMENT_LIST_HEAD* ListHead, MEMORY_BLOCK_CACHE_LINE* CacheLine);
+
+
 
 typedef enum _ALLOCATE_POOL_FLAGS {
 	ALLOCATE_POOL_LOW_4GB = 1,
 	ALLOCATE_POOL_PHYSICAL = 2, // Returns the Physical Address of the Allocated Pool instead of its Virtual Address
-	ALLOCATE_POOL_NOT_RAM = 4 // Prevents decrementing RAM When allocating IO Pool Or Virtual RAM Space POOL
+	ALLOCATE_POOL_NOT_RAM = 4, // Prevents decrementing RAM When allocating IO Pool Or Virtual RAM Space POOL
+    ALLOCATE_POOL_DISK_SWAPPING_UNALLOWED = 8
 } ALLOCATE_POOL_FLAGS;
 
-LPVOID KEXPORT KERNELAPI AllocatePoolEx(HTHREAD Thread, UINT64 NumBytes, UINT32 Align, UINT64 Flags);
+void* AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flags);
+void* AllocatePool(UINT64 NumBytes);
+void* FreePool(void* HeapAddress);
+void* RemoteFreePool(RFPROCESS Process, void* HeapAddress);
 
+#define PAGE_FILE_LOCATION "//OS/$SwapFile"
 
-LPVOID KEXPORT KERNELAPI malloc(UINT64 NumBytes);
-LPVOID KEXPORT KERNELAPI free(LPVOID Heap, RFPROCESS Process);
-LPVOID KEXPORT KERNELAPI FastFree(LPVOID AllocationSegment, RFPROCESS Process);
-LPVOID KERNELAPI kfree(LPVOID Heap);
+void InitPagingFile(); // System PARTITION_INSTANCE Located in C:/ By default
+KERNELSTATUS PageOutPool(RFPROCESS Process, void* VirtualAddress);
+KERNELSTATUS LoadPagedPool(RFPROCESS Process, void* VirtualAddress);
 
-LPVOID KERNELAPI kmalloc(UINT64 NumBytes);
-LPVOID KERNELAPI kpalloc(UINT64 NumPages);
+LPVOID KEXPORT KERNELAPI AllocateIoMemory(_IN LPVOID PhysicalAddress, _IN UINT64 NumPages, _IN UINT Flags);
+BOOL KEXPORT KERNELAPI FreeIoMemory(_IN LPVOID IoMemory);
 
-LPVOID KERNELAPI UserExtendedAlloc(UINT64 NumBytes, UINT32 Align);
-LPVOID KERNELAPI UserMalloc(UINT64 NumBytes);
-
-LPVOID KERNELAPI AllocateUserHeapSpace(RFPROCESS Process, UINT64 NumBytes); // Automatically Aligned to 0x1000
-
-BOOL GetPhysicalMemoryStatus(LPMEMORYSTATUS MemoryStatus);
-
-LPVOID KERNELAPI CurrentProcessMalloc(unsigned long long HeapSize);
-LPVOID KERNELAPI CurrentProcessFree(LPVOID Heap);
-
-typedef struct _GLOBAL_MEMORY_STATUS {
-	UINT64 TotalMemory;
-	UINT64 AllocatedMemory;
-} PHYSICALMEMORYSTATUS, * LPPHYSICALMEMORYSTATUS;
-
-extern PHYSICALMEMORYSTATUS PhysicalMemoryStatus;
-
-LPVOID KEXPORT KERNELAPI AllocateIoMemory(LPVOID PhysicalAddress, UINT64 NumPages, UINT Flags);
-BOOL KEXPORT KERNELAPI FreeIoMemory(LPVOID IoMem);
+RFMEMORY_SEGMENT (*_SIMD_AllocateMemorySegmentFromCache)(MEMORY_BLOCK_CACHE_LINE* CacheLine);

@@ -18,7 +18,7 @@ RTC_TIME_DATE RtcTimeDate = {0};
 
 void RtcUpdate();
 
-HTHREAD RtcClientThread = NULL;
+RFTHREAD RtcClientThread = NULL;
 BOOL Updating = FALSE;
 void RtcClient(){
 	SetThreadPriority(RtcClientThread, THREAD_PRIORITY_HIGH);

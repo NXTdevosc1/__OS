@@ -106,7 +106,7 @@ FILE KERNELAPI DefaultOpenFile(PARTITION_INSTANCE* Partition, LPWSTR Path, UINT6
     if (!Partition->Interface.GetInfo) return NULL;
     UINT64 PathLength = wstrlen(Path);
     RFPROCESS Process = KeGetCurrentProcess();
-    LPWSTR Copy = kmalloc((PathLength + 1) << 1);
+    LPWSTR Copy = AllocatePool((PathLength + 1) << 1);
     memcpy16(Copy, Path, PathLength);
     Copy[PathLength] = 0;
 
@@ -120,11 +120,11 @@ FILE KERNELAPI DefaultOpenFile(PARTITION_INSTANCE* Partition, LPWSTR Path, UINT6
                 return FoundFile;
             }
             if ((Access & FILE_OPEN_WRITE) && (FoundFile->OpenAccess & FILE_OPEN_WRITE)) {
-                kfree(Copy);
+                RemoteFreePool(kproc, Copy);
                 return NULL;
             }
             if ((Access & FILE_OPEN_SET_INFORMATION) && (FoundFile->OpenAccess & FILE_OPEN_SET_INFORMATION)) {
-                kfree(Copy);
+                RemoteFreePool(kproc, Copy);
                 return NULL;
             }
         }
@@ -163,7 +163,7 @@ FILE KERNELAPI DefaultOpenFile(PARTITION_INSTANCE* Partition, LPWSTR Path, UINT6
 KERNELSTATUS KERNELAPI DefaultCloseFile(FILE File) {
     File->Handle->Flags &= ~(HANDLE_FLAG_CLOSE_FILE_ON_EXIT); // File is manually closed, calling CloseHandle will cause CloseFile and causes stack overflow, ... problems
     CloseHandle(File->Handle);
-    kfree(File->Path);
+    RemoteFreePool(kproc, File->Path);
     SZeroMemory(File);
     return KERNEL_SOK;
 }
@@ -171,21 +171,21 @@ KERNELSTATUS KERNELAPI DefaultCloseFile(FILE File) {
 
 int FsMountDevice(RFDEVICE_OBJECT device){
     if(!ValidateDevice(device)) return -1;
-    void* sect0 = kpalloc(1);
+    void* sect0 = AllocatePoolEx(kproc, 0x1000, 0, 0);
     if(!sect0) SET_SOD_OUT_OF_RESOURCES;
     memset(sect0,0, 0x1000);
 
 
     if(KERNEL_ERROR(FsReadDrive((DISK_DEVICE_INSTANCE*)device->ExtensionPointer,0,1,sect0))) {
-        free(sect0,kproc);
+        RemoteFreePool(kproc, sect0);
         return -1;
     }
 
     if(KERNEL_ERROR(MountMbrDevice((DISK_DEVICE_INSTANCE*)device->ExtensionPointer, sect0))) {
-        free(sect0, kproc);
+        RemoteFreePool(kproc, sect0);
         return -2;
     }
-    free(sect0, kproc);
+    RemoteFreePool(kproc, sect0);
     return SUCCESS;
 }
 

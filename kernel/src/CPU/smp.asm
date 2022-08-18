@@ -111,7 +111,7 @@ TMP_GDT_END:
     
 
 [BITS 64]
-extern kpalloc
+extern AllocatePool
 extern SetupCPU
 align 0x10
 
@@ -165,14 +165,14 @@ SmpEntry:
     mov rax, [KERNEL_PAGE_TABLE_POINTER]
     mov cr3, rax
 
-    mov rcx, 10 ; 40K Stack Memory
-    mov rbx, kpalloc
+    mov rcx, 0x40000 ; 40K Stack Memory
+    mov rbx, AllocatePool
     call rbx
     cmp rax, 0
     je .ResetSystem
     ; No Allocation Check
 
-    add rax, 0x800 ; 2 K Padding for protection
+    add rax, 0x3F800 ; Go to stack top and leave 2k of free stack as padding
     mov rsp, rax
     mov rbp, rax
    

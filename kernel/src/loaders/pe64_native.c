@@ -40,7 +40,7 @@ KERNELSTATUS Pe64LoadNativeApplication(void* ImageBuffer, RFDRIVER_OBJECT Driver
 		}
 	}
 	if (!VirtualBufferLength) return -1;
-	char* VirtualBuffer = kmalloc(VirtualBufferLength);
+	char* VirtualBuffer = AllocatePool(VirtualBufferLength);
 	if (!VirtualBuffer) SET_SOD_MEMORY_MANAGEMENT;
 
 	Section = (PE_SECTION_TABLE*)((char*)&PeImage->OptionnalHeader + PeImage->SizeofOptionnalHeader);
@@ -71,7 +71,7 @@ KERNELSTATUS Pe64LoadNativeApplication(void* ImageBuffer, RFDRIVER_OBJECT Driver
 
 	DriverObject->DriverStartup = (DRIVER_STARTUP_PROCEDURE)EntryPoint;
 	DriverObject->StackSize = PeImage->ThirdHeader.StackReserve;
-	free(ImageBuffer, kproc);
+	RemoteFreePool(kproc, ImageBuffer);
 	return KERNEL_SOK;
 }
 

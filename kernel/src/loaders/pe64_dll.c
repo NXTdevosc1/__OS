@@ -67,7 +67,7 @@ HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR*
 			wstrcmp_nocs(FileImportTable[i].BaseName, WDllName, DllNameLength)
 			){
 				// Fork the dll
-				DllBuffer = kmalloc(FileImportTable[i].LoadedFileSize);
+				DllBuffer = AllocatePool(FileImportTable[i].LoadedFileSize);
 				if(!DllBuffer) SET_SOD_MEMORY_MANAGEMENT;
 				memcpy(DllBuffer, FileImportTable[i].LoadedFileBuffer, FileImportTable[i].LoadedFileSize);
 				
@@ -85,7 +85,7 @@ HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR*
 	
 
 	if (!DllFileInfo.FileSize) return -1; // Invalid Dll
-	DllBuffer = kmalloc(DllFileInfo.FileSize);
+	DllBuffer = AllocatePool(DllFileInfo.FileSize);
 	if (!DllBuffer) SET_SOD_MEMORY_MANAGEMENT;
 
 	if (FAILED(ReadFile(DllFile, 0, NULL, DllBuffer))) return -4;
@@ -243,7 +243,7 @@ HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR*
 	if(OSKRNLX64) {
 		SystemDebugPrint(L"OSKRNLX64 Loaded !");
 	} else {
-		free(DllBuffer, kproc);
+		RemoteFreePool(kproc, DllBuffer);
 	}
 
 	

@@ -9,15 +9,7 @@
 #include <CPU/cpu.h>
 
 void* GlobalSyscallTable[MAX_SYSCALL + 1] = {
-    SysIdentify,
-    SyscallDebugPrint,
-    KeGetCurrentProcessId,
-    KeGetCurrentThreadId,
-    UserMalloc,
-    NULL,
-    NULL,
-    GetPhysicalMemoryStatus,
-    TerminateCurrentProcess
+    NULL
 };
 
 //void* __GlobalSyscallTable[] = {

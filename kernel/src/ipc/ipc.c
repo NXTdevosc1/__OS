@@ -45,7 +45,7 @@ PCLIENT AllocateClient() {
 	return NULL;
 }
 
-PCLIENT KERNELAPI IpcClientCreate(HTHREAD HostThread, UINT MessageQueueLength, UINT CreationFlags){
+PCLIENT KERNELAPI IpcClientCreate(RFTHREAD HostThread, UINT MessageQueueLength, UINT CreationFlags){
 	if (MessageQueueLength < 50) MessageQueueLength = 0x2000;
 
 #ifdef  ___KERNEL_DEBUG___
@@ -105,7 +105,7 @@ BOOL KERNELAPI	IpcClientDestroy(PCLIENT Client) {
 	DebugWrite("IPC : Destroy Client");
 #endif //  ___KERNEL_DEBUG___
 	CloseHandle(Client->ClientHandle);
-	kfree(Client->InMessageQueue);
+	RemoteFreePool(kproc, Client->InMessageQueue);
 
 	HANDLE_ITERATION_STRUCTURE Iterator = { 0 };
 	StartHandleIteration(Client->Process->Handles, &Iterator);
@@ -122,7 +122,7 @@ BOOL KERNELAPI	IpcClientDestroy(PCLIENT Client) {
 	return TRUE;
 }
 
-KERNELSTATUS KERNELAPI IpcPostThreadMessage(HTHREAD Thread, UINT64 Message, void* Data, UINT64 NumBytes){
+KERNELSTATUS KERNELAPI IpcPostThreadMessage(RFTHREAD Thread, UINT64 Message, void* Data, UINT64 NumBytes){
 	if (!Thread) return KERNEL_SERR_INVALID_PARAMETER;
 	return IpcSendMessage(KeGetCurrentThread()->Client, Thread->Client, TRUE, Message, Data, NumBytes);
 }
@@ -302,7 +302,7 @@ BOOL KERNELAPI IpcMessageDispatch(PCLIENT Client) {
 
 	if (!Client->CurrentMessage || !Client->InMessageQueue->PendingMessages) return FALSE;
 
-	HTHREAD SenderThread = Client->CurrentMessage->Header.Source->Thread;
+	RFTHREAD SenderThread = Client->CurrentMessage->Header.Source->Thread;
 
 	BOOL SyncMessage = FALSE;
 	if (Client->CurrentMessage->Header.Status) SyncMessage = TRUE;
@@ -339,7 +339,7 @@ void* KERNELAPI IpcGetMessagePacket(PCLIENT Client){
 	return Packet;
 }
 
-PCLIENT KERNELAPI IpcGetThreadClient(HTHREAD Thread) {
+PCLIENT KERNELAPI IpcGetThreadClient(RFTHREAD Thread) {
 	if (!Thread) return NULL;
 	return Thread->Client;
 }

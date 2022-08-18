@@ -127,7 +127,7 @@ LPVOID DeviceConfigurationPtr // Used in PCI Configuration Space (if PCI Source 
 			return Device;
 		}
 		if (!list->Next) {
-			list->Next = kmalloc(sizeof(DEVICE_LIST));
+			list->Next = AllocatePool(sizeof(DEVICE_LIST));
 			list = list->Next;
 			SZeroMemory(list);
 		}

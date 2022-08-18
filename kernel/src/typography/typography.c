@@ -13,7 +13,7 @@ char LoadFont(
 )
 {
     struct TTF_TABLE_HDR* font_hdr = font;
-    struct FONT_TABLE* font_table = kmalloc(sizeof(struct FONT_TABLE));
+    struct FONT_TABLE* font_table = AllocatePool(sizeof(struct FONT_TABLE));
     if(!font_table) return 0;
 
     memset(font_table,0,sizeof(struct FONT_TABLE));

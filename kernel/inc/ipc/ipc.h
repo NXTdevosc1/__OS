@@ -60,7 +60,7 @@ typedef struct _CLIENT {
 	UINT64			__IndexInList;
 	RFCLIENT_LIST	__ParentList;
 	RFPROCESS	Process;
-	HTHREAD		Thread;
+	RFTHREAD		Thread;
 	HANDLE      ClientHandle;
 	MSG_QUEUE	InMessageQueue;
 	MSG_OBJECT* CurrentMessage;
@@ -85,7 +85,7 @@ void IpcInit();
 
 BOOL KERNELAPI IpcIsValidClient(RFPROCESS Process, PCLIENT Client);
 
-PCLIENT KERNELAPI IpcClientCreate(HTHREAD HostThread, UINT MessageQueueLength, UINT CreationFlags);
+PCLIENT KERNELAPI IpcClientCreate(RFTHREAD HostThread, UINT MessageQueueLength, UINT CreationFlags);
 BOOL KERNELAPI	IpcClientDestroy(PCLIENT Client);
 
 // PCLIENT Destination. Will be cleared after the message was processed
@@ -98,7 +98,7 @@ BOOL KERNELAPI IpcMessageDispatch(PCLIENT Client);
 //KERNELSTATUS KERNELAPI AsyncSendMessage(PCLIENT Client, PCLIENT Destination, MSG* Message, KERNELSTATUS* ReturnValue, BOOL* Pending);
 
 
-KERNELSTATUS KERNELAPI IpcPostThreadMessage(HTHREAD Thread, UINT64 Message, void* Data, UINT64 NumBytes);
+KERNELSTATUS KERNELAPI IpcPostThreadMessage(RFTHREAD Thread, UINT64 Message, void* Data, UINT64 NumBytes);
 
 
 
@@ -112,7 +112,7 @@ KERNELSTATUS KERNELAPI IpcPostThreadMessage(HTHREAD Thread, UINT64 Message, void
 BOOL KERNELAPI		 IpcGetMessage(PCLIENT Client, MSG* Message);
 
 //void KERNELAPI KTIpcClientThread(); // Kernel Thread (KT)
-PCLIENT KERNELAPI IpcGetThreadClient(HTHREAD Thread);
+PCLIENT KERNELAPI IpcGetThreadClient(RFTHREAD Thread);
 
 BOOL KERNELAPI IpcQueryMessageHeader(PCLIENT Client, MSG_HEADER* Header);
 void* KERNELAPI IpcGetMessagePacket(PCLIENT Client);

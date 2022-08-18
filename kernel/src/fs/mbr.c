@@ -41,10 +41,10 @@ int MountMbrDevice(DISK_DEVICE_INSTANCE* Disk, void* sect0){
             case MBR_FAT32:
             {
             
-                FAT32_Mount(
-                hdr->partition_entries[i].starting_lba_addr_low | (hdr->partition_entries[i].starting_lba_addr_high << 16),
-                hdr->partition_entries[i].sector_count_low | (hdr->partition_entries[i].sector_count_high<<16),
-                Disk);
+                // FAT32_Mount(
+                // hdr->partition_entries[i].starting_lba_addr_low | (hdr->partition_entries[i].starting_lba_addr_high << 16),
+                // hdr->partition_entries[i].sector_count_low | (hdr->partition_entries[i].sector_count_high<<16),
+                // Disk);
                 break;
             }
             case MBR_GPT:

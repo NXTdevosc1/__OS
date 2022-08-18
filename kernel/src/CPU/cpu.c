@@ -32,7 +32,7 @@ UINT64 ProcessorTablesOffset = 0;
 void InitProcessorDescriptors(void** CpuBuffer, UINT64* CpuBufferSize){
 	UINT64 _CpuBufferNumPages = 20 + TSS_IST1_NUMPAGES + TSS_IST2_NUMPAGES + TSS_IST3_NUMPAGES + SYSENTRY_STACK_NUMPAGES;
 	void* _CpuBuffer = (char*)SystemSpaceBase + SYSTEM_SPACE48_PROCESSOR_TABLES + ProcessorTablesOffset;
-	void* __Allocated = kpalloc(_CpuBufferNumPages);
+	void* __Allocated = AllocatePoolEx(kproc, _CpuBufferNumPages << 12, 0x1000, ALLOCATE_POOL_PHYSICAL);
 	if(!__Allocated) SOD(SOD_PROCESSOR_INITIALIZATION, "Failed to allocate Processor Tables, Please Upgrade your RAM");
 	MapPhysicalPages(kproc->PageMap, _CpuBuffer, __Allocated, _CpuBufferNumPages, PM_MAP);
 	ZeroMemory(_CpuBuffer, _CpuBufferNumPages << 12);
@@ -92,7 +92,7 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 		CPU_MANAGEMENT_TABLE* __CpuMgmt = CpuManagementTable[i];
 		KeMapMemory(__CpuMgmt, (char*)SystemSpaceBase + SYSTEM_SPACE48_CPU_MGMT + CPU_MGMT_OFFSET, 8, PM_MAP);
 
-		RFTHREAD_WAITING_QUEUE WaitingQueue = AllocatePoolEx(kproc->StartupThread, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES, 0x1000, 0);
+		RFTHREAD_WAITING_QUEUE WaitingQueue = AllocatePoolEx(kproc, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES, 0x1000, 0);
 		ZeroMemory(WaitingQueue, sizeof(THREAD_WAITING_QUEUE) * NUM_PRIORITY_CLASSES);
 		if(i == CurrentProcessor){
 			CpuManagementTable[i]->Initialized = TRUE;
@@ -111,7 +111,7 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 		
 
 		// Setup Idle Thread
-		HTHREAD hIdleThread = CpuManagementTable[i]->SystemIdleThread;
+		RFTHREAD hIdleThread = CpuManagementTable[i]->SystemIdleThread;
 		CpuManagementTable[i]->CurrentThread = hIdleThread;
 		hIdleThread->ProcessorId = i; // Make thread only runnable on this cpu
 		hIdleThread->SchedulingQuantum = 0;
@@ -119,7 +119,7 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 
 
 		// Setup Interrupts Thread
-		HTHREAD InterruptsThread = CpuManagementTable[i]->SystemInterruptsThread;
+		RFTHREAD InterruptsThread = CpuManagementTable[i]->SystemInterruptsThread;
 		InterruptsThread->ProcessorId = i;
 		InterruptsThread->Registers.rflags = 0; // Interrupts disabled
 		InterruptsThread->TimeBurst = 0;
@@ -320,7 +320,7 @@ void SetupLocalApicTimer(){
 
 // Base Quantum = Timer Update Rate / s
 void KERNELAPI Sleep(UINT64 Milliseconds){
-	HTHREAD Thread = KeGetCurrentThread();
+	RFTHREAD Thread = KeGetCurrentThread();
 	Thread->SleepUntil[0] = GetHighPrecisionTimeSinceBoot() + GetHighPerformanceTimerFrequency() / MILLISECONDS_PER_SECOND * Milliseconds;
 	Thread->State |= THS_SLEEP;
 	Thread->RemainingClocks = 0; // Reset remaining clocks to force scheduler to not re-run this thread
@@ -330,7 +330,7 @@ void KERNELAPI Sleep(UINT64 Milliseconds){
 
 
 void KERNELAPI MicroSleep(UINT64 Microseconds){
-	HTHREAD Thread = KeGetCurrentThread();
+	RFTHREAD Thread = KeGetCurrentThread();
 	Thread->SleepUntil[0] = GetHighPrecisionTimeSinceBoot() + GetHighPerformanceTimerFrequency() / MICROSECONDS_PER_SECOND * Microseconds;
 	Thread->State |= THS_SLEEP;
 	Thread->RemainingClocks = 0;

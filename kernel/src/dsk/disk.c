@@ -39,7 +39,7 @@ DISK_DEVICE_INSTANCE* KERNELAPI CreateDisk(UINT64* DiskId, UINT64 SecurityDescri
 			}
 		}
 		if (!DiskDeviceList->Next) {
-			DiskDeviceList->Next = kmalloc(sizeof(DISK_DEVICE_LIST));
+			DiskDeviceList->Next = AllocatePool(sizeof(DISK_DEVICE_LIST));
 			if (!DiskDeviceList->Next) SET_SOD_MEMORY_MANAGEMENT;
 			SZeroMemory(DiskDeviceList->Next);
 		}
@@ -56,7 +56,7 @@ BOOL KERNELAPI SetPartitionName(PARTITION_INSTANCE* Partition, LPWSTR PartitionN
 
 	UINT64 len = wstrlen(PartitionName);
 	if (!len) return FALSE;
-	LPWSTR Copy = kmalloc((len + 1) << 1); // len * 2 + 2
+	LPWSTR Copy = AllocatePool((len + 1) << 1); // len * 2 + 2
 	if (!Copy) SET_SOD_MEMORY_MANAGEMENT;
 	memcpy16(Copy, PartitionName, len);
 	Copy[len] = 0;
@@ -115,7 +115,7 @@ PARTITION_INSTANCE* KERNELAPI CreatePartition(LPWSTR PartitionName, UINT64* Part
 			}
 		}
 		if (!PartitionList->Next) {
-			PartitionList->Next = kmalloc(sizeof(PARTITION_LIST));
+			PartitionList->Next = AllocatePool(sizeof(PARTITION_LIST));
 			if (!PartitionList->Next) SET_SOD_MEMORY_MANAGEMENT;
 			SZeroMemory(PartitionList->Next);
 		}
@@ -148,7 +148,7 @@ BOOL KERNELAPI ValidatePartition(PARTITION_INSTANCE* Partition) {
 
 BOOL KERNELAPI DestroyPartition(PARTITION_INSTANCE* Partition) {
 	if (!ValidatePartition(Partition)) return FALSE;
-	kfree(Partition->PartitionName);
+	RemoteFreePool(kproc, Partition->PartitionName);
 	if (Partition == MainPartition) MainPartition = NULL;
 	if (Partition == SystemPartition) SystemPartition = NULL;
 	SZeroMemory(Partition);
@@ -162,7 +162,7 @@ BOOL KERNELAPI RemoveDisk(DISK_DEVICE_INSTANCE* Disk) {
 }
 
 OPEN_FILE_LIST* KERNELAPI CreateFileTable() {
-	OPEN_FILE_LIST* ret = kmalloc(sizeof(OPEN_FILE_LIST));
+	OPEN_FILE_LIST* ret = AllocatePool(sizeof(OPEN_FILE_LIST));
 	if (!ret) SET_SOD_MEMORY_MANAGEMENT;
 	SZeroMemory(ret);
 	return ret;
@@ -187,7 +187,7 @@ FILE KERNELAPI AllocateFile(OPEN_FILE_LIST* FileList) {
 			}
 		}
 		if (FileList->Next) {
-			FileList->Next = kmalloc(sizeof(OPEN_FILE_LIST));
+			FileList->Next = AllocatePool(sizeof(OPEN_FILE_LIST));
 			if (!FileList->Next) SET_SOD_MEMORY_MANAGEMENT;
 			SZeroMemory(FileList->Next);
 		}
@@ -198,7 +198,7 @@ FILE KERNELAPI AllocateFile(OPEN_FILE_LIST* FileList) {
 BOOL KERNELAPI ReleaseFile(FILE File) {
 	if (!File) return FALSE;
 	CloseHandle(File->Handle);
-	kfree(File->Path);
+	RemoteFreePool(kproc, File->Path);
 	SZeroMemory(File);
 	return TRUE;
 }
