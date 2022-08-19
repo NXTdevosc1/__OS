@@ -1,5 +1,5 @@
 #pragma once
-#include <immintrin.h>
+// #include <immintrin.h>
 #include <stdint.h>
 
 typedef struct _CPU_MANAGEMENT_TABLE CPU_MANAGEMENT_TABLE;
@@ -23,7 +23,7 @@ void _enable(void);
 // Intrinsic used in MSVC CL (directly inserted in code without function call)
 
 
-__m128 _mm_load_si128 (__m128 const* mem_addr);
+// __m128 _mm_load_si128 (__m128 const* mem_addr);
 
 
 #define SMP_BOOT_ADDR (void*)0x8000

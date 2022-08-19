@@ -134,7 +134,10 @@ KERNELSTATUS KERNELAPI SystemDebugPrint(LPWSTR Format, ...){
 
     // Format string
 
-    UINT8 PNAME_LEN = wstrlen(Process->ProcessName);
+    LPWSTR ProcessName = L"Unnamed Process.";
+    if(Process->ProcessName) ProcessName = Process->ProcessName;
+
+    UINT8 PNAME_LEN = wstrlen(ProcessName);
     Len = wstrlen(_DEBUGPRINT_FORMATTED);
 
     // if(Len > 100) Len = 100;
@@ -151,7 +154,7 @@ KERNELSTATUS KERNELAPI SystemDebugPrint(LPWSTR Format, ...){
     if(( (Len + PNAME_LEN + 3) << 3) > SDBGP_BiggestWidth){
         SDBGP_BiggestWidth =  (Len + PNAME_LEN + 3) << 3;
     }
-    Gp_draw_sf_textW(Process->ProcessName, 0xE29910, 20, YOFF);
+    Gp_draw_sf_textW(ProcessName, 0xE29910, 20, YOFF);
     GP_draw_sf_text(" : ", 0xE29910, 20 + (PNAME_LEN << 3), YOFF);
     for(UINT8 i = 0;i<Len;i++){
         GP_sf_put_char((char)_DEBUGPRINT_FORMATTED[i], 0xffffff, 20 + ((PNAME_LEN + 3 + i) << 3), YOFF);

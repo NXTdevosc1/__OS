@@ -8,7 +8,7 @@ FILE PageFile = NULL;
 BOOL _PageFilePresent = 0;
 
 
-MEMORY_MANAGEMENT_TABLE MemoryManagementTable = {0};
+__declspec(align(0x1000)) MEMORY_MANAGEMENT_TABLE MemoryManagementTable = {0};
 
 #define DECLARE_USED_MEMORY(NumBytes) {MemoryManagementTable.UsedMemory += (NumBytes); MemoryManagementTable.AvailableMemory -= (NumBytes);}
 #define DECLARE_FREE_MEMORY(NumBytes) {MemoryManagementTable.UsedMemory -= (NumBytes); MemoryManagementTable.AvailableMemory += (NumBytes);}
@@ -26,14 +26,20 @@ char LegacyBiosMemoryMapToEfiMapping[8] = {
 };
 
 // SSE Variants
-extern RFMEMORY_SEGMENT _SSE_AllocateMemorySegmentFromCache(MEMORY_BLOCK_CACHE_LINE* CacheLine);
+extern RFMEMORY_SEGMENT _SSE_FetchMemoryCacheLine(MEMORY_BLOCK_CACHE_LINE* CacheLine);
 // AVX Variants
-extern RFMEMORY_SEGMENT _AVX_AllocateMemorySegmentFromCache(MEMORY_BLOCK_CACHE_LINE* CacheLine);
+extern RFMEMORY_SEGMENT _AVX_FetchMemoryCacheLine(MEMORY_BLOCK_CACHE_LINE* CacheLine);
 // AVX512 Variants
-extern RFMEMORY_SEGMENT _AVX512_AllocateMemorySegmentFromCache(MEMORY_BLOCK_CACHE_LINE* CacheLine);
+extern RFMEMORY_SEGMENT _AVX512_FetchMemoryCacheLine(MEMORY_BLOCK_CACHE_LINE* CacheLine);
 
 // SIMD Function List
-RFMEMORY_SEGMENT (*_SIMD_AllocateMemorySegmentFromCache)(MEMORY_BLOCK_CACHE_LINE* CacheLine) = _SSE_AllocateMemorySegmentFromCache;
+RFMEMORY_SEGMENT (*_SIMD_FetchMemoryCacheLine)(MEMORY_BLOCK_CACHE_LINE* CacheLine) = _SSE_FetchMemoryCacheLine;
+RFMEMORY_SEGMENT (*_SIMD_FetchUnusedSegmentsUncached)(MEMORY_SEGMENT_LIST_HEAD* ListHead) = NULL;
+RFMEMORY_SEGMENT (*_SIMD_FetchSegmentListHead)(MEMORY_SEGMENT_LIST_HEAD* ListHead, UINT64 MinimumNumBytes, UINT Align) = NULL;
+
+// ---------------------------
+
+
 
 // Can be used before kernel relocation ? Yes
 void InitMemoryManagementSubsystem() {
@@ -85,14 +91,24 @@ void InitMemoryManagementSubsystem() {
             }
         }
     }
+
+    // Declare all the free segments in the cache
+    for(int i = 0;i<NUM_FREE_MEMORY_LEVELS;i++) {
+        MemoryManagementTable.FreeMemoryLevels[i].UnallocatedSegmentCache.CachedMemorySegments[i] = 
+        &MemoryManagementTable.FreeMemoryLevels[i].SegmentListHead.MemorySegments[i];
+
+        MemoryManagementTable.FreeMemoryLevels[i].UnallocatedSegmentCache.CacheLineSize++;
+    }
 }
 
 // Used after relocation
 void SIMD_InitOptimizedMemoryManagement() {
-    if(ExtensionLevel == EXTENSION_LEVEL_SSE) return; // No need
-    if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
-        _SIMD_AllocateMemorySegmentFromCache = _AVX_AllocateMemorySegmentFromCache;
+    if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
+        _SIMD_FetchMemoryCacheLine = _SSE_FetchMemoryCacheLine;
+    }
+    else if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
+        _SIMD_FetchMemoryCacheLine = _AVX_FetchMemoryCacheLine;
     } else if((ExtensionLevel & EXTENSION_LEVEL_AVX512)) {
-        _SIMD_AllocateMemorySegmentFromCache = _AVX512_AllocateMemorySegmentFromCache;
+        _SIMD_FetchMemoryCacheLine = _AVX512_FetchMemoryCacheLine;
     }
 }

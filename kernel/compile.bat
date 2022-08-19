@@ -17,7 +17,7 @@ set OBJFILES=x86_64/Assembly/*.obj x86_64/fs/*.obj x86_64/fs/fat32/*.obj
 
 
 %COMPILE% /c src/fs/*.c %OUT%/fs/ %CFLAGS%
-%COMPILE% /c src/fs/fat32/*.c %OUT%/fs/fat32/ %CFLAGS%
+@REM %COMPILE% /c src/fs/fat32/*.c %OUT%/fs/fat32/ %CFLAGS%
 
 %COMPILE% %srcfiles% %OBJFILES% /Fo:x86_64/ %CFLAGS% /Fe:oskrnlx64.exe /LD /link /DLL /MACHINE:x64 /NODEFAULTLIB /SUBSYSTEM:native /ENTRY:KrnlEntry /FIXED:no /DYNAMICBASE /LARGEADDRESSAWARE
 

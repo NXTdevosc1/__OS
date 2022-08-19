@@ -114,10 +114,17 @@ extern void __declspec(noreturn) _start() {
 			ExtensionLevel |= EXTENSION_LEVEL_OPMASK;
 		}
 	}
-
-	// if (!InitializeRuntimeSymbols()) SET_SOD_INITIALIZATION;
 	kproc = KeCreateProcess(NULL, NULL, SUBSYSTEM_NATIVE, KERNELMODE_PROCESS);
 	if(!kproc) SET_SOD_INITIALIZATION;
+
+	InitMemoryManagementSubsystem();
+	GP_clear_screen(0xFFFFFF);
+	GP_draw_sf_text(to_hstring64((UINT64)AllocatePool(0x500)), 0, 400, 20);
+	GP_draw_sf_text(to_hstring64((UINT64)AllocatePool(0x20)), 0, 400, 40);
+	GP_draw_sf_text(to_hstring64((UINT64)AllocatePoolEx(kproc, 0x500, 0x1500, ALLOCATE_POOL_PHYSICAL)), 0, 400, 60);
+	while(1);
+
+	// if (!InitializeRuntimeSymbols()) SET_SOD_INITIALIZATION;
 
 	
 
