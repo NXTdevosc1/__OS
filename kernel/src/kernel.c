@@ -122,7 +122,16 @@ extern void __declspec(noreturn) _start() {
 	GP_draw_sf_text(to_hstring64((UINT64)AllocatePool(0x500)), 0, 400, 20);
 	GP_draw_sf_text(to_hstring64((UINT64)AllocatePool(0x20)), 0, 400, 40);
 	GP_draw_sf_text(to_hstring64((UINT64)AllocatePoolEx(kproc, 0x500, 0x1500, ALLOCATE_POOL_PHYSICAL)), 0, 400, 60);
-	while(1);
+	
+	__cpuid(&CpuIdInfo, 1);
+	if(CpuIdInfo.edx & (1 << 16)) {
+		SystemDebugPrint(L"Page Attribute Table Supported");
+	} else {
+		SystemDebugPrint(L"Page Attribute Table Unsupported");
+	}
+
+
+	while(1) __hlt();
 
 	// if (!InitializeRuntimeSymbols()) SET_SOD_INITIALIZATION;
 

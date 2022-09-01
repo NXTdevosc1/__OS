@@ -1,3 +1,22 @@
+
+/*
+
+The Operating System Memory Manager
+
+How it works:
+Page allocation table describes every page in the system
+Physical Memory can only be allocated in pages.
+
+For each process, A Virtual Memory base is assigned, and pages are allocated to the virtual mapping
+
+The Declaration : void* AllocatePhysicalPages(RFPROCESS Process, UINT64 NumPages, void* VirtualAddressStart)
+
+Thus the memory management subsystem allocates fragmented physical pages to the virtual memory starting at VirtualAddressStart
+
+each process has the page allocation table start and end pointer, then the continuation is set on an allocation
+
+*/
+
 #pragma once
 #include <krnltypes.h>
 #include <mem.h>
@@ -14,8 +33,8 @@ typedef struct _PAGE_ALLOCATION_TABLE {
         struct {
             UINT64 Used : 1;
             UINT64 Paged : 1;
-            UINT64 NumHeaps : 9; // 0-256
-            UINT64 Reserved : 1;
+            UINT64 DiskPageAndCompressionAllowed : 1; // 0-256
+            UINT64 Reserved : 9;
             UINT64 PhysicalAddress : 52;
         } State;
         UINT64 Raw; // Uncleared at startup
@@ -41,10 +60,13 @@ typedef struct _MEMORY_BLOCK_CACHE_LINE{
 #define MEMORY_LIST_HEAD_SIZE 0x40
 #define DEFAULT_MEMORY_ALIGNMENT 0x10
 
+#define MEMORY_SEGMENT_SEMAPHORE 2 // Bit Index 2
 typedef enum _MEMORY_SEGMENT_FLAGS {
-    MEMORY_SEGMENT_PRESENT = 1,
+    // Initial Heap can't be relinked
+    MEMORY_SEGMENT_INITIAL_HEAP = 1,
     MEMORY_SEGMENT_SWAPPING_UNALLOWED = 2, // Prevents memory manager from paging out memory in this segment
-    MEMORY_SEGMENT_CONTROLLED = 4 // Bit 2
+    // MEMORY_SEGMENT_SEMAPHORE = 4
+
 } MEMORY_SEGMENT_FLAGS;
 
 typedef enum _IO_MEMORY_FLAGS {
@@ -67,7 +89,8 @@ typedef struct _MEMORY_SEGMENT_LIST_HEAD MEMORY_SEGMENT_LIST_HEAD, *RFMEMORY_SEG
 
 typedef struct _MEMORY_SEGMENT_LIST_HEAD {
     MEMORY_SEGMENT MemorySegments[MEMORY_LIST_HEAD_SIZE];
-    RFMEMORY_SEGMENT_LIST_HEAD NextList;
+    RFMEMORY_SEGMENT_LIST_HEAD NextListHead;
+    UINT64 Bitmask;
 } MEMORY_SEGMENT_LIST_HEAD;
 
 #define UNALLOCATED_MEMORY_SEGMENT_CACHE_SIZE 0x100
@@ -91,7 +114,7 @@ typedef struct _MEMORY_REGION_TABLE {
     RFMEMORY_SEGMENT_LIST_HEAD LastListHead; // To optimize fetching, when :
                                             // AllocatedEntries = Total Entries
                                             /// LastListHead->Next = New List Head
-    UINT8 AllocateListControl;
+    UINT64 AllocateListControl; // UINT64 To make alignement
 } MEMORY_REGION_TABLE, *RFMEMORY_REGION_TABLE;
 
 
@@ -106,8 +129,6 @@ typedef struct _MEMORY_MANAGEMENT_TABLE {
     UINT64 IoMemory;
     UINT64 PageAllocationTableSize; // In Number of entries
     PAGE_ALLOCATION_TABLE* PageAllocationTable;
-    MEMORY_REGION_TABLE AllocatedMemory;
-    MEMORY_REGION_TABLE FreeMemoryLevels[4];
 } MEMORY_MANAGEMENT_TABLE;
 
 extern MEMORY_MANAGEMENT_TABLE MemoryManagementTable;
@@ -135,7 +156,6 @@ RFMEMORY_SEGMENT QueryAllocatedBlockSegment(void* BlockAddress);
 RFMEMORY_SEGMENT QueryFreeBlockSegment(void* BlockAddress);
 RFMEMORY_SEGMENT AllocateMemorySegment(RFMEMORY_REGION_TABLE MemoryRegion);
 
-
 typedef enum _ALLOCATE_POOL_FLAGS {
 	ALLOCATE_POOL_LOW_4GB = 1,
 	ALLOCATE_POOL_PHYSICAL = 2, // Returns the Physical Address of the Allocated Pool instead of its Virtual Address
@@ -144,7 +164,7 @@ typedef enum _ALLOCATE_POOL_FLAGS {
     // Only used by memory manager to prevent a deadlock when allocating a new list head
     // when set the memory manager should check if it's in heap segments, if yes then
     // it will allocate the new heap segment in this list, otherwise it will work normally
-    ALLOCATE_POOL_NEW_LIST_HEAD = 0x10 
+    ALLOCATE_POOL_NEW_LIST_HEAD = 0x10
 } ALLOCATE_POOL_FLAGS;
 
 
@@ -163,11 +183,14 @@ KERNELSTATUS LoadPagedPool(RFPROCESS Process, void* VirtualAddress);
 LPVOID KEXPORT KERNELAPI AllocateIoMemory(_IN LPVOID PhysicalAddress, _IN UINT64 NumPages, _IN UINT Flags);
 BOOL KEXPORT KERNELAPI FreeIoMemory(_IN LPVOID IoMemory);
 
+
+// The free memory segment has the semaphore bit set until the pool is actually given
+// the host routine must reset the MEMORY_SEGMENT_SEMAPHORE Bit in the returned Segment
+RFMEMORY_SEGMENT MemMgr_FreePool(RFMEMORY_REGION_TABLE MemoryRegion, RFMEMORY_SEGMENT_LIST_HEAD ListHead, RFMEMORY_SEGMENT MemorySegment);
+RFMEMORY_SEGMENT MemMgr_CreateInitialHeap(void* HeapAddress, UINT64 HeapLength);
+
 // Sets present bit in Memory Segment flags when Found
 RFMEMORY_SEGMENT (*_SIMD_FetchMemoryCacheLine)(MEMORY_BLOCK_CACHE_LINE* CacheLine);
 RFMEMORY_SEGMENT (*_SIMD_FetchUnusedSegmentsUncached)(MEMORY_SEGMENT_LIST_HEAD* ListHead);
 // ---------------------------
 
-
-// Virtual Memory is fragmented, meaning that the function should allocate fragmented memory
-RFMEMORY_SEGMENT (*_SIMD_FetchSegmentListHead)(MEMORY_SEGMENT_LIST_HEAD* ListHead, UINT64 MinimumNumBytes, UINT Align);

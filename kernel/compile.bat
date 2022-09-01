@@ -1,4 +1,4 @@
-rd /s /q x86_64
+@REM rd /s /q x86_64
 mkdir x86_64\
 mkdir x86_64\Assembly
 mkdir x86_64\fs\fat32

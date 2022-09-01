@@ -35,7 +35,6 @@ extern RFMEMORY_SEGMENT _AVX512_FetchMemoryCacheLine(MEMORY_BLOCK_CACHE_LINE* Ca
 // SIMD Function List
 RFMEMORY_SEGMENT (*_SIMD_FetchMemoryCacheLine)(MEMORY_BLOCK_CACHE_LINE* CacheLine) = _SSE_FetchMemoryCacheLine;
 RFMEMORY_SEGMENT (*_SIMD_FetchUnusedSegmentsUncached)(MEMORY_SEGMENT_LIST_HEAD* ListHead) = NULL;
-RFMEMORY_SEGMENT (*_SIMD_FetchSegmentListHead)(MEMORY_SEGMENT_LIST_HEAD* ListHead, UINT64 MinimumNumBytes, UINT Align) = NULL;
 
 // ---------------------------
 
@@ -111,4 +110,12 @@ void SIMD_InitOptimizedMemoryManagement() {
     } else if((ExtensionLevel & EXTENSION_LEVEL_AVX512)) {
         _SIMD_FetchMemoryCacheLine = _AVX512_FetchMemoryCacheLine;
     }
+}
+
+RFMEMORY_SEGMENT MemMgr_CreateInitialHeap(void* HeapAddress, UINT64 HeapLength) {
+    
+}
+
+RFMEMORY_SEGMENT MemMgr_FreePool(RFMEMORY_REGION_TABLE MemoryRegion, RFMEMORY_SEGMENT_LIST_HEAD ListHead, RFMEMORY_SEGMENT MemorySegment) {
+    return NULL;
 }
