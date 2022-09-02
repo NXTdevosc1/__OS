@@ -23,6 +23,11 @@
         "paging.h": "c",
         "sod.h": "c",
         "memorymanagement.h": "c",
-        "immintrin.h": "c"
+        "immintrin.h": "c",
+        "cmath": "c",
+        "ratio": "c",
+        "algorithm": "c",
+        "chrono": "c",
+        "iterator": "c"
     }
 }

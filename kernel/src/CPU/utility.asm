@@ -50,11 +50,15 @@ global __stmxcsr
 
 global __Schedule
 
-
+global __sqrt
 
 [BITS 64]
 
 section .text
+
+__sqrt:
+	sqrtsd xmm0, xmm0
+	ret
 
 __Schedule:
 	int 0x40

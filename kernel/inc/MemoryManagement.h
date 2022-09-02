@@ -28,22 +28,36 @@ each process has the page allocation table start and end pointer, then the conti
 
 typedef struct _PROCESS_CONTROL_BLOCK *RFPROCESS;
 
-typedef struct _PAGE_ALLOCATION_TABLE {
+typedef union _PAGE {
+    struct {
+        UINT64 Allocated : 1;
+        UINT64 DiskSwappingAllowed : 1;
+        UINT64 CompressingAllowed : 1;
+        UINT64 Reserved : 9;
+        UINT64 PhysicalPageNumber : 52;
+    } PageStruct;
+    UINT64 PhysicalAddress;
+} PAGE;
+
+typedef struct _PAGE_ALLOCATION_TABLE PAGE_ALLOCATION_TABLE;
+
+#define PAGE_ALLOCATION_TABLE_ENTRY_COUNT 0x40
+
+typedef struct _VIRTUAL_MEMORY_PAGE {
     union {
-        struct {
-            UINT64 Used : 1;
-            UINT64 Paged : 1;
-            UINT64 DiskPageAndCompressionAllowed : 1; // 0-256
-            UINT64 Reserved : 9;
-            UINT64 PhysicalAddress : 52;
-        } State;
-        UINT64 Raw; // Uncleared at startup
-    } State;
-    
-    UINT64 NextPage;
+        UINT64 Present : 1;
+        UINT64 Unallocated : 1; // If present && Unallocate then AllocatePages
+        UINT64 PagePtr : 62; // Reference to the 8-Byte aligned PAGE Structure
+    } Details;
+    PAGE* RawPage; // To directly set the PAGE Pointer
+} VIRTUAL_MEMORY_PAGE;
+
+typedef struct _PAGE_ALLOCATION_TABLE {
+    VIRTUAL_MEMORY_PAGE VirtualMemoryPages[PAGE_ALLOCATION_TABLE_ENTRY_COUNT];
+    PAGE_ALLOCATION_TABLE* Next;
 } PAGE_ALLOCATION_TABLE;
 
-extern PAGE_ALLOCATION_TABLE* PageAllocationTable;
+extern PAGE* PageArray;
 
 typedef struct _MEMORY_SEGMENT MEMORY_SEGMENT, *RFMEMORY_SEGMENT;
 
@@ -120,15 +134,18 @@ typedef struct _MEMORY_REGION_TABLE {
 
 // Global Memory Management Table for kernel processes and allocation source for user processes
 typedef struct _MEMORY_MANAGEMENT_TABLE {
-    
-    UINT64 AvailableMemory; // Physical Memory + Paging File Size
+    UINT64 AvailableMemory; // Physical Memory
     UINT64 UsedMemory;
     UINT64 PagingFileSize;
     UINT64 PagedMemory;
     UINT64 UnpageableMemory;
-    UINT64 IoMemory;
-    UINT64 PageAllocationTableSize; // In Number of entries
-    PAGE_ALLOCATION_TABLE* PageAllocationTable;
+    UINT64 CompressedMemorySize;
+    UINT64 UncompressibleMemory;
+    UINT64 IoMemorySize;
+    UINT64 PageArraySize; // In Number of entries
+    PAGE* PageArray;
+    UINT64 NumBytesPageBitmap;
+    char* PageBitmap;
 } MEMORY_MANAGEMENT_TABLE;
 
 extern MEMORY_MANAGEMENT_TABLE MemoryManagementTable;
@@ -142,7 +159,7 @@ typedef struct _PROCESS_MEMORY_TABLE {
     UINT64 UnpageableMemory;
     MEMORY_BLOCK_CACHE_LINE UnallocatedSegmentCache; // for Allocated Memory
     MEMORY_SEGMENT_LIST_HEAD AllocatedMemory;
-    
+    PAGE_ALLOCATION_TABLE PageAllocationTable;
     struct {
         MEMORY_BLOCK_CACHE_LINE UnallocatedSegmentCache; // for Free Memory
         MEMORY_SEGMENT_LIST_HEAD SegmentListHead;

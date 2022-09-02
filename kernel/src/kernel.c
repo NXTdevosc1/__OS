@@ -69,6 +69,7 @@ UINT ExtensionLevel = 0;
 
 
 __declspec(allocate(_FIMPORT)) FILE_IMPORT_ENTRY FileImportTable[0x20] = {
+	{FILE_IMPORT_DATA, 0, NULL, L"", 0, L"OS\\Fonts\\segoeui.ttf"},
 	{FILE_IMPORT_DATA, 0, NULL, L"$BOOTCONFIG", 0, L"OS\\System\\KeConfig\\$BOOTCONFIG"},
 	{FILE_IMPORT_DATA, 0, NULL, L"$DRVTBL", 0, L"OS\\System\\KeConfig\\$DRVTBL"},
 	{FILE_IMPORT_DLL, 0, NULL, L"osdll.dll", 0, L"OS\\System\\osdll.dll"},
@@ -93,6 +94,9 @@ void th() {
 }
 
 LPWSTR KernelProcessName = L"System Kernel.";
+
+
+
 
 extern void __declspec(noreturn) _start() {
 	__cli();
@@ -123,6 +127,30 @@ extern void __declspec(noreturn) _start() {
 	GP_draw_sf_text(to_hstring64((UINT64)AllocatePool(0x20)), 0, 400, 40);
 	GP_draw_sf_text(to_hstring64((UINT64)AllocatePoolEx(kproc, 0x500, 0x1500, ALLOCATE_POOL_PHYSICAL)), 0, 400, 60);
 	
+	UINT XOff = 500;
+	UINT YOff = 100;
+	double XCords[] = {0, 100, 0};
+	double YCords[] = {0, 100, 200};
+
+	double IncValue = 0.1;
+	double X0 = GetBezierPoint(XCords, 3, 0.1), X1 = GetBezierPoint(XCords, 3, 0.2), Y0 = GetBezierPoint(YCords, 3, 0.1), Y1 = GetBezierPoint(YCords, 3, 0.2);
+	double Distance = __sqrt(pow(X1 - X0, 2) + pow(Y1-Y0, 2));
+	IncValue /= (Distance + 1);
+
+
+	double LastX = XOff;
+	double LastY = YOff;
+
+	double X = 0;
+	double Y = 0;
+	
+	for(double t = 0;t<=1;t+=IncValue) {
+		X = XOff + GetBezierPoint(XCords, 3, t);
+		Y = YOff + GetBezierPoint(YCords, 3, t);
+		GP_set_pixel(X, Y, 0);
+		LastX = X;
+		LastY = Y;
+	}
 	__cpuid(&CpuIdInfo, 1);
 	if(CpuIdInfo.edx & (1 << 16)) {
 		SystemDebugPrint(L"Page Attribute Table Supported");
@@ -130,7 +158,7 @@ extern void __declspec(noreturn) _start() {
 		SystemDebugPrint(L"Page Attribute Table Unsupported");
 	}
 
-
+	LineTo(200, 200, 210, 400, 0xFF);
 	while(1) __hlt();
 
 	// if (!InitializeRuntimeSymbols()) SET_SOD_INITIALIZATION;

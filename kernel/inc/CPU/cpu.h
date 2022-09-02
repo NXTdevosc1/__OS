@@ -169,6 +169,9 @@ extern uint64_t SMP_TRAMPOLINE_END;
 
 extern void EnableExtendedStates();
 
+extern double __sqrt(double val);
+
+
 // Setup booted SMP Cpu's
 
 extern void __Schedule(); // throw an INT_SCHEDULE

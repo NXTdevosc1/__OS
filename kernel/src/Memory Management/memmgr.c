@@ -2,7 +2,6 @@
 #include <fs/fs.h>
 #include <kernel.h>
 
-PAGE_ALLOCATION_TABLE* PageAllocationTable = NULL;
 
 FILE PageFile = NULL;
 BOOL _PageFilePresent = 0;
@@ -57,47 +56,57 @@ void InitMemoryManagementSubsystem() {
                 Memory->PhysicalStart = 0x1000;
                 Memory->PageCount--;
             }
-            MemoryManagementTable.PageAllocationTableSize+=Memory->PageCount;
+            if(Memory->PhysicalStart & 0xFFF) {
+                Memory->PhysicalStart += 0x1000;
+                Memory->PhysicalStart &= ~0xFFF;
+                Memory->PageCount--;
+            }
+            MemoryManagementTable.PageArraySize+=Memory->PageCount;
             MemoryManagementTable.AvailableMemory += (Memory->PageCount << 12);
         }
     }
     if(MemoryManagementTable.AvailableMemory < 0x40000000) SOD(0, "Unsufficient Memory"); // Memory Must be >= 1GB
 
-    UINT64 NumPages = ((sizeof(PAGE_ALLOCATION_TABLE) * MemoryManagementTable.PageAllocationTableSize) >> 12) + 1;
+    UINT64 NumPages = ((sizeof(PAGE) * MemoryManagementTable.PageArraySize) >> 12) + 1;
+    UINT64 BitmapOffset = NumPages << 12;
+    NumPages += ((MemoryManagementTable.PageArraySize + 1) >> 12) >> 3; // Bitmap
     // Search a place for PAGE_ALLOCATION_TABLE (Must be physically contiguous)
-    MemoryManagementTable.PageAllocationTableSize -= NumPages;
-    NumPages = ((sizeof(PAGE_ALLOCATION_TABLE) * MemoryManagementTable.PageAllocationTableSize) >> 12) + 1;
+    MemoryManagementTable.PageArraySize -= NumPages;
+    NumPages = ((sizeof(PAGE) * MemoryManagementTable.PageArraySize) >> 12) + 1;
 
     Memory = InitData.MemoryMap->MemoryDescriptors;
 
     for(UINT64 i = 0;i<InitData.MemoryMap->Count;i++, Memory++) {
-        if(Memory->Type == EfiConventionalMemory && Memory->PageCount > NumPages) {
-            PageAllocationTable = (PAGE_ALLOCATION_TABLE*)Memory->PhysicalStart;
+        if(Memory->Type == EfiConventionalMemory && Memory->PageCount >= NumPages) {
+            MemoryManagementTable.PageArray = (PAGE*)Memory->PhysicalStart;
+            MemoryManagementTable.PageBitmap = (char*)Memory->PhysicalStart + BitmapOffset;
             (char*)Memory->PhysicalStart+=(NumPages << 12);
             Memory->PageCount -= NumPages;
             DECLARE_USED_MEMORY(NumPages << 12);
             break;
         }
     }
-    if(!PageAllocationTable) SOD(0, "Cannot allocate contiguous Physical Memory for Resources.");
+    if(!MemoryManagementTable.PageArray) SOD(0, "Cannot allocate contiguous Physical Memory for Resources.");
     Memory = InitData.MemoryMap->MemoryDescriptors;
-    PAGE_ALLOCATION_TABLE* Page = PageAllocationTable;
+    PAGE* Page = MemoryManagementTable.PageArray;
     for(UINT64 x = 0;x<InitData.MemoryMap->Count;x++, Memory++) {
         if(Memory->Type == EfiConventionalMemory) {
-            UINT64 PhysicalAddress = (Memory->PhysicalStart >> 12) << 12;
+            UINT64 PhysicalAddress = Memory->PhysicalStart;
             for(UINT i = 0;i<Memory->PageCount;i++, Page++, PhysicalAddress+=0x1000) {
-                Page->State.Raw = PhysicalAddress; // To initialize remaining variables as 0
+                Page->PhysicalAddress = PhysicalAddress;
             }
         }
     }
+    // Zero Page Bitmap
+    MemoryManagementTable.NumBytesPageBitmap = (((MemoryManagementTable.PageArraySize + 1) >> 12) >> 3) << 12;
+    ZeroMemory(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap);
+    // // Declare all the free segments in the cache
+    // for(int i = 0;i<NUM_FREE_MEMORY_LEVELS;i++) {
+    //     MemoryManagementTable.FreeMemoryLevels[i].UnallocatedSegmentCache.CachedMemorySegments[i] = 
+    //     &MemoryManagementTable.FreeMemoryLevels[i].SegmentListHead.MemorySegments[i];
 
-    // Declare all the free segments in the cache
-    for(int i = 0;i<NUM_FREE_MEMORY_LEVELS;i++) {
-        MemoryManagementTable.FreeMemoryLevels[i].UnallocatedSegmentCache.CachedMemorySegments[i] = 
-        &MemoryManagementTable.FreeMemoryLevels[i].SegmentListHead.MemorySegments[i];
-
-        MemoryManagementTable.FreeMemoryLevels[i].UnallocatedSegmentCache.CacheLineSize++;
-    }
+    //     MemoryManagementTable.FreeMemoryLevels[i].UnallocatedSegmentCache.CacheLineSize++;
+    // }
 }
 
 // Used after relocation
@@ -113,7 +122,7 @@ void SIMD_InitOptimizedMemoryManagement() {
 }
 
 RFMEMORY_SEGMENT MemMgr_CreateInitialHeap(void* HeapAddress, UINT64 HeapLength) {
-    
+    return NULL;
 }
 
 RFMEMORY_SEGMENT MemMgr_FreePool(RFMEMORY_REGION_TABLE MemoryRegion, RFMEMORY_SEGMENT_LIST_HEAD ListHead, RFMEMORY_SEGMENT MemorySegment) {

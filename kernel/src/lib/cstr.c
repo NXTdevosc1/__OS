@@ -154,7 +154,7 @@ const char* to_string64(int64_t value){
 char doubleout[100] = { 0 };
 const char* strdbl(double value, int radix)
 {
-    UINT64 dbl = 100;
+    UINT64 dbl = 1000;
     const char* buff = to_string64((UINT64)((double)value));
     for (UINT64 i = 0;; i++, buff++) {
         if (!*buff) {

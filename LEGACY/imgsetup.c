@@ -216,7 +216,7 @@ typedef struct _IMAGE_STRUCTURE {
 
 
 // Only path is set, other details are set by SetupFs Function
-#define NUM_BOOT_POINTER_ENTRIES 8
+#define NUM_BOOT_POINTER_ENTRIES 9
 UINT16* BootPointerPaths[NUM_BOOT_POINTER_ENTRIES] = {
     L"OS\\System\\KeConfig\\$BOOTCONFIG",
     L"OS\\System\\KeConfig\\$DRVTBL",
@@ -225,7 +225,8 @@ UINT16* BootPointerPaths[NUM_BOOT_POINTER_ENTRIES] = {
     L"OS\\System\\ehci.sys",
     L"OS\\System\\ahci.sys",
     L"OS\\Fonts\\zap-light16.psf",
-    L"OS\\System\\xhci.sys"
+    L"OS\\System\\xhci.sys",
+    L"OS\\Fonts\\segoeui.ttf"
 };
 
 __declspec(align(0x1000)) IMAGE_STRUCTURE Image = {0};
