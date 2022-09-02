@@ -127,29 +127,35 @@ extern void __declspec(noreturn) _start() {
 	GP_draw_sf_text(to_hstring64((UINT64)AllocatePool(0x20)), 0, 400, 40);
 	GP_draw_sf_text(to_hstring64((UINT64)AllocatePoolEx(kproc, 0x500, 0x1500, ALLOCATE_POOL_PHYSICAL)), 0, 400, 60);
 	
-	UINT XOff = 500;
-	UINT YOff = 100;
-	double XCords[] = {0, 100, 0};
-	double YCords[] = {0, 100, 200};
-
+	UINT XOff = 200;
+	UINT YOff = 300;
+	double XCords[] = {0, 50, 100, 150};
+	double YCords[] = {0, 50, -50, 0};
+	double betabuffer[4] = {0};
 	double IncValue = 0.1;
-	double X0 = GetBezierPoint(XCords, 3, 0.1), X1 = GetBezierPoint(XCords, 3, 0.2), Y0 = GetBezierPoint(YCords, 3, 0.1), Y1 = GetBezierPoint(YCords, 3, 0.2);
+	double X0 = GetBezierPoint(XCords, betabuffer, 4, 0.1), X1 = GetBezierPoint(XCords, betabuffer, 4, 0.2), Y0 = GetBezierPoint(YCords, betabuffer, 4, 0.1), Y1 = GetBezierPoint(YCords, betabuffer, 4, 0.2);
 	double Distance = __sqrt(pow(X1 - X0, 2) + pow(Y1-Y0, 2));
 	IncValue /= (Distance + 1);
 
+	// IncValue /= 10;
 
-	double LastX = XOff;
-	double LastY = YOff;
 
-	double X = 0;
-	double Y = 0;
+	SystemDebugPrint(L"Starting...");
+	for(UINT c = 0;c<0x5000;c++) { 
+	UINT64 LastX = XOff;
+	UINT64 LastY = YOff;
+
+	UINT64 X = 0;
+	UINT64 Y = 0;
 	
+
 	for(double t = 0;t<=1;t+=IncValue) {
-		X = XOff + GetBezierPoint(XCords, 3, t);
-		Y = YOff + GetBezierPoint(YCords, 3, t);
-		GP_set_pixel(X, Y, 0);
+		X = XOff + GetBezierPoint(XCords, betabuffer, 4, t);
+		Y = YOff + GetBezierPoint(YCords, betabuffer, 4, t);
+		*(UINT32*)(InitData.fb->FrameBufferBase + ((UINT64)X << 2) + ((UINT64)Y * InitData.fb->Pitch)) = 0xFF0000;
 		LastX = X;
 		LastY = Y;
+	}
 	}
 	__cpuid(&CpuIdInfo, 1);
 	if(CpuIdInfo.edx & (1 << 16)) {

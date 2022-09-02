@@ -99,25 +99,18 @@ void GP_sf_put_char(const char ch, unsigned int color, unsigned int x, unsigned 
 	}
 }
 
-	
-int16_t GetBezierPoint(double* cordinates, UINT16 cordinate_length, double percent){
-	double values[25] = { 0 };
-	memset(values,0,sizeof(double)*cordinate_length);
-	for(uint16_t a = 0;a<cordinate_length-1;a++){
-		values[a] = (cordinates[a] + ((cordinates[a+1]-cordinates[a])*percent));
-	}
-	uint16_t cvalues[4] = { 0 };
-	for(uint16_t i = 2;i<cordinate_length;i++){
-		memset(cvalues,0,2*(4-i));
-	for(uint16_t a = 0;a<cordinate_length-i;a++){
-		cvalues[a] = (values[a] + ((values[a+1]-values[a]) * percent));
-	}
-	memset(values,0,sizeof(values));
-	for(uint16_t a = 0;a<cordinate_length-i;a++){
-		values[a] = cvalues[a];
-	}
-	}
-return (INT16)values[0];
+extern inline void _SSE_BezierCopyCords(double* dest, double* src, UINT8 NumCords);
+extern inline UINT64 _SSE_ComputeBezier(double* beta, UINT NumCordinates, double percent);
+extern inline UINT64 GetBezierPoint(double* cordinates, double* beta, UINT8 NumCordinates, double percent){
+	if(!NumCordinates || NumCordinates > 0x80) return 0;
+	_SSE_BezierCopyCords(beta, cordinates, NumCordinates);
+	return _SSE_ComputeBezier(beta, NumCordinates, percent);
+	// for(register UINT k = 1;k < NumCordinates;k++) {
+	// 	for(register UINT i = 0;i<NumCordinates - k;i++) {
+	// 		beta[i] = (1 - percent) * beta[i] + percent * beta[i + 1];
+	// 	}
+	// }
+	// return (UINT64)*beta;
 }
 
 

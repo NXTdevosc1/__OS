@@ -35,7 +35,6 @@ int TRIANGULAR_BEZIER_GET_POINT(int n1, int n2, float perc);
 void GP_set_st_f(struct PSF1_FONT* font);
 void GP_draw_sf_text(const char* data, unsigned int color,unsigned int x,unsigned int y);
 void GP_sf_put_char(const char ch, unsigned int color, unsigned int x, unsigned int y);
-int16_t GetBezierPoint(double* cordinates, UINT16 cordinate_length, double percent);
 struct RGBA calculate_rgba(struct RGBA color, uint16_t x, uint16_t y);
 void Gp_draw_sf_textW(const wchar_t* data,unsigned int color,unsigned int x,unsigned int y);
 void DrawOsLogo();
@@ -43,3 +42,4 @@ void DrawOsLogo();
 void LineTo(INT16 x0, INT16 y0, INT16 x1, INT16 y1, UINT32 Color);
 
 void CalculateRgba(struct RGBA* Color, struct RGBA* Source);
+extern inline UINT64 GetBezierPoint(double* cordinates, double* beta, UINT8 NumCordinates, double percent);

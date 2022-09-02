@@ -213,11 +213,12 @@ char DrawGlyph(struct FONT_TABLE* font_table, uint16_t glyph_index, uint32_t x_o
         int16_t last_y = 0;
         int16_t last_x = 0;
         int16_t last_vy = 0;
-        int16_t* cords_descx = AllocatePool(gcd->num_cordinates * 2);
-        int16_t* cords_descy = AllocatePool(gcd->num_cordinates * 2);
+        double* cords_descx = AllocatePool(gcd->num_cordinates * 2);
+        double* cords_descy = AllocatePool(gcd->num_cordinates * 2);
         uint32_t* buffer = AllocatePool(120*120*4);
         if(!buffer || !cords_descx || !cords_descy) SET_SOD_OUT_OF_RESOURCES;
         memset32(buffer,0,120*120);
+        double betabuffer[0x40] = {0};
         
         uint16_t size_divx = 18;
         uint16_t size_divy = 18;
@@ -261,8 +262,8 @@ char DrawGlyph(struct FONT_TABLE* font_table, uint16_t glyph_index, uint32_t x_o
                 cords_descy[pt_count] = (gcd->ymax/size_divy) - gcd->coordinates[i].y / size_divy;
                 pt_count++;
                 for(float t = 0;t<1;t+=0.001){
-                    int16_t x = GetBezierPoint(cords_descx,pt_count,t);
-                    int16_t y = GetBezierPoint(cords_descy, pt_count, t);
+                    int16_t x = GetBezierPoint(cords_descx, betabuffer, pt_count, t);
+                    int16_t y = GetBezierPoint(cords_descy, betabuffer, pt_count, t);
                     last_x = x;
                     last_y = y;
                     *(uint32_t*)(buffer + x + (y*120) - (gcd->xmin/size_divx) - ((gcd->ymin/size_divy)*120)) = 0xffffffff;
@@ -281,8 +282,8 @@ char DrawGlyph(struct FONT_TABLE* font_table, uint16_t glyph_index, uint32_t x_o
                     cords_descy[pt_count] = (gcd->ymax/size_divy) - lst_start_contoury / size_divy;
                     pt_count++;
                     for(float t = 0;t<1;t+=0.001){
-                        int16_t x = GetBezierPoint(cords_descx,pt_count,t);
-                        int16_t y = GetBezierPoint(cords_descy, pt_count, t);
+                        int16_t x = GetBezierPoint(cords_descx,betabuffer, pt_count, t);
+                        int16_t y = GetBezierPoint(cords_descy, betabuffer, pt_count, t);
            
                         last_x = x;
                         last_y = y;

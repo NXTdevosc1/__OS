@@ -1,8 +1,8 @@
 #include <math.h>
 
 double pow(double n1, double n2){
-	n2--;
 	if(n2 <= 0) return 1;
+	n2--;
 	for(uint16_t i = 0;i<n2;i++) n1*=n1;
 	return n1;
 }
