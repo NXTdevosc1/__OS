@@ -191,6 +191,9 @@ void* AllocatePool(UINT64 NumBytes);
 void* FreePool(void* HeapAddress);
 void* RemoteFreePool(RFPROCESS Process, void* HeapAddress);
 
+// Process = NULL will return true physical pages, only allowed before system startup
+void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags);
+
 #define PAGE_FILE_LOCATION "//OS/$SwapFile"
 
 void InitPagingFile(); // System PARTITION_INSTANCE Located in C:/ By default
@@ -201,6 +204,7 @@ LPVOID KEXPORT KERNELAPI AllocateIoMemory(_IN LPVOID PhysicalAddress, _IN UINT64
 BOOL KEXPORT KERNELAPI FreeIoMemory(_IN LPVOID IoMemory);
 
 
+
 // The free memory segment has the semaphore bit set until the pool is actually given
 // the host routine must reset the MEMORY_SEGMENT_SEMAPHORE Bit in the returned Segment
 RFMEMORY_SEGMENT MemMgr_FreePool(RFMEMORY_REGION_TABLE MemoryRegion, RFMEMORY_SEGMENT_LIST_HEAD ListHead, RFMEMORY_SEGMENT MemorySegment);
@@ -209,5 +213,6 @@ RFMEMORY_SEGMENT MemMgr_CreateInitialHeap(void* HeapAddress, UINT64 HeapLength);
 // Sets present bit in Memory Segment flags when Found
 RFMEMORY_SEGMENT (*_SIMD_FetchMemoryCacheLine)(MEMORY_BLOCK_CACHE_LINE* CacheLine);
 RFMEMORY_SEGMENT (*_SIMD_FetchUnusedSegmentsUncached)(MEMORY_SEGMENT_LIST_HEAD* ListHead);
+LPVOID (__fastcall *_SIMD_AllocatePhysicalPage) (char* PageBitmap, UINT64 BitmapSize, PAGE* PageArray);
 // ---------------------------
 

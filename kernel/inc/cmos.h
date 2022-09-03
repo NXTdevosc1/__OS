@@ -19,3 +19,5 @@ enum CMOS_MEMORY{
 
 unsigned char CmosRead(unsigned char Address);
 void CmosWrite(unsigned char Address, unsigned char Value);
+
+void QemuWriteSerialMessage(char* Message);

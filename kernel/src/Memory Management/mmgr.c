@@ -26,6 +26,7 @@ char LegacyBiosMemoryMapToEfiMapping[8] = {
 
 // SSE Variants
 extern RFMEMORY_SEGMENT _SSE_FetchMemoryCacheLine(MEMORY_BLOCK_CACHE_LINE* CacheLine);
+extern LPVOID __fastcall _SSE_AllocatePhysicalPage(char* PageBitmap, UINT64 BitmapSize, PAGE* PageArray);
 // AVX Variants
 extern RFMEMORY_SEGMENT _AVX_FetchMemoryCacheLine(MEMORY_BLOCK_CACHE_LINE* CacheLine);
 // AVX512 Variants
@@ -34,7 +35,7 @@ extern RFMEMORY_SEGMENT _AVX512_FetchMemoryCacheLine(MEMORY_BLOCK_CACHE_LINE* Ca
 // SIMD Function List
 RFMEMORY_SEGMENT (*_SIMD_FetchMemoryCacheLine)(MEMORY_BLOCK_CACHE_LINE* CacheLine) = _SSE_FetchMemoryCacheLine;
 RFMEMORY_SEGMENT (*_SIMD_FetchUnusedSegmentsUncached)(MEMORY_SEGMENT_LIST_HEAD* ListHead) = NULL;
-
+LPVOID (__fastcall *_SIMD_AllocatePhysicalPage) (char* PageBitmap, UINT64 BitmapSize, PAGE* PageArray) = _SSE_AllocatePhysicalPage;
 // ---------------------------
 
 
@@ -69,10 +70,10 @@ void InitMemoryManagementSubsystem() {
 
     UINT64 NumPages = ((sizeof(PAGE) * MemoryManagementTable.PageArraySize) >> 12) + 1;
     UINT64 BitmapOffset = NumPages << 12;
-    NumPages += ((MemoryManagementTable.PageArraySize + 1) >> 12) >> 3; // Bitmap
-    // Search a place for PAGE_ALLOCATION_TABLE (Must be physically contiguous)
+    NumPages += (((MemoryManagementTable.PageArraySize + 1) >> 3) >> 12) + 10; // Bitmap
     MemoryManagementTable.PageArraySize -= NumPages;
-    NumPages = ((sizeof(PAGE) * MemoryManagementTable.PageArraySize) >> 12) + 1;
+    // Search a place for PAGE_ALLOCATION_TABLE (Must be physically contiguous)
+    // NumPages = ((sizeof(PAGE) * MemoryManagementTable.PageArraySize) >> 12) + 1;
 
     Memory = InitData.MemoryMap->MemoryDescriptors;
 
@@ -98,7 +99,7 @@ void InitMemoryManagementSubsystem() {
         }
     }
     // Zero Page Bitmap
-    MemoryManagementTable.NumBytesPageBitmap = (((MemoryManagementTable.PageArraySize + 1) >> 12) >> 3) << 12;
+    MemoryManagementTable.NumBytesPageBitmap = ((((MemoryManagementTable.PageArraySize + 1) >> 12) >> 3) << 12) + 0x80; // Padding 0x80
     ZeroMemory(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap);
     // // Declare all the free segments in the cache
     // for(int i = 0;i<NUM_FREE_MEMORY_LEVELS;i++) {

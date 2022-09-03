@@ -80,7 +80,11 @@ _SSE_BezierCopyCords:
 
 %endmacro
 
+%assign i 8
+%rep 7
 
+%assign i i + 1
+%endrep
 
 CalculateBetaFromXMM_Ptrs:
 

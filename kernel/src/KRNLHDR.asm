@@ -99,7 +99,6 @@ KernelRelocate:
 	
 
 	mov cr3, r9
-	
 	mov rbx, _KernelStackTop
 	mov rbp, rbx ; Base Pointer = Stack Top
 
@@ -111,6 +110,7 @@ global __JumpToRelocatedKernel
 
 __JumpToRelocatedKernel:
 	; Relocate Return Address
+	
 	pop rdx
 	sub rdx, rax
 	add rdx, rcx

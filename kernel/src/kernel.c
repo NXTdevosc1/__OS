@@ -163,9 +163,17 @@ extern void __declspec(noreturn) _start() {
 	} else {
 		SystemDebugPrint(L"Page Attribute Table Unsupported");
 	}
+	SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 1, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
+	SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 0x10, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
+	SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 1, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
+	SystemDebugPrint(L"Allocate Page : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
+	SystemDebugPrint(L"Allocate Page : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
+	
+	ConfigureSystemSpace();
+	// Initialize Kernel Page tables
+	KernelPagingInitialize();
 
-	LineTo(200, 200, 210, 400, 0xFF);
-	while(1) __hlt();
+	
 
 	// if (!InitializeRuntimeSymbols()) SET_SOD_INITIALIZATION;
 
@@ -183,14 +191,9 @@ extern void __declspec(noreturn) _start() {
 			DebugWrite("Memory Heaps initialized.");
 		#endif
 	
-	ConfigureSystemSpace();
 	
 
-	KernelHeapInitialize();
-	// Initialize Kernel Page tables
-	KernelPagingInitialize();
-
-	KeGlobalCR3 = (UINT64)kproc->PageMap;	
+	// KernelHeapInitialize();
 	
 
 	#ifdef ___KERNEL_DEBUG___
@@ -208,9 +211,11 @@ extern void __declspec(noreturn) _start() {
 	void* __KeReloc = KernelRelocate;
 	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 1, PM_MAP);
 	KernelRelocate(); // CR3 Will be automatically set with the new kernel one
-	// Unmap KernelRelocate
 	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 1, 0);
 	
+	kproc->ProcessName = KernelProcessName;
+	
+	// Unmap KernelRelocate
 	// Setup I/O Memory process & thread
 	
 	// if(!CreateMemoryTable(&IoSpaceMemoryProcess, &IoSpaceMemoryProcess.MemoryManagementTable)) SET_SOD_MEMORY_MANAGEMENT;
@@ -223,7 +228,6 @@ extern void __declspec(noreturn) _start() {
 	// AllocateFreeHeapDescriptor(&VirtualRamProcess, NULL, (LPVOID)((UINT64)SystemSpaceBase + SYSTEM_SPACE48_RAM), ((UINT64)-1) - ((UINT64)SystemSpaceBase + SYSTEM_SPACE48_RAM));
 	// VirtualRamThread.Process = &VirtualRamProcess;
 
-	kproc->ProcessName = KernelProcessName;
 
 	// Relocate kernel memory table
 	// kproc->MemoryManagementTable.Process = kproc;
@@ -231,9 +235,21 @@ extern void __declspec(noreturn) _start() {
 	// kproc->MemoryManagementTable.FreeMemory = &kproc->MemoryManagementTable.FreeMemoryList;
 
 	// Map physical address of the frame buffer to the Kernel Space
+	
+	QemuWriteSerialMessage("OSKRNLX64.exe : Allocating I/O Memory for Frame Buffer");
 	InitData.fb->FrameBufferBase = AllocateIoMemory(InitData.fb->FrameBufferBase, (InitData.fb->FrameBufferSize >> 12) + 1, PM_WRITE_THROUGH);
-		
+	QemuWriteSerialMessage("Allocated I/O Memory :");
+	QemuWriteSerialMessage(to_hstring64(InitData.fb->FrameBufferBase));
 
+	
+	SystemDebugPrint(L"sadasd");
+	SystemDebugPrint(L"IO_MEM : %x", AllocateIoMemory((void*)0x1000, 10, 0));
+	SystemDebugPrint(L"IO_MEM : %x", AllocateIoMemory((void*)0x2000, 10, 0));
+	SystemDebugPrint(L"IO_MEM : %x", AllocateIoMemory((void*)0x1000, 10, 0));
+
+	// GP_clear_screen(0xff);
+	while(1) __hlt();
+	LineTo(200, 200, 210, 400, 0xFF);
 	GlobalInterruptDescriptorInitialize();
 	GlobalSysEntryTableInitialize();
 

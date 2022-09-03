@@ -89,7 +89,7 @@ int MapPhysicalPages(
 
 
         if(!Pml4Entry[Pml4Index].Present){
-            EntryAddr = (UINT64)AllocatePoolEx(NULL, 0x1000, 0x1000, ALLOCATE_POOL_PHYSICAL);
+            EntryAddr = (UINT64)_SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray);
             if(!EntryAddr) SET_SOD_MEMORY_MANAGEMENT;
             Pml4Entry[Pml4Index].PhysicalAddr = EntryAddr >> 12;
             Pml4Entry[Pml4Index].Present = 1;
@@ -103,7 +103,7 @@ int MapPhysicalPages(
         PdpEntry = (RFPAGEMAP)EntryAddr;
 
         if(!PdpEntry[PdpIndex].Present){
-            EntryAddr = (UINT64)AllocatePoolEx(NULL, 0x1000, 0x1000, ALLOCATE_POOL_PHYSICAL);
+            EntryAddr = (UINT64)_SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray);
             if(!EntryAddr) SET_SOD_MEMORY_MANAGEMENT;
 
             PdpEntry[PdpIndex].PhysicalAddr = EntryAddr >> 12;
@@ -120,7 +120,7 @@ int MapPhysicalPages(
             PdEntry[PdIndex].PhysicalAddr = TmpPhysicalAddr;
         } else {
             if(!PdEntry[PdIndex].Present){
-                EntryAddr = (UINT64)AllocatePoolEx(NULL, 0x1000, 0x1000, ALLOCATE_POOL_PHYSICAL);
+                EntryAddr = (UINT64)_SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray);
                 if(!EntryAddr) SET_SOD_MEMORY_MANAGEMENT;
 
                 PdEntry[PdIndex].PhysicalAddr = EntryAddr >> 12;
@@ -159,7 +159,7 @@ int KERNELAPI KeMapProcessMemory(RFPROCESS Process, void* PhysicalAddress, void*
 }
 
 RFPAGEMAP CreatePageMap(){
-    RFPAGEMAP PageMap = AllocatePoolEx(NULL, 0x1000, 0x1000, ALLOCATE_POOL_PHYSICAL);
+    RFPAGEMAP PageMap = _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray);
     if(!PageMap) SET_SOD_MEMORY_MANAGEMENT;
     ResetPageMap(PageMap);
     return PageMap;
