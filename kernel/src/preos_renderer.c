@@ -3,12 +3,15 @@
 #include <kernel.h>
 #include <stdlib.h>
 #include <math.h>
+#include <cstr.h>
+#include <cmos.h>
+
 
 
 void GP_clear_screen(unsigned int background_color){
 	memset32((void*)InitData.fb->FrameBufferBase, background_color, InitData.fb->HorizontalResolution * InitData.fb->VerticalResolution);
 }
-void GP_set_pixel(unsigned int x, unsigned int y, unsigned int color)
+extern inline void GP_set_pixel(unsigned int x, unsigned int y, unsigned int color)
 {
 	((UINT32*)(InitData.fb->FrameBufferBase))[x + y * InitData.fb->HorizontalResolution] = color;
 	
@@ -148,9 +151,10 @@ void DrawOsLogo(){
 	GP_draw_rect((InitData.fb->HorizontalResolution-150)/2,(InitData.fb->VerticalResolution - 150 - 50)/2,150,150,0xffffffff);
 
 }
-
-void LineTo(INT16 x0, INT16 y0, INT16 x1, INT16 y1, UINT32 Color) {
+void LineTo(INT64 x0, INT64 y0, INT64 x1, INT64 y1, UINT32 Color) {
 	// Brensenham Algorithm f(x) = mx + p
+	if(x0 == x1 && y0 == y1) return;
+
 	double dx = abs(x1 - x0);
 	double sx = x0 < x1 ? 1 : -1;
 	double dy = -abs(y1 - y0);
@@ -159,6 +163,7 @@ void LineTo(INT16 x0, INT16 y0, INT16 x1, INT16 y1, UINT32 Color) {
 
 	for(;;) {
 		GP_set_pixel(x0, y0, Color);
+		for(UINT b = 0;b<0x10000;b++);
 		if(x0 == x1 && y0 == y1) break;
 		double e2 = 2 * error;
 		if(e2 >= dy) {
@@ -170,6 +175,69 @@ void LineTo(INT16 x0, INT16 y0, INT16 x1, INT16 y1, UINT32 Color) {
 			if(y0 == y1) break;
 			error = error + dx;
 			y0 = y0 + sy;
+		}
+	}
+}
+void TestFill(UINT16 RectX, UINT16 RectY, UINT16 RectWidth, UINT16 RectHeight, UINT32 Color) {
+	struct {
+		INT64 y;
+	} Intersects[0x40] = {0};
+	struct {
+		INT64 y;
+	} ResolvedBuffer[0x40] = {0};
+	Color &= 0xFFFFFF;
+	for(UINT x = 0;x<RectWidth;x++) {
+		UINT NumIntersects = 0;
+		BOOL IS = 0;
+		UINT X = x + RectX;
+		for(UINT y = 0;y<RectHeight;y++) {
+			UINT Y = y + RectY;
+			UINT32* Pixel = (UINT32*)(InitData.fb->FrameBufferBase + (X << 2) + ((Y) * InitData.fb->Pitch));
+			UINT32* YPlusOnePixel = (UINT32*)(InitData.fb->FrameBufferBase + (X << 2) + ((Y + 1) * InitData.fb->Pitch));
+			if(*Pixel == Color) {
+				if(IS) continue;
+				Intersects[NumIntersects].y = Y;
+				NumIntersects++;
+				IS = 1;
+			} else {
+				IS = 0;
+			}
+
+			
+		}
+		if(NumIntersects < 2) continue;
+
+		
+
+		UINT Index = 0;
+		UINT TargetDoubleIntersect = -1;
+		QemuWriteSerialMessage("_____");
+		if((NumIntersects & 1)) {
+			TargetDoubleIntersect = NumIntersects / 2 + 1;
+		}
+		QemuWriteSerialMessage(to_hstring16(TargetDoubleIntersect));
+		QemuWriteSerialMessage(to_hstring16(NumIntersects));
+
+		UINT Rindx = 0;
+		for(UINT i = 0;i<NumIntersects;i++, Rindx++) {
+			ResolvedBuffer[Rindx].y = Intersects[i].y;
+			if(i == TargetDoubleIntersect) {
+				QemuWriteSerialMessage("DOUBLE_INTERSECT DETECTED.");
+				Rindx++;
+				ResolvedBuffer[Rindx].y = Intersects[i].y;
+			}
+		}
+		NumIntersects = Rindx;
+		QemuWriteSerialMessage(to_hstring16(NumIntersects));
+
+		INT LastIndex = -1;
+		for(UINT i = 0;i<NumIntersects;i++) {
+			if(LastIndex != -1) {
+				LineTo(X, ResolvedBuffer[LastIndex].y, X, ResolvedBuffer[i].y, Color);
+				LastIndex = -1;
+			} else {
+				LastIndex = i;
+			}
 		}
 	}
 }

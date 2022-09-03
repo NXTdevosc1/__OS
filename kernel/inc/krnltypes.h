@@ -11,7 +11,6 @@
 #define UNITS_PER_LIST 120
 
 #define MULTIBIT_TEST(Value, Mask) ((Value & Mask) == Mask)
-
 #define __KERNEL
 
 #define _IN

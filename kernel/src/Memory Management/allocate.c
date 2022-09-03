@@ -41,7 +41,7 @@ void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags) 
     for(UINT64 k = 0;k<MemoryManagementTable.NumBytesPageBitmap;k+=8, PageBitmap++) {
         register UINT64 Bitmask = *PageBitmap;
         for(UINT64 i = 0;i<0x40;i++, Page++, Bitmask >>= 1) {
-            if(Bitmask & 1) {
+            if(!(Bitmask & 1)) {
                 if(FillStart) {
                     FillStart = NULL;
                     CurrentPages = 0;
@@ -70,7 +70,7 @@ void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags) 
                         Mask = *f;
                         for(;x<0x40;x++, StartBuffer++) {
                             if(!CurrentPages) goto Ret;
-                            Mask |= (1 << x);
+                            Mask &= ~(1 << x);
                             StartBuffer->PageStruct.Allocated = 1;
                             CurrentPages--;
                         }

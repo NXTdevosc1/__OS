@@ -1,6 +1,6 @@
 #pragma once
 #include <kernel.h>
-
+#include <krnltypes.h>
 
 struct QUADRATIC_BEZIER{
 	unsigned int x0;
@@ -29,7 +29,7 @@ void GP_draw_rounded_rect(unsigned short x,unsigned short y, unsigned short widt
 void GP_draw_border_rect(unsigned short x, unsigned short y, unsigned short width, unsigned short height,unsigned short border_width, unsigned int background_color, unsigned long border_color);
 unsigned int GP_calculate_rgba_color(uint32_t x, uint32_t y,uint32_t color, unsigned char alpha);
 void GP_draw_rect(unsigned short x, unsigned short y, unsigned short width, unsigned short height,unsigned int background_color);
-void GP_set_pixel(unsigned int x, unsigned int y, unsigned int color);
+extern inline void GP_set_pixel(unsigned int x, unsigned int y, unsigned int color);
 void GP_clear_screen(unsigned int background_color);
 int TRIANGULAR_BEZIER_GET_POINT(int n1, int n2, float perc);
 void GP_set_st_f(struct PSF1_FONT* font);
@@ -39,7 +39,9 @@ struct RGBA calculate_rgba(struct RGBA color, uint16_t x, uint16_t y);
 void Gp_draw_sf_textW(const wchar_t* data,unsigned int color,unsigned int x,unsigned int y);
 void DrawOsLogo();
 
-void LineTo(INT16 x0, INT16 y0, INT16 x1, INT16 y1, UINT32 Color);
+void LineTo(INT64 x0, INT64 y0, INT64 x1, INT64 y1, UINT32 Color);
 
 void CalculateRgba(struct RGBA* Color, struct RGBA* Source);
 extern inline UINT64 GetBezierPoint(double* cordinates, double* beta, UINT8 NumCordinates, double percent);
+
+void TestFill(UINT16 RectX, UINT16 RectY, UINT16 RectWidth, UINT16 RectHeight, UINT32 Color);

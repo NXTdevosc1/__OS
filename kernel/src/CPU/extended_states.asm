@@ -15,6 +15,10 @@ EnableExtendedStates:
     push rcx
     push rdx
 
+    ; enable write protect
+    mov rax, cr0
+    or rax, 1 << 16 ; WP
+    mov cr0, rax
 
     ; Enable SSE
     mov rax, cr0

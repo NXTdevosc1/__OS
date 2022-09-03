@@ -4,6 +4,7 @@
 #include <sys/sys.h>
 #include <Management/runtimesymbols.h>
 #include <stdlib.h>
+#include <CPU/cpu.h>
 void FirmwareControlRelease(){
     // memory map code
 
@@ -68,30 +69,19 @@ void KernelPagingInitialize(){
 
 	KeGlobalCR3 = (UINT64)kproc->PageMap;
 	
-	UINT16 LoaderData = EfiLoaderData;
-	UINT16 LoaderCode = EfiLoaderCode;
-	UINT16 ConventionalMemory = EfiConventionalMemory;
-	UINT16 UnusableMemory = EfiUnusableMemory;
-	if(!InitData.uefi) {
-		LoaderData = -1; // BIOS May set 0xFF (who knows ??)
-		LoaderCode = -1;
-		UnusableMemory = -1;
-		ConventionalMemory = 1; // BIOS 'SMAP' Conventional Memory Entry
-	}
-	{
+
 		UINT64 Flags = PM_MAP | PM_NO_CR3_RELOAD | PM_NO_TLB_INVALIDATION;
 		for (UINT64 i = 0; i < InitData.MemoryMap->Count; i++) {
 			UINT16 MemoryType = InitData.MemoryMap->MemoryDescriptors[i].Type;
-			if(MemoryType == UnusableMemory) continue;
+			if(MemoryType == EfiUnusableMemory) continue;
 			// Check if its a conventionnal memory, if not then the page writing
 			//  should not be cached (page must be writting in memory not only in cache)
-			if (MemoryType != LoaderData && MemoryType != LoaderCode &&
-				MemoryType != ConventionalMemory) Flags |= PM_WRITE_THROUGH;
+			if (MemoryType != EfiLoaderData && MemoryType != EfiLoaderCode &&
+				MemoryType != EfiConventionalMemory) Flags |= PM_WRITE_THROUGH;
 			
 			MapPhysicalPages(kproc->PageMap, (LPVOID)InitData.MemoryMap->MemoryDescriptors[i].PhysicalStart, (LPVOID)InitData.MemoryMap->MemoryDescriptors[i].PhysicalStart, InitData.MemoryMap->MemoryDescriptors[i].PageCount, Flags);
 			Flags = PM_MAP | PM_NO_CR3_RELOAD | PM_NO_TLB_INVALIDATION;
 		}
-	}
 		// Map Kernel (BIOS Bootloader memory map is very simple and kernel memory region is not mapped)
 		MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_KERNEL, (char*)InitData.ImageBase, (InitData.ImageSize >> 12), PM_MAP);
 		// MapPhysicalPages(kproc->PageMap, (char*)InitData.ImageBase, (char*)InitData.ImageBase, (InitData.ImageSize >> 12) + 1, PM_MAP);
@@ -121,6 +111,12 @@ void KernelPagingInitialize(){
 		}
 
 	MapPhysicalPages(kproc->PageMap, InitData.PEDataDirectories, InitData.PEDataDirectories, 1, PM_MAP);
+	
+	// a page fault when setting PageArray, PageBitmap to high virtual memory
+	MapPhysicalPages(kproc->PageMap, MemoryManagementTable.PageArray, MemoryManagementTable.PageArray, ALIGN_VALUE(MemoryManagementTable.PageArraySize, 0x1000) >> 12, PM_MAP);
+	MapPhysicalPages(kproc->PageMap, MemoryManagementTable.PageBitmap, MemoryManagementTable.PageBitmap, ALIGN_VALUE(MemoryManagementTable.NumBytesPageBitmap, 0x1000) >> 12, PM_MAP);
+
+
 }
 
 void __KernelRelocate() {

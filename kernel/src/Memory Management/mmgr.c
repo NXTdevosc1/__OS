@@ -1,7 +1,7 @@
 #include <MemoryManagement.h>
 #include <fs/fs.h>
 #include <kernel.h>
-
+#include <CPU/cpu.h>
 
 FILE PageFile = NULL;
 BOOL _PageFilePresent = 0;
@@ -100,7 +100,7 @@ void InitMemoryManagementSubsystem() {
     }
     // Zero Page Bitmap
     MemoryManagementTable.NumBytesPageBitmap = ((((MemoryManagementTable.PageArraySize + 1) >> 12) >> 3) << 12) + 0x80; // Padding 0x80
-    ZeroMemory(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap);
+    memset(MemoryManagementTable.PageBitmap, 0xFF, MemoryManagementTable.NumBytesPageBitmap);
     // // Declare all the free segments in the cache
     // for(int i = 0;i<NUM_FREE_MEMORY_LEVELS;i++) {
     //     MemoryManagementTable.FreeMemoryLevels[i].UnallocatedSegmentCache.CachedMemorySegments[i] = 
@@ -112,8 +112,13 @@ void InitMemoryManagementSubsystem() {
 
 // Used after relocation
 void SIMD_InitOptimizedMemoryManagement() {
+    // Relocate variables
+    MemoryManagementTable.PageArray = AllocateIoMemory(MemoryManagementTable.PageArray, ALIGN_VALUE(MemoryManagementTable.PageArraySize, 0x1000) >> 12, 0);
+    MemoryManagementTable.PageBitmap = AllocateIoMemory(MemoryManagementTable.PageBitmap, ALIGN_VALUE(MemoryManagementTable.NumBytesPageBitmap, 0x1000) >> 12, 0);
+
     if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
         _SIMD_FetchMemoryCacheLine = _SSE_FetchMemoryCacheLine;
+        _SIMD_AllocatePhysicalPage = _SSE_AllocatePhysicalPage;
     }
     else if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
         _SIMD_FetchMemoryCacheLine = _AVX_FetchMemoryCacheLine;

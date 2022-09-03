@@ -28,7 +28,7 @@ LPVOID KEXPORT KERNELAPI KeResolvePhysicalAddress(RFPROCESS Process, const void*
     if(!_pd->Present) return NULL;
 
     // Check if it's a 2MB Page
-    if(_pd->Size) return (void*)((_pd->PhysicalAddr << 0x15) + ((UINT64)VirtualAddress & 0x1FFFFF));
+    if(_pd->SizePAT) return (void*)((_pd->PhysicalAddr << 0x15) + ((UINT64)VirtualAddress & 0x1FFFFF));
 
     RFPAGEMAP _pt = (RFPAGEMAP)((_pd->PhysicalAddr << 12) + (pt << 3));
     if(!_pt->Present) return NULL;
@@ -36,7 +36,7 @@ LPVOID KEXPORT KERNELAPI KeResolvePhysicalAddress(RFPROCESS Process, const void*
     return (void*)((_pt->PhysicalAddr << 12) + ((UINT64)VirtualAddress & 0xFFF));
 }
 
-
+BOOL NX = FALSE;
 
 int MapPhysicalPages(
     RFPAGEMAP PageMap,
@@ -58,26 +58,34 @@ int MapPhysicalPages(
     PTBLENTRY ModelEntry = { 0 };
 
     if (Flags & PM_PRESENT) ModelEntry.Present = TRUE;
-    if (Flags & PM_READWRITE) ModelEntry.ReadWrite = TRUE;
+    if (Flags & PM_READWRITE) {
+        ModelEntry.ReadWrite = TRUE;
+    } else {
+        ModelEntry.PWT = 1;
+        ModelEntry.PCD = 1;
+    }
     if (Flags & PM_USER) ModelEntry.UserSupervisor = TRUE;
     if (Flags & PM_NX) {
-        // Check Execute Disable Compatiblity (If Reserved bit is set (NX on non compatible cpu)
-        // A page fault will occur
-        int edx = 0;
-        CPUID_INFO CpuInfo = {0};
-        __cpuidex(&CpuInfo, 0x80000001, 0);
-        
-        if (CpuInfo.edx & (1 << 20)) {
-            ModelEntry.ExecuteDisable = TRUE; // CPU is NX (Data Execution Prevention) Compatible
-        }
+        if(NX) ModelEntry.ExecuteDisable = 1;
     }
     if (Flags & PM_GLOBAL) ModelEntry.Global = TRUE;
-    if (Flags & PM_WRITE_THROUGH) ModelEntry.PageLevelWriteThrough = TRUE;
-    if (Flags & PM_CACHE_DISABLE) ModelEntry.PageLevelCacheDisable = TRUE;
+    if (Flags & PM_WRITE_THROUGH) {
+        if(Flags & PM_LARGE_PAGES) {
+            ModelEntry.PhysicalAddr = 1; // PATi
+        } else {
+            ModelEntry.SizePAT = 1;
+        }
+    } else if (Flags & PM_CACHE_DISABLE) {
+        ModelEntry.PCD = 1;
+    } else if (Flags & PM_WRITE_COMBINE) {
+        ModelEntry.PWT = 1;
+    }
+
+    
 
     UINT64 IncVaddr = 1;
     if(Flags & PM_LARGE_PAGES) {
-        ModelEntry.Size = 1; // 2MB Pages
+        ModelEntry.SizePAT = 1; // 2MB Pages
         IncVaddr = 0x200;
     }
     for(UINT64 i = 0;i<Count;i++, TmpPhysicalAddr+=IncVaddr, TmpVirtualAddr+=IncVaddr){
@@ -117,7 +125,7 @@ int MapPhysicalPages(
 
         if(Flags & PM_LARGE_PAGES) {
             *&PdEntry[PdIndex] = ModelEntry;
-            PdEntry[PdIndex].PhysicalAddr = TmpPhysicalAddr;
+            PdEntry[PdIndex].PhysicalAddr = TmpPhysicalAddr | ModelEntry.PhysicalAddr;
         } else {
             if(!PdEntry[PdIndex].Present){
                 EntryAddr = (UINT64)_SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray);
@@ -136,7 +144,7 @@ int MapPhysicalPages(
 
             *&PtEntry[PtIndex] = ModelEntry;
 
-            PtEntry[PtIndex].PhysicalAddr = TmpPhysicalAddr;
+            PtEntry[PtIndex].PhysicalAddr = TmpPhysicalAddr | ModelEntry.PhysicalAddr;
         }
         // Check if paging modification is not very big
         if(Count <= 0x2000 || !(Flags & PM_NO_TLB_INVALIDATION)){
@@ -163,4 +171,45 @@ RFPAGEMAP CreatePageMap(){
     if(!PageMap) SET_SOD_MEMORY_MANAGEMENT;
     ResetPageMap(PageMap);
     return PageMap;
+}
+
+
+#define PAT_MSR 0x277
+
+// PAT Memory Types
+#define PAT_UNCACHEABLE 0
+#define PAT_WRITE_COMBINING 1
+#define PAT_WRITE_THROUGH 4
+#define PAT_WRITE_PROTECT 5
+#define PAT_WRITE_BACK 6
+#define PAT_UNCACHED 7
+
+UINT8 PageAttributeTable[] = {
+    PAT_WRITE_BACK,
+    PAT_WRITE_COMBINING,
+    PAT_UNCACHEABLE,
+    PAT_WRITE_PROTECT,
+    PAT_WRITE_THROUGH,
+    PAT_WRITE_BACK,
+    PAT_WRITE_BACK,
+    PAT_WRITE_BACK
+};
+
+
+void SetupPageAttributeTable() {
+    // Check Execute Disable Compatiblity (If Reserved bit is set (NX on non compatible cpu)
+    // A page fault will occur
+    int edx = 0;
+    CPUID_INFO CpuInfo = {0};
+    __cpuidex(&CpuInfo, 0x80000001, 0);
+    
+    if (CpuInfo.edx & (1 << 20)) {
+        NX = TRUE; // CPU is NX (Data Execution Prevention) Compatible
+    }
+
+    // Set Page Attribute Table
+    UINT64 Val = *(UINT64*)PageAttributeTable;
+    UINT32 EAX = Val;
+    UINT32 EDX = Val >> 32;
+    __WriteMsr(PAT_MSR, EAX, EDX);
 }

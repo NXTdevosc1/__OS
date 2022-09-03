@@ -28,6 +28,7 @@
         "ratio": "c",
         "algorithm": "c",
         "chrono": "c",
-        "iterator": "c"
+        "iterator": "c",
+        "cpu.h": "c"
     }
 }

@@ -17,8 +17,12 @@ void CmosWrite(unsigned char Address, unsigned char Value){
 
 #define SERIAL_COM1 0x3F8
 #define QEMU_SERIAL_PORT SERIAL_COM1
+#define QEMU 1
 
-void QemuWriteSerialMessage(char* Message) {
+void QemuWriteSerialMessage(const char* Message) {
+#ifndef QEMU
+    return;
+#endif
     while(*Message) {
         OutPortB(QEMU_SERIAL_PORT, *Message);
         Message++;

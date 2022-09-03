@@ -31,3 +31,5 @@ int KEXPORT KERNELAPI KeMapProcessMemory(
 );
 
 LPVOID KEXPORT KERNELAPI KeResolvePhysicalAddress(RFPROCESS Process, const void* VirtualAddress);
+
+void SetupPageAttributeTable();

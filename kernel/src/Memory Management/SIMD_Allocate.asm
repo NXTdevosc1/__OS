@@ -11,39 +11,40 @@ MEMORY_LIST_HEAD_SIZE equ 0x40
 global _SSE_AllocatePhysicalPage
 
 
-%macro _SSE_FIND_PHYS_PAGE 1
-    test rdi, rax
-    jnz %%.EXIT
-    lock bts qword [rcx], %1
-    jc %%.EXIT
+%macro _APP0 0
+    mov rax, 1
+    movq rdi, xmm0
+    bsf rsi, rdi
+    jz %%.EXIT
+    lock btr qword [rcx], rsi
+    jnc %%.EXIT
+    shl rsi, 3
+    add r8, rsi
+    or qword [r8], 1
     mov rax, [r8]
     and rax, ~0xFFF
     ret
 %%.EXIT:
-add r8, 8 ; inc PAGE_ARRAY
+    add r8, 64 * 8
+    psrldq xmm0, 8
+    add rcx, 0x08
 %endmacro
 
 ; (char* PageBitmap, UINT64 BitmapSize, PAGE* PageArray)
+
+extern MemoryManagementTable
+
 _SSE_AllocatePhysicalPage:
+    mov rbx, [rel MemoryManagementTable] ; Available Memory
+    cmp rbx, 0x1000
+    jb .ExitFailure
 .loop0:
-    test rdx, rdx
-    jz .ExitFailure
     movdqa xmm0, [rcx] ; Page Bitmap
     %rep 2
-    mov rax, 1
-    movq rdi, xmm0
-    %assign i 0
-    %rep 64
-    _SSE_FIND_PHYS_PAGE i
-    shl rax, 1
-    %assign i i + 1
-    %endrep
-    psrldq xmm0, 8
-    add rcx, 0x8
+    _APP0
     %endrep
     sub rdx, 0x10
     jmp .loop0
-
 .ExitFailure:
     xor rax, rax
     ret

@@ -101,7 +101,7 @@ LPWSTR KernelProcessName = L"System Kernel.";
 extern void __declspec(noreturn) _start() {
 	__cli();
 	EnableExtendedStates();
-
+	SetupPageAttributeTable();
 	Pmgrt.NumProcessors = 1;
 	CPUID_INFO CpuIdInfo = {0};
 	__cpuid(&CpuIdInfo, 1);
@@ -208,13 +208,19 @@ extern void __declspec(noreturn) _start() {
 
 // Relocate the kernel
 	// Map KernelRelocate (To change CR3 With no Page-Fault)
+
+	
+
 	void* __KeReloc = KernelRelocate;
 	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 1, PM_MAP);
 	KernelRelocate(); // CR3 Will be automatically set with the new kernel one
 	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 1, 0);
 	
 	kproc->ProcessName = KernelProcessName;
-	
+	SIMD_InitOptimizedMemoryManagement();
+
+
+
 	// Unmap KernelRelocate
 	// Setup I/O Memory process & thread
 	
@@ -237,19 +243,43 @@ extern void __declspec(noreturn) _start() {
 	// Map physical address of the frame buffer to the Kernel Space
 	
 	QemuWriteSerialMessage("OSKRNLX64.exe : Allocating I/O Memory for Frame Buffer");
-	InitData.fb->FrameBufferBase = AllocateIoMemory(InitData.fb->FrameBufferBase, (InitData.fb->FrameBufferSize >> 12) + 1, PM_WRITE_THROUGH);
+	// AllocateIoMemory(0x1000, 10, 0);
+	InitData.fb->FrameBufferBase = AllocateIoMemory(InitData.fb->FrameBufferBase, (InitData.fb->FrameBufferSize >> 12) + 1, IO_MEMORY_WRITE_COMBINE);
 	QemuWriteSerialMessage("Allocated I/O Memory :");
-	QemuWriteSerialMessage(to_hstring64(InitData.fb->FrameBufferBase));
+	QemuWriteSerialMessage(to_hstring64((UINT64)InitData.fb->FrameBufferBase));
+	GP_clear_screen(0);
+	LineTo(500, 200, 600, 200, 0xFF0000);
+	LineTo(600, 200, 540, 240, 0xFF0000);
+	LineTo(540, 240, 600, 280, 0xFF0000);
+	LineTo(600, 280, 500, 280, 0xFF0000);
+	LineTo(500, 280, 500, 200, 0xFF0000);
+
+	TestFill(450, 150, 300, 300, 0xFF0000);
+	
+	// LineTo(500, 200, 500, 100, 0xFF);
+	// LineTo(500, 100, 520, 120, 0xFF);
+	// LineTo(520, 120, 540, 100, 0xFF);
+	// LineTo(540, 100, 540, 200, 0xFF);
+	// LineTo(540, 200, 500, 200, 0xFF);
+	// TestFill(500, 100, 120, 120, 0xFF);
+
+
+
+
+	// for(;;) {
+	// 	for(UINT i = 0;i<=0xFF;i++) {
+	// 		GP_clear_screen(i);
+	// 	}
+	// 	for(UINT i = 0;i<=0xFF;i++) {
+	// 		GP_clear_screen(i << 8);
+	// 	}
+	// 	for(UINT i = 0;i<=0xFF;i++) {
+	// 		GP_clear_screen(i << 16);
+	// 	}
+	// }
 
 	
-	SystemDebugPrint(L"sadasd");
-	SystemDebugPrint(L"IO_MEM : %x", AllocateIoMemory((void*)0x1000, 10, 0));
-	SystemDebugPrint(L"IO_MEM : %x", AllocateIoMemory((void*)0x2000, 10, 0));
-	SystemDebugPrint(L"IO_MEM : %x", AllocateIoMemory((void*)0x1000, 10, 0));
-
-	// GP_clear_screen(0xff);
 	while(1) __hlt();
-	LineTo(200, 200, 210, 400, 0xFF);
 	GlobalInterruptDescriptorInitialize();
 	GlobalSysEntryTableInitialize();
 

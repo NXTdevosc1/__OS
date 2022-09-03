@@ -84,9 +84,10 @@ typedef enum _MEMORY_SEGMENT_FLAGS {
 } MEMORY_SEGMENT_FLAGS;
 
 typedef enum _IO_MEMORY_FLAGS {
-	IO_MEMORY_CACHE_DISABLED,
-	IO_MEMORY_WRITE_THROUGH,
-	IO_MEMORY_READ_ONLY
+	IO_MEMORY_CACHE_DISABLED = 1,
+	IO_MEMORY_WRITE_THROUGH = 2,
+	IO_MEMORY_READ_ONLY = 4,
+    IO_MEMORY_WRITE_COMBINE = 8
 } IO_MEMORY_FLAGS;
 
 typedef struct _MEMORY_SEGMENT {
@@ -216,3 +217,4 @@ RFMEMORY_SEGMENT (*_SIMD_FetchUnusedSegmentsUncached)(MEMORY_SEGMENT_LIST_HEAD* 
 LPVOID (__fastcall *_SIMD_AllocatePhysicalPage) (char* PageBitmap, UINT64 BitmapSize, PAGE* PageArray);
 // ---------------------------
 
+void SIMD_InitOptimizedMemoryManagement();
