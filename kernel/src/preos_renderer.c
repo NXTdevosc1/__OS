@@ -213,10 +213,10 @@ void TestFill(UINT16 RectX, UINT16 RectY, UINT16 RectWidth, UINT16 RectHeight, U
 		UINT TargetDoubleIntersect = -1;
 		QemuWriteSerialMessage("_____");
 		if((NumIntersects & 1)) {
-			TargetDoubleIntersect = NumIntersects / 2 + 1;
+			TargetDoubleIntersect = NumIntersects / 2;
 		}
-		QemuWriteSerialMessage(to_hstring16(TargetDoubleIntersect));
-		QemuWriteSerialMessage(to_hstring16(NumIntersects));
+		// QemuWriteSerialMessage(to_hstring16(TargetDoubleIntersect));
+		// QemuWriteSerialMessage(to_hstring16(NumIntersects));
 
 		UINT Rindx = 0;
 		for(UINT i = 0;i<NumIntersects;i++, Rindx++) {
@@ -228,16 +228,27 @@ void TestFill(UINT16 RectX, UINT16 RectY, UINT16 RectWidth, UINT16 RectHeight, U
 			}
 		}
 		NumIntersects = Rindx;
-		QemuWriteSerialMessage(to_hstring16(NumIntersects));
-
+		// QemuWriteSerialMessage(to_hstring16(NumIntersects));
+		
 		INT LastIndex = -1;
 		for(UINT i = 0;i<NumIntersects;i++) {
 			if(LastIndex != -1) {
 				LineTo(X, ResolvedBuffer[LastIndex].y, X, ResolvedBuffer[i].y, Color);
+				if(TargetDoubleIntersect != -1 || x > 125) {
+				// SystemDebugPrint(L"Y : %x , Y : %x", ResolvedBuffer[LastIndex].y, ResolvedBuffer[i].y);
+				QemuWriteSerialMessage(to_stringu64(ResolvedBuffer[LastIndex].y));
+				QemuWriteSerialMessage(to_stringu64(ResolvedBuffer[i].y));
+				QemuWriteSerialMessage("-");
+
+				}
 				LastIndex = -1;
 			} else {
 				LastIndex = i;
 			}
 		}
+		// if(TargetDoubleIntersect != -1 || x > 125)
+		// 	SystemDebugPrint(L"______");
+
+		
 	}
 }

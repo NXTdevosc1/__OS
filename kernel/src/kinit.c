@@ -154,3 +154,7 @@ void __KernelRelocate() {
 void InitFeatures(){
 	IpcInit();
 }
+
+void KeInitOptimizedComputing() {
+	
+}

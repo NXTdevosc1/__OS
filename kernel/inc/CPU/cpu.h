@@ -152,6 +152,11 @@ typedef struct _USER_SYSTEM_CONFIG {
 
 } USER_SYSTEM_CONFIG;
 
+
+// Searches the first bit set to 1 and release it (as allocated)
+// returns Index within the bitmap, -1 if failed
+INT64 __SyncBitmapAllocate(UINT64* Bitmap);
+
 void InitProcessorDescriptors(void** CpuBuffer, UINT64* CpuBufferSize);
 
 void KEXPORT KERNELAPI Sleep(UINT64 Milliseconds);

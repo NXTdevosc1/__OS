@@ -43,16 +43,17 @@ typedef struct _PAGE_ALLOCATION_TABLE PAGE_ALLOCATION_TABLE;
 
 #define PAGE_ALLOCATION_TABLE_ENTRY_COUNT 0x40
 
-typedef struct _VIRTUAL_MEMORY_PAGE {
-    union {
+typedef union _VIRTUAL_MEMORY_PAGE {
+    struct {
         UINT64 Present : 1;
         UINT64 Unallocated : 1; // If present && Unallocate then AllocatePages
         UINT64 PagePtr : 62; // Reference to the 8-Byte aligned PAGE Structure
     } Details;
-    PAGE* RawPage; // To directly set the PAGE Pointer
+    UINT64 VirtualMemoryDescriptor;    
 } VIRTUAL_MEMORY_PAGE;
 
 typedef struct _PAGE_ALLOCATION_TABLE {
+    UINT64 Bitmap;
     VIRTUAL_MEMORY_PAGE VirtualMemoryPages[PAGE_ALLOCATION_TABLE_ENTRY_COUNT];
     PAGE_ALLOCATION_TABLE* Next;
 } PAGE_ALLOCATION_TABLE;
@@ -91,12 +92,19 @@ typedef enum _IO_MEMORY_FLAGS {
 } IO_MEMORY_FLAGS;
 
 typedef struct _MEMORY_SEGMENT {
-    UINT16 Flags;
-    UINT16 ProcessId;
-    void* BlockAddress;
-    UINT64 BlockSize;
-    UINT64 PageAllocationTableStart;
+    UINT32 Present : 1;
+    UINT32 Reserved : 19;
+    UINT32 Offset : 12;
+    UINT64 HeapLength;
 } MEMORY_SEGMENT;
+
+typedef struct _FREE_MEMORY_SEGMENT {
+    UINT8 Present : 1;
+    UINT8 Reserved : 7;
+    void* Address;
+    UINT64 HeapLength;
+} FREE_MEMORY_SEGMENT;
+
 
 typedef struct _MEMORY_SEGMENT_LIST_HEAD MEMORY_SEGMENT_LIST_HEAD, *RFMEMORY_SEGMENT_LIST_HEAD;
 
@@ -107,6 +115,12 @@ typedef struct _MEMORY_SEGMENT_LIST_HEAD {
     RFMEMORY_SEGMENT_LIST_HEAD NextListHead;
     UINT64 Bitmask;
 } MEMORY_SEGMENT_LIST_HEAD;
+
+typedef struct _FREE_MEMORY_SEGMENT_LIST_HEAD {
+    FREE_MEMORY_SEGMENT MemorySegments[MEMORY_LIST_HEAD_SIZE];
+    RFMEMORY_SEGMENT_LIST_HEAD NextListHead;
+    UINT64 Bitmask;
+} FREE_MEMORY_SEGMENT_LIST_HEAD;
 
 #define UNALLOCATED_MEMORY_SEGMENT_CACHE_SIZE 0x100
 
@@ -158,12 +172,14 @@ typedef struct _PROCESS_MEMORY_TABLE {
     UINT64 UsedMemory;
     UINT64 PagedMemory;
     UINT64 UnpageableMemory;
+    UINT64 AllocatedPages;
+    UINT64 VirtualMemoryBase;
     MEMORY_BLOCK_CACHE_LINE UnallocatedSegmentCache; // for Allocated Memory
     MEMORY_SEGMENT_LIST_HEAD AllocatedMemory;
     PAGE_ALLOCATION_TABLE PageAllocationTable;
     struct {
         MEMORY_BLOCK_CACHE_LINE UnallocatedSegmentCache; // for Free Memory
-        MEMORY_SEGMENT_LIST_HEAD SegmentListHead;
+        FREE_MEMORY_SEGMENT_LIST_HEAD SegmentListHead;
     } FreeMemoryLevels[NUM_FREE_MEMORY_LEVELS];
 } PROCESS_MEMORY_TABLE;
 

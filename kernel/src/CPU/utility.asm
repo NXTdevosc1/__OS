@@ -52,9 +52,70 @@ global __Schedule
 
 global __sqrt
 
+global _SSE_memset
+global _SSE_memcopy
+global _AVX_memset
+global _AVX_memcopy
+
+global __SyncBitmapAllocate
+
 [BITS 64]
 
 section .text
+
+; RCX = UINT64* Bitmap
+__SyncBitmapAllocate:
+	bsf rax, qword [rcx]
+	jz .Failed
+	lock btr qword [rcx], rax
+	jnc __SyncBitmapAllocate
+	ret
+.Failed:
+	mov rax, -1
+	ret
+
+; void* Addr:RCX (Aligned); UINT64 Val:RDX ; UINT64 Count:R8 (Must be 64 byte aligned) In 1 Byte Blocks
+_SSE_memset:
+	movq xmm0, rdx
+	movlhps xmm0, xmm0
+.loop:
+	test r8, r8
+	jz .Exit
+	movdqa [rcx], xmm0
+	add rcx, 0x10
+	sub r8, 0x10
+	jmp .loop
+.Exit:
+	ret
+
+_SSE_memcopy:
+	test r8, r8
+	jz .Exit
+	movdqa xmm0, [rdx]
+	movdqa [rcx], xmm0
+	add rcx, 0x10
+	add rdx, 0x10
+	sub r8, 0x10
+	jmp _SSE_memcopy
+.Exit:
+	ret
+
+_AVX_memset:
+	push rdx
+	vbroadcastsd ymm0, [rsp]
+	pop rdx
+.loop:
+	test r8, r8
+	jz .Exit
+	vmovdqa [rcx], xmm0
+	add rcx, 0x20
+	sub r8, 0x20
+	jmp .loop
+.Exit:
+	ret
+
+
+
 
 __sqrt:
 	sqrtsd xmm0, xmm0

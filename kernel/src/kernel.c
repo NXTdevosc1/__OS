@@ -127,6 +127,9 @@ extern void __declspec(noreturn) _start() {
 	GP_draw_sf_text(to_hstring64((UINT64)AllocatePool(0x20)), 0, 400, 40);
 	GP_draw_sf_text(to_hstring64((UINT64)AllocatePoolEx(kproc, 0x500, 0x1500, ALLOCATE_POOL_PHYSICAL)), 0, 400, 60);
 	
+	UINT64 Bitmap = 0x180;
+	SystemDebugPrint(L"INDX : %x, BMP : %x", __SyncBitmapAllocate(&Bitmap), Bitmap);
+	while(1);
 	UINT XOff = 200;
 	UINT YOff = 300;
 	double XCords[] = {0, 50, 100, 150};
@@ -135,28 +138,28 @@ extern void __declspec(noreturn) _start() {
 	double IncValue = 0.1;
 	double X0 = GetBezierPoint(XCords, betabuffer, 4, 0.1), X1 = GetBezierPoint(XCords, betabuffer, 4, 0.2), Y0 = GetBezierPoint(YCords, betabuffer, 4, 0.1), Y1 = GetBezierPoint(YCords, betabuffer, 4, 0.2);
 	double Distance = __sqrt(pow(X1 - X0, 2) + pow(Y1-Y0, 2));
-	IncValue /= (Distance + 1);
+	IncValue /= (Distance - 1);
 
 	// IncValue /= 10;
 
 
 	SystemDebugPrint(L"Starting...");
-	for(UINT c = 0;c<0x5000;c++) { 
-	UINT64 LastX = XOff;
-	UINT64 LastY = YOff;
+	// for(UINT c = 0;c<0x5000;c++) { 
+	// UINT64 LastX = XOff;
+	// UINT64 LastY = YOff;
 
-	UINT64 X = 0;
-	UINT64 Y = 0;
+	// UINT64 X = 0;
+	// UINT64 Y = 0;
 	
 
-	for(double t = 0;t<=1;t+=IncValue) {
-		X = XOff + GetBezierPoint(XCords, betabuffer, 4, t);
-		Y = YOff + GetBezierPoint(YCords, betabuffer, 4, t);
-		*(UINT32*)(InitData.fb->FrameBufferBase + ((UINT64)X << 2) + ((UINT64)Y * InitData.fb->Pitch)) = 0xFF0000;
-		LastX = X;
-		LastY = Y;
-	}
-	}
+	// for(double t = 0;t<=1;t+=IncValue) {
+	// 	X = XOff + GetBezierPoint(XCords, betabuffer, 4, t);
+	// 	Y = YOff + GetBezierPoint(YCords, betabuffer, 4, t);
+	// 	*(UINT32*)(InitData.fb->FrameBufferBase + ((UINT64)X << 2) + ((UINT64)Y * InitData.fb->Pitch)) = 0xFF0000;
+	// 	LastX = X;
+	// 	LastY = Y;
+	// }
+	// }
 	__cpuid(&CpuIdInfo, 1);
 	if(CpuIdInfo.edx & (1 << 16)) {
 		SystemDebugPrint(L"Page Attribute Table Supported");
@@ -217,6 +220,7 @@ extern void __declspec(noreturn) _start() {
 	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 1, 0);
 	
 	kproc->ProcessName = KernelProcessName;
+	KeInitOptimizedComputing();
 	SIMD_InitOptimizedMemoryManagement();
 
 
