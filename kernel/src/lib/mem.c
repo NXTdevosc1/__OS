@@ -2,62 +2,90 @@
 #include <CPU/cpu.h>
 
 
-void* memset(void* ptr, uint8_t value, size_t size){
+// All Addresses must be aligned (0x10) Boundary
+
+void (__fastcall *_SIMD_Memset)(LPVOID ptr, UINT64 Value, UINT64 Count) = _SSE_Memset;
+
+LPVOID __fastcall _Wrap_SSE_Memset(LPVOID ptr, UINT64 value, size_t size){
+    __repstos(ptr, value, size);
+    return NULL;
+    if(size < 0x10) {
+        __repstos(ptr, value, size);
+        return NULL;
+    }
+    if((UINT64)ptr & 0xF) {
+        __repstos(ptr, value, 0x10 - ((UINT64)ptr & 0xF));
+        size-= 0x10 - ((UINT64)ptr & 0xF);
+        (UINT64)ptr += 0x10;
+        (UINT64)ptr &= ~0x10;
+    }
+    if(size & 0xF) {
+        __repstos(ptr, value, size & 0xF);
+        size-= 0x10 - ((UINT64)size & 0xF);
+    }
+    _SSE_Memset(ptr, value, size);
+    return NULL;
+}
+
+LPVOID __fastcall _Wrap_AVX_Memset(LPVOID ptr, UINT64 value, size_t size) {
+    if(size < 0x20) {
+        __repstos(ptr, value, size);
+        return NULL;
+    }
+    if((UINT64)ptr & 0xF) {
+        __repstos(ptr, value, 0x10 - ((UINT64)ptr & 0xF));
+        size-= 0x10 - ((UINT64)ptr & 0xF);
+        (UINT64)ptr += 0x10;
+        (UINT64)ptr &= ~0x10;
+    }
+    if(size & 0x1F) {
+        __repstos(ptr, value, size & 0x1F);
+        (char*)ptr += (size & 0x1F);
+    }
+    _AVX_Memset(ptr, value, size);
+    
+    return NULL;
+}
+
+
+LPVOID __fastcall _r8_SSE_Memset(LPVOID ptr, uint8_t value, size_t size) {
+    UINT64 CombinedValue = value;
+    CombinedValue |= CombinedValue << 8 | CombinedValue << 16 | CombinedValue << 24
+    | CombinedValue << 32 | CombinedValue << 40 | CombinedValue << 48 | CombinedValue << 56;
+    return _Wrap_SSE_Memset(ptr, CombinedValue, size);
+}
+LPVOID __fastcall _r8_AVX_Memset(LPVOID ptr, uint8_t value, size_t size) {
     UINT64 CombinedValue = (UINT64)value;
     CombinedValue |= CombinedValue << 8 | CombinedValue << 16 | CombinedValue << 24
     | CombinedValue << 32 | CombinedValue << 40 | CombinedValue << 48 | CombinedValue << 56;
-    if (!(size % 16)) {
-        _Xmemset128(ptr, CombinedValue, size >> 4);
-    }
-    else if (!(size % 8)) {
-        __repstos64(ptr, CombinedValue, size >> 3);
-    }
-    else if (!(size % 4)) {
-        __repstos32(ptr, CombinedValue, size >> 2);
-    }
-    else if (!(size % 2)) {
-        __repstos16(ptr, CombinedValue, size >> 1);
-    }
-    else {
-        __repstos(ptr, value, size);
-        // uint8_t* ptr_byte = (uint8_t*)(ptr);
-        // for (size_t i = 0; i < size; i++) {
-
-        //     ptr_byte[i] = value;
-        // }
-    }
-    return NULL;
+    return _Wrap_AVX_Memset(ptr, CombinedValue, size);
 }
-void memset16(void* ptr, uint16_t value, size_t size){
+
+LPVOID (__fastcall *memset)(LPVOID ptr, uint8_t value, size_t size) = _r8_SSE_Memset;
+
+LPVOID (__fastcall *MemSetArray[3]) (LPVOID ptr, UINT64 value, size_t size) = {
+    _Wrap_SSE_Memset, _Wrap_AVX_Memset, NULL
+};
+
+void memset16(LPVOID ptr, uint16_t value, size_t size){
     uint16_t* ptr_byte = (uint16_t*)(ptr);
     for(size_t i = 0;i<size;i++){
         ptr_byte[i] = value;
     }
 }
-void memset32(void* ptr, uint32_t value, size_t size){
-    size_t realsz = size << 2; // size * 4
-    UINT64 V = value | ((UINT64)value << 32);
-    if(!(realsz % 16)){
-        _Xmemset128(ptr, V, realsz >> 4);
-    }else if(!(realsz % 8)){
-        __repstos64(ptr, V, realsz >> 3);
-    }else{
-        __repstos32(ptr, V, size);
-    // uint32_t* ptr_byte = (uint32_t*)(ptr);
-    // for(size_t i = 0;i<size;i++){
-    //     ptr_byte[i] = value;
-    // }
-    }
+void memset32(LPVOID ptr, uint32_t value, size_t size){
+    UINT64 CombinedValue = (UINT64)value | ((UINT64)value << 32);
+    MemSetArray[ExtensionLevel & 3](ptr, CombinedValue, size);
 }
 
-void memset64(void* ptr, uint64_t value, size_t size){
+void memset64(LPVOID ptr, uint64_t value, size_t size){
     uint64_t* ptr_byte = (uint64_t*)(ptr);
     for(size_t i = 0;i<size;i++){
         ptr_byte[i] = value;
     }
 }  
 
-void* memcpy(void* dest, const void* src, size_t size){
+LPVOID memcpy(LPVOID dest, LPCVOID src, size_t size){
     if (!(size % 8)) {
         memcpy64(dest, src, size >> 3);
     }
@@ -75,7 +103,7 @@ void* memcpy(void* dest, const void* src, size_t size){
     return NULL;
 }
 
-void memcpy16(void* dest, const void* src, size_t size) {
+void memcpy16(LPVOID dest, LPCVOID src, size_t size) {
     UINT16* DestW = dest;
     const UINT16* SrcW = src;
     for (size_t i = 0; i < size; i++, DestW++, SrcW++) {
@@ -83,7 +111,7 @@ void memcpy16(void* dest, const void* src, size_t size) {
     }
 }
 
-void memcpy32(void* dest, const void* src, size_t size) {
+void memcpy32(LPVOID dest, LPCVOID src, size_t size) {
     UINT32* DestW = dest;
     const UINT32* SrcW = src;
     for (size_t i = 0; i < size; i++, DestW++, SrcW++) {
@@ -91,7 +119,7 @@ void memcpy32(void* dest, const void* src, size_t size) {
     }
 }
 
-void memcpy64(void* dest, const void* src, size_t size) {
+void memcpy64(LPVOID dest, LPCVOID src, size_t size) {
     UINT64* DestW = dest;
     const UINT64* SrcW = src;
     for (size_t i = 0; i < size; i++, DestW++, SrcW++) {
@@ -100,7 +128,7 @@ void memcpy64(void* dest, const void* src, size_t size) {
 }
 
 
-int memcmp(void* x, void* y, size_t size){
+int memcmp(LPVOID x, LPVOID y, size_t size){
     for(size_t i = 0;i<size;i++){
         if(((uint8_t*)x)[i] != ((uint8_t*)y)[i]) return 0;
     }

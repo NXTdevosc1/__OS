@@ -91,9 +91,9 @@ void KernelPagingInitialize(){
 
 		// Map Allocated Memory by bootloader
 		UINT64 DependencyOffset = 0;
-		MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset, InitData.start_font, 8, PM_MAP);
-		InitData.start_font = (void*)((char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset);
-		DependencyOffset += 0x8000;
+		MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset, InitData.start_font, 10, PM_MAP);
+		InitData.start_font = (void*)((char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset + ((UINT64)InitData.start_font & 0xFFF));
+		DependencyOffset += 0xA000;
 
 		FILE_IMPORT_ENTRY* Entry = FileImportTable;
 		while(Entry->Type != FILE_IMPORT_ENDOFTABLE) {
@@ -156,5 +156,13 @@ void InitFeatures(){
 }
 
 void KeInitOptimizedComputing() {
-	
+	if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
+		_SIMD_Memset = _SSE_Memset;
+		memset = _r8_SSE_Memset;
+	} else if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
+		_SIMD_Memset = _AVX_Memset;
+		// memset = _r8_AVX_Memset;
+	} else if(ExtensionLevel & EXTENSION_LEVEL_AVX512) {
+
+	}
 }

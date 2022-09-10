@@ -58,6 +58,8 @@ typedef INT64 KERNELSTATUS;
 
 typedef UINT64 UINTPTR;
 
+typedef const void* LPCVOID;
+
 #define DWVOID (void*)(UINT64)
 
 #define TRUE 1

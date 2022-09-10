@@ -82,19 +82,22 @@ EnableExtendedStates:
 .A1:
 
     ; AVX 512
+    xor ecx, ecx
     mov eax, 0xD
     cpuid
     mov rbx, rax
     and rbx, 7 << 5
-    cmp rbx, 7 << 5
-    jne .A2
+    test rbx, 7 << 5
+    jz .A2
     push rax
     push rcx
     push rdx
+    xor rcx, rcx
     xgetbv
     or eax, 1 << 6 ; AVX-512 & lower ZMM Enabled
-    pop rdx
     xsetbv
+
+    pop rdx
     pop rcx
     pop rax
 

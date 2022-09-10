@@ -2,123 +2,113 @@
 
 section .text
 
-global _SSE_BezierCopyCords
 global _SSE_ComputeBezier
-; RCX = DEST (Reserved), RDX = SRC, R8b = NumCords
-_SSE_BezierCopyCords:
-    test r8b, 1
-    jz .loop
-    inc r8b
-; Fill XMM8-XMM15 with betas
-.loop:
-    test r8b, r8b
-    jz .Exit
-    movdqu xmm8, [rdx]
-    sub r8b, 2
-    add rcx, 0x10
-    add rdx, 0x10
-    test r8b, r8b
-    jz .Exit
-    movdqu xmm9, [rdx]
-    sub r8b, 2
-    add rcx, 0x10
-    add rdx, 0x10
-    test r8b, r8b
-    jz .Exit
-    movdqu xmm10, [rdx]
-    sub r8b, 2
-    add rcx, 0x10
-    add rdx, 0x10
-    test r8b, r8b
-    jz .Exit
-    movdqu xmm11, [rdx]
-    sub r8b, 2
-    add rcx, 0x10
-    add rdx, 0x10
-    test r8b, r8b
-    jz .Exit
-    movdqu xmm12, [rdx]
-    sub r8b, 2
-    add rcx, 0x10
-    add rdx, 0x10
-    test r8b, r8b
-    jz .Exit
-    movdqu xmm13, [rdx]
-    sub r8b, 2
-    add rcx, 0x10
-    add rdx, 0x10
-    test r8b, r8b
-    jz .Exit
-    movdqu xmm14, [rdx]
-    sub r8b, 2
-    add rcx, 0x10
-    add rdx, 0x10
-    test r8b, r8b
-    jz .Exit
-    movdqu xmm15, [rdx]
+
+; r8 = k, < RDX
+; r11 = i, < R9
+; R10 = RCX = Beta
+; XMM1 = 1 - percent
+; XMM2 = Percent
+_SSE_ComputeBezier:
+; for(register UINT k = 1;k < NumCordinates;k++)
+    mov r8, 1
+    mov r9, rdx
+    cvtsi2ss xmm1, r8
+    subss xmm1, xmm2
+    movd eax, xmm1
+    mov r11, rax
+    shl r11, 32
+    or rax, r11
+    movq xmm1, rax
+
+    movlhps xmm1, xmm1
+
+    movd eax, xmm2
+    mov r11, rax
+    shl r11, 32
+    or rax, r11
+    movq xmm2, rax
+    movlhps xmm2, xmm2
+
+.loop0:
+    cmp r8, rdx
+    je .Exit
+    ; for(register UINT i = 0;i<NumCordinates - k;i++)
+    inc r8
+    dec r9
+    xor r11, r11
+    mov r10, rcx
+    .loop1:
+        cmp r11, r9
+        jae .loop0
+        ; beta[i]:XMM0 = (1 - percent) * beta[i] + percent * beta[i + 1];
+
+        ; XMM0 = (1 - percent) * beta[i]
+        ; XMM0 = XMM1 * XMM3
+        movaps xmm0, xmm1
+        movups xmm3, [r10]
+        mulps xmm0, xmm3
+        ; XMM3 = percent * beta[i + 1]
+        ; XMM3 = XMM2 * XMM4
+        movaps xmm3, xmm2
+        movups xmm4, [r10 + 4]
+        mulps xmm3, xmm4
+        ; XMM0 = XMM0 + XMM3
+        addps xmm0, xmm3
+        movups [r10], xmm0
+        add r10, 0x10
+        add r11, 4
+        jmp .loop1
 .Exit:
+    movups xmm0, [rcx]
+    cvtss2si rax, xmm0
     ret
 
-%macro MACRO__SSE_CalculateBetaFromXMM 2
-    movq rdi, 1
-    movq xmm3, rdi
-    movlhps xmm3, xmm3 ; Use parallel computing
-    subpd xmm3, xmm2 ; (1 - percent)
-    mulpd xmm3, xmm%1 ; * beta[i]
-    movaps xmm4, xmm2
-    ; percent * beta[i + 1];
-    ; Pack multipliers into XMM5
-    movaps xmm5, xmm%1
-    movlhps xmm%2, xmm6
-    ; Multiply the two values
-    mulpd xmm4, xmm5
-    ; Add the two groups
-    addpd xmm3, xmm4
-    ; beta[i] = (1 - percent) * beta[i] + percent * beta[i + 1];
-    movaps xmm%1, xmm3
 
+; r8 = k, < RDX
+; r11 = i, < R9
+; R10 = RCX = Beta
+; XMM1 = 1 - percent
+; XMM2 = Percent
+_SSE_ComputeBezierW:
+; for(register UINT k = 1;k < NumCordinates;k++)
+    mov r8, 1
+    mov r9, rdx
+    cvtsi2sd xmm1, r8
+    subsd xmm1, xmm2
 
-%endmacro
-
-%assign i 8
-%rep 7
-
-%assign i i + 1
-%endrep
-
-CalculateBetaFromXMM_Ptrs:
-
-; RCX = Beta (Reserved), edx = NumCordinates, XMM2 = percent (t)
-; R10b = K, R11b = i, R13b = IMAX
-
-; for(register UINT k = 1;k < NumCordinates;k++) {
-; 		for(register UINT i = 0;i<NumCordinates - k;i++) {
-; 			beta[i] = (1 - percent) * beta[i] + percent * beta[i + 1];
-; 		}
-; 	}
-
-
-_SSE_ComputeBezier:
-    mov r10b, 1
-    mov r13b, dl
+    movlhps xmm1, xmm1
     movlhps xmm2, xmm2
 .loop0:
-    cmp r10b, dl
+    cmp r8, rdx
     je .Exit
-    xor r11b, r11b
+    ; for(register UINT i = 0;i<NumCordinates - k;i++)
+    inc r8
+    dec r9
+    xor r11, r11
+    mov r10, rcx 
     .loop1:
-        cmp r11b, r13b
-        je .Loop1Exit
-        
-        ; beta[i] = (1 - percent) * beta[i] + percent * beta[i + 1];
-    
-    
-        inc r11b
+        cmp r11, r9
+        jae .loop0
+        ; beta[i]:XMM0 = (1 - percent) * beta[i] + percent * beta[i + 1];
+
+        ; XMM0 = (1 - percent) * beta[i]
+        ; XMM0 = XMM1 * XMM3
+        movapd xmm0, xmm1
+        movupd xmm3, [r10]
+        mulpd xmm0, xmm3
+        ; XMM3 = percent * beta[i + 1]
+        ; XMM3 = XMM2 * XMM4
+        movapd xmm3, xmm2
+        movupd xmm4, [r10 + 0x08]
+        mulpd xmm3, xmm4
+        ; XMM0 = XMM0 + XMM3
+        addpd xmm0, xmm3
+        movupd [r10], xmm0
+        add r10, 0x10
+        add r11, 2
         jmp .loop1
-    .Loop1Exit:
-        inc r10b
-        dec r13b
-        jmp .loop0
 .Exit:
-    movaps xmm0, xmm8 ; Beta [0]
+    movaps xmm0, [rcx]
+    cvtsd2si rax, xmm0
     ret

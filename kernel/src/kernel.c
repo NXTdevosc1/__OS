@@ -121,45 +121,56 @@ extern void __declspec(noreturn) _start() {
 	kproc = KeCreateProcess(NULL, NULL, SUBSYSTEM_NATIVE, KERNELMODE_PROCESS);
 	if(!kproc) SET_SOD_INITIALIZATION;
 
+
+
 	InitMemoryManagementSubsystem();
-	GP_clear_screen(0xFFFFFF);
-	GP_draw_sf_text(to_hstring64((UINT64)AllocatePool(0x500)), 0, 400, 20);
-	GP_draw_sf_text(to_hstring64((UINT64)AllocatePool(0x20)), 0, 400, 40);
-	GP_draw_sf_text(to_hstring64((UINT64)AllocatePoolEx(kproc, 0x500, 0x1500, ALLOCATE_POOL_PHYSICAL)), 0, 400, 60);
+	// GP_clear_screen(0);
+	// GP_draw_sf_text(to_hstring64((UINT64)AllocatePool(0x500)), 0, 400, 20);
+	// GP_draw_sf_text(to_hstring64((UINT64)AllocatePool(0x20)), 0, 400, 40);
+	// GP_draw_sf_text(to_hstring64((UINT64)AllocatePoolEx(kproc, 0x500, 0x1500, ALLOCATE_POOL_PHYSICAL)), 0, 400, 60);
 	
 	UINT64 Bitmap = 0x180;
 	SystemDebugPrint(L"INDX : %x, BMP : %x", __SyncBitmapAllocate(&Bitmap), Bitmap);
-	while(1);
+
+	
 	UINT XOff = 200;
 	UINT YOff = 300;
-	double XCords[] = {0, 50, 100, 150};
-	double YCords[] = {0, 50, -50, 0};
-	double betabuffer[4] = {0};
-	double IncValue = 0.1;
-	double X0 = GetBezierPoint(XCords, betabuffer, 4, 0.1), X1 = GetBezierPoint(XCords, betabuffer, 4, 0.2), Y0 = GetBezierPoint(YCords, betabuffer, 4, 0.1), Y1 = GetBezierPoint(YCords, betabuffer, 4, 0.2);
+	float XCords[] = {0, 50, 100, 150};
+	float YCords[] = {0, 50, -50, 0};
+	float betabuffer[0x10] = {0};
+	float IncValue = 0.1;
+	float X0 = GetBezierPoint(XCords, betabuffer, 4, 0.1), X1 = GetBezierPoint(XCords, betabuffer, 4, 0.2), Y0 = GetBezierPoint(YCords, betabuffer, 4, 0.1), Y1 = GetBezierPoint(YCords, betabuffer, 4, 0.2);
 	double Distance = __sqrt(pow(X1 - X0, 2) + pow(Y1-Y0, 2));
-	IncValue /= (Distance - 1);
+	if(Distance > 2) {
+		IncValue /= (Distance - 1);
+	}
 
 	// IncValue /= 10;
 
+	GP_clear_screen(0);
 
 	SystemDebugPrint(L"Starting...");
-	// for(UINT c = 0;c<0x5000;c++) { 
-	// UINT64 LastX = XOff;
-	// UINT64 LastY = YOff;
+	for(UINT c = 0;c<0x1000;c++) { 
+	UINT64 LastX = XOff;
+	UINT64 LastY = YOff;
 
-	// UINT64 X = 0;
-	// UINT64 Y = 0;
+	UINT64 X = 0;
+	UINT64 Y = 0;
 	
 
-	// for(double t = 0;t<=1;t+=IncValue) {
-	// 	X = XOff + GetBezierPoint(XCords, betabuffer, 4, t);
-	// 	Y = YOff + GetBezierPoint(YCords, betabuffer, 4, t);
-	// 	*(UINT32*)(InitData.fb->FrameBufferBase + ((UINT64)X << 2) + ((UINT64)Y * InitData.fb->Pitch)) = 0xFF0000;
-	// 	LastX = X;
-	// 	LastY = Y;
-	// }
-	// }
+	for(float t = 0;t<=1;t+=IncValue) {
+		X = XOff + GetBezierPoint(XCords, betabuffer, 4, t);
+		Y = YOff + GetBezierPoint(YCords, betabuffer, 4, t);
+		// if(X > LastX + 1 || X < LastX - 1 || Y > LastY + 1 || Y < LastY - 1) {
+		// 	LineTo(LastX, LastY, X, Y, 0xFF0000);
+		// } else {
+			*(UINT32*)(InitData.fb->FrameBufferBase + ((UINT64)X << 2) + ((UINT64)Y * InitData.fb->Pitch)) = 0xFF0000;
+		// }
+		LastX = X;
+		LastY = Y;
+	}
+	}
+	SystemDebugPrint(L"All done");
 	__cpuid(&CpuIdInfo, 1);
 	if(CpuIdInfo.edx & (1 << 16)) {
 		SystemDebugPrint(L"Page Attribute Table Supported");
@@ -176,7 +187,7 @@ extern void __declspec(noreturn) _start() {
 	// Initialize Kernel Page tables
 	KernelPagingInitialize();
 
-	
+	while(1) __hlt();
 
 	// if (!InitializeRuntimeSymbols()) SET_SOD_INITIALIZATION;
 
@@ -217,12 +228,11 @@ extern void __declspec(noreturn) _start() {
 	void* __KeReloc = KernelRelocate;
 	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 1, PM_MAP);
 	KernelRelocate(); // CR3 Will be automatically set with the new kernel one
+	KeInitOptimizedComputing();
 	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 1, 0);
 	
 	kproc->ProcessName = KernelProcessName;
-	KeInitOptimizedComputing();
 	SIMD_InitOptimizedMemoryManagement();
-
 
 
 	// Unmap KernelRelocate
@@ -251,7 +261,30 @@ extern void __declspec(noreturn) _start() {
 	InitData.fb->FrameBufferBase = AllocateIoMemory(InitData.fb->FrameBufferBase, (InitData.fb->FrameBufferSize >> 12) + 1, IO_MEMORY_WRITE_COMBINE);
 	QemuWriteSerialMessage("Allocated I/O Memory :");
 	QemuWriteSerialMessage(to_hstring64((UINT64)InitData.fb->FrameBufferBase));
-	GP_clear_screen(0);
+	GP_clear_screen(0xFF);
+
+	char* ExtensionLevelStr[2] = {"SSE", "AVX"};
+	SystemDebugPrint(L"EXT_LEVEL : %s", ExtensionLevelStr[ExtensionLevel]);
+	for(UINT64 i = 0;i<0xFFFFF00;i++);
+	for(;;) {
+		for(UINT64 x = 0;x<4;x++) {
+			UINT64 f = 0;
+			if(x) f = 0xff << (x - 1);
+			for(UINT64 i = 0;i<0xff;i++) {
+			GP_clear_screen((i << 0) | f);
+			}
+			
+			for(UINT64 i = 0;i<0xff;i++) {
+				GP_clear_screen((i << 8) | f);
+			}
+			
+			for(UINT64 i = 0;i<0xff;i++) {
+				GP_clear_screen((i << 16) | f);
+			}
+		}
+		
+	}
+	while(1);
 	LineTo(500, 200, 600, 200, 0xFF0000);
 	LineTo(600, 200, 540, 240, 0xFF0000);
 	LineTo(540, 240, 600, 280, 0xFF0000);

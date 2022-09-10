@@ -116,15 +116,15 @@ void SIMD_InitOptimizedMemoryManagement() {
     MemoryManagementTable.PageArray = AllocateIoMemory(MemoryManagementTable.PageArray, ALIGN_VALUE(MemoryManagementTable.PageArraySize, 0x1000) >> 12, 0);
     MemoryManagementTable.PageBitmap = AllocateIoMemory(MemoryManagementTable.PageBitmap, ALIGN_VALUE(MemoryManagementTable.NumBytesPageBitmap, 0x1000) >> 12, 0);
 
-    if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
+    // if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
         _SIMD_FetchMemoryCacheLine = _SSE_FetchMemoryCacheLine;
         _SIMD_AllocatePhysicalPage = _SSE_AllocatePhysicalPage;
-    }
-    else if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
-        _SIMD_FetchMemoryCacheLine = _AVX_FetchMemoryCacheLine;
-    } else if((ExtensionLevel & EXTENSION_LEVEL_AVX512)) {
-        _SIMD_FetchMemoryCacheLine = _AVX512_FetchMemoryCacheLine;
-    }
+    // }
+    // else if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
+    //     _SIMD_FetchMemoryCacheLine = _AVX_FetchMemoryCacheLine;
+    // } else if((ExtensionLevel & EXTENSION_LEVEL_AVX512)) {
+    //     _SIMD_FetchMemoryCacheLine = _AVX512_FetchMemoryCacheLine;
+    // }
 }
 
 RFMEMORY_SEGMENT MemMgr_CreateInitialHeap(void* HeapAddress, UINT64 HeapLength) {

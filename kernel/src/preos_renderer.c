@@ -9,7 +9,7 @@
 
 
 void GP_clear_screen(unsigned int background_color){
-	memset32((void*)InitData.fb->FrameBufferBase, background_color, InitData.fb->HorizontalResolution * InitData.fb->VerticalResolution);
+	_SIMD_Memset((LPVOID)InitData.fb->FrameBufferBase, (UINT64)background_color | ((UINT64)background_color << 32), (InitData.fb->HorizontalResolution * InitData.fb->VerticalResolution) << 2);
 }
 extern inline void GP_set_pixel(unsigned int x, unsigned int y, unsigned int color)
 {
@@ -103,17 +103,17 @@ void GP_sf_put_char(const char ch, unsigned int color, unsigned int x, unsigned 
 }
 
 extern inline void _SSE_BezierCopyCords(double* dest, double* src, UINT8 NumCords);
-extern inline UINT64 _SSE_ComputeBezier(double* beta, UINT NumCordinates, double percent);
-extern inline UINT64 GetBezierPoint(double* cordinates, double* beta, UINT8 NumCordinates, double percent){
-	if(!NumCordinates || NumCordinates > 0x80) return 0;
-	_SSE_BezierCopyCords(beta, cordinates, NumCordinates);
-	return _SSE_ComputeBezier(beta, NumCordinates, percent);
+extern inline UINT64 _SSE_ComputeBezier(float* beta, UINT NumCordinates, float percent);
+extern inline UINT64 GetBezierPoint(float* cordinates, float* beta, UINT8 NumCordinates, float percent){
+	memcpy(beta, cordinates, NumCordinates * sizeof(float));
 	// for(register UINT k = 1;k < NumCordinates;k++) {
 	// 	for(register UINT i = 0;i<NumCordinates - k;i++) {
 	// 		beta[i] = (1 - percent) * beta[i] + percent * beta[i + 1];
 	// 	}
 	// }
-	// return (UINT64)*beta;
+	return _SSE_ComputeBezier(beta, NumCordinates, percent);
+	// _SSE_BezierCopyCords(beta, cordinates, NumCordinates);
+	// return _SSE_ComputeBezier(beta, NumCordinates, percent);
 }
 
 

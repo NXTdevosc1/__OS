@@ -46,4 +46,5 @@ RFMEMORY_SEGMENT FindFreePhysicalMemory(RFMEMORY_REGION_TABLE MemoryRegion, UINT
     //     Previous = ListHead;
     //     ListHead = ListHead->NextListHead;
     // }
+    return NULL;
 }
