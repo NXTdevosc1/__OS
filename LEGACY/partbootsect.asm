@@ -2,16 +2,20 @@
 ; Partition Boot Loader
 
 [BITS 16]
-[ORG 0x7C00]
+[ORG 0]
 
 ; Jmp
+
 jmp _Start
 
 times 89 db 0
 _Start:
-    jmp 0:.Load
+    jmp 0x1FE0:.Load
 .Load:
-    jmp [0x7E10] ; Contains the address of the bootmanager
+    
+    mov ax, 0x2000
+    mov gs, ax
+    jmp [gs:0x10] ; Contains the address of the bootmanager
 
 
 

@@ -42,8 +42,9 @@ EnterLongMode:
 
 
     ; Set CR3
-    mov eax, PageTable
+    mov eax, PageTable + BOOT_PARTITION_BASE_ADDRESS
     mov cr3, eax
+
 
     ; Activate Long Mode
     mov ecx, 0xC0000080 ; EFER_MSR
@@ -51,17 +52,14 @@ EnterLongMode:
     or eax, 1 << 8 ; Set LME (Long Mode Enable) bit
     wrmsr
 
-    lidt [IDTR64]
+    lidt [IDTR64 + BOOT_PARTITION_BASE_ADDRESS]
 
     ; Set CR0 With (PE, MP, PG)
 
     mov eax, 3 | (1 << 31)
     mov cr0, eax
  
-    cli
-    
-    
-    jmp 0x20:LongModeEntry ; Jmp to long mode
+    jmp 0x20:LongModeEntry + BOOT_PARTITION_BASE_ADDRESS ; Jmp to long mode
 
 StrCpuidNotSupported db "The bootloader cannot continue, Processor does not support CPUID.", 13, 10, 0
 StrLongModeNotSupported db "The bootloader cannot continue, Long Mode (x64 A.K.A 64 BIT Mode) Not Supported.", 13, 10, 0
@@ -70,30 +68,32 @@ StrLongModeNotSupported db "The bootloader cannot continue, Long Mode (x64 A.K.A
 [BITS 64]
 SavedRAX dq 0
 %macro CallRealMode64 2
-    mov [SavedRAX], rax
+    mov [SavedRAX + BOOT_PARTITION_BASE_ADDRESS], rax
     push 0x8
     push %%protectedmode
 
     retfq
 [BITS 32]
 %%protectedmode:
+
     mov ax, 0x10
     mov ds, ax
     mov ss, ax
-
+    
     mov eax, cr0
     and eax, ~(1 << 31)
     mov cr0, eax ; This will automatically disabled LME (And compatibility mode also)
     
     xor eax, eax
-    mov cr4, eax
-    xor eax, eax
     mov cr3, eax
+    mov cr4, eax
 
+    
     CallRealMode %1, %%tolongmode
 %%tolongmode:
 ; Active PAE & Page Global (PGE)
-    mov eax, PageTable
+    
+    mov eax, PageTable + BOOT_PARTITION_BASE_ADDRESS
     mov cr3, eax
 
     mov eax, (1 << 5) | (1 << 7)
@@ -111,19 +111,18 @@ SavedRAX dq 0
     mov eax, 3 | (1 << 31) ; Set PE | MP | PG Bits
     mov cr0, eax
 
-    lidt [IDTR64]
+    lidt [IDTR64 + BOOT_PARTITION_BASE_ADDRESS]
 
     
-    jmp 0x20:%%exit
+    jmp 0x20:%%exit + BOOT_PARTITION_BASE_ADDRESS
 
 [BITS 64]
 %%exit:
+
 mov ax, 0x28
 mov ds, ax
 mov ss, ax
 mov es, ax
-mov gs, ax
-mov fs, ax
 
 mov rax, [SavedRAX]
 jmp %2
@@ -143,15 +142,16 @@ LongModeEntry:
     mov gs, ax
     mov fs, ax
 
+   
+
+
     ; Clear RFLAGS
     xor rax, rax
     push rax
     popf
 
-
-
-    mov rax, [MemoryMap.Count]
-    mov rbx, MemoryMap.MemoryDescriptors
+    mov rax, [MemoryMap.Count + BOOT_PARTITION_BASE_ADDRESS]
+    mov rbx, MemoryMap.MemoryDescriptors + BOOT_PARTITION_BASE_ADDRESS
 
 
     ; Reset unaccessible registers in Real Mode
@@ -178,6 +178,8 @@ LongModeEntry:
         jmp .loop
 
     .end0:
+
+    
     ; Load Kernel & Other files as well (R15 = Cluster Size)
     mov r15, [BOOT_PARTITION_BASE_ADDRESS + 13] ; Cluster Size of the partition
     and r15, 0xFF ; Get lower bytes only
@@ -195,11 +197,13 @@ LongModeEntry:
     mov rbx, rax
 
 
+    
     ; RBX = Cluster Start (Current Cluster), R15 = Buffer
     mov rax, [BootPointerTable + BPTOFF_ALLOCATION_TABLE_LBA]
     mov [AllocationTableLba], rax
     mov rax, [BootPointerTable + BPTOFF_DATA_CLUSTERS_LBA]
     mov [DataClustersStartLba], rax
+    
     call LoadPsf1Font
 
 
@@ -208,7 +212,6 @@ LongModeEntry:
 
     mov r15, [KernelBufferAddress]
     call ReadClusters
-
 
 ; Parsing Kernel File
     mov rax, [KernelBufferAddress]
@@ -546,6 +549,7 @@ inc rcx ; Padding
 call IdentityMapPages
 
 
+
 wbinvd
 
 
@@ -562,11 +566,13 @@ jmp rax
 .StrInvalidKernelImage db "Invalid Kernel Image, please re-install your Operating System.", 13, 10, 0
 
 %macro UNICODE_LENGTH 1 ; %1 = Unicode Str ($ must be right after Str)
-    dq (($ - %1) / 2) - 1
+    (($ - %1) / 2) - 1
 %endmacro
 
-PathPsf1Font dw __utf16__("OS\Fonts\zap-light16.psf"), 0
-LenPathPsf1Font UNICODE_LENGTH PathPsf1Font
+__PathPsf1Font dw __utf16__("OS\Fonts\zap-light16.psf"), 0
+LenPathPsf1Font equ (($ - __PathPsf1Font - 1) / 2)
+PathPsf1Font equ __PathPsf1Font + BOOT_PARTITION_BASE_ADDRESS
+
 
 align 0x10
 FrameBufferDescriptor:
@@ -574,9 +580,13 @@ FrameBufferDescriptor:
 
 LoadPsf1Font:
     mov rbx, PathPsf1Font
-    mov rax, [LenPathPsf1Font]
+    mov rax, LenPathPsf1Font
+
+
     call LoadBootPointerFile
+    jmp $
     mov [Psf1FontAddress], rax
+    
     ; Check Magic 0 & Magic 1
 
     cmp byte [rax], 0x36 ; PSF1_MAGIC0
@@ -585,9 +595,9 @@ LoadPsf1Font:
     jne FailedToLoadResources
     ret ; Font Loaded Successfully
 FailedToLoadResources:
+
     mov di, StrFailedToLoadResources
-    call _print64
-    jmp halt64
+    CallRealMode64 _print16, halt64
 
 StrFailedToLoadResources db "Failed to load resources. Please re-install your Operating System.", 13, 10, 0
 
@@ -602,6 +612,7 @@ LoadBootPointerFile:
     add rdx, BootPointerTable
     mov r8d, [BootPointerTable + BPTOFF_ENTRY_SIZE]
     mov ecx, [BootPointerTable + BPTOFF_NUM_ENTRIES]
+
 .loop:
     test ecx, ecx
     jz FailedToLoadResources
@@ -634,6 +645,7 @@ LoadBootPointerFile:
         inc r9 ; Index
         jmp .CmpLoop
     .ValidPath:
+    
         mov ecx, [rdx + BPT_ENTRY_NUM_CLUSTERS]
         mov eax, ecx
         push rdx
@@ -654,6 +666,7 @@ LoadBootPointerFile:
         shl rcx, 9
         pop rdx
         call ReadClusters
+        
         pop rax
         jmp .Exit
 .ContinueSearch:
@@ -703,8 +716,10 @@ add rbx, [DataClustersStartLba]
 mov rcx, r12 ; Cluster Size
 mov rdi, r15
 add r15, r13 ; Increment Buffer Pointer
+
 call DiskRead
 pop rbx
+
 
 .loop:
 
@@ -738,7 +753,7 @@ pop rbx
 
 .ReadAllocationSector:
     push rbx
-    mov rbx, [AllocationTableLba]
+    mov rbx, [AllocationTableLba + BOOT_PARTITION_BASE_ADDRESS]
     add rbx, r9
     mov r8, r9
 
@@ -803,7 +818,7 @@ IdentityMapPages:
     shl r10, 3
     shl r11, 3
     ; PML4 Allocation
-    mov rdx, PageTable
+    mov rdx, PageTable + BOOT_PARTITION_BASE_ADDRESS
     add rdx, r11
     test qword [rdx], 1
     jz .AllocatePml4
@@ -877,8 +892,8 @@ AllocatePages:
     push rbx
     push rdx
     push rcx
-    mov rax, [MemoryMap.Count]
-    mov rbx, MemoryMap.MemoryDescriptors
+    mov rax, [MemoryMap.Count + BOOT_PARTITION_BASE_ADDRESS]
+    mov rbx, MemoryMap.MemoryDescriptors + BOOT_PARTITION_BASE_ADDRESS
 
 .loop:
     test rax, rax
@@ -893,7 +908,7 @@ AllocatePages:
     mov rax, [rbx + 9]
     sub [rbx + 1], rcx
     shl rcx, 12
-    add [BootLoaderMemory], rcx
+    add [BootLoaderMemory + BOOT_PARTITION_BASE_ADDRESS], rcx
     add [rbx + 9], rcx
     jmp .Exit ; Return Address
     .ContinueSearch:
@@ -990,6 +1005,8 @@ DiskRead:
     and rax, 7
     shr rcx, 3 ; divide by 3
     push rax
+
+    
     .loop:
         test rcx, rcx
         jz .exit1
@@ -1000,6 +1017,8 @@ DiskRead:
         push rcx
         push rdi
         push rbx
+
+        
         CallRealMode64 Int13, .R0
 .R0:
         ; Copy content into rdi
@@ -1020,8 +1039,10 @@ DiskRead:
     ; Setup packet
     mov [DiskLbaPacket.NumSectors], ax
     mov [DiskLbaPacket.Lba], rbx
+    
     mov word [DiskLbaPacket.RealModeAddress], DiskTransferBuffer
     CallRealMode64 Int13, .R1
+    
 .R1:
     ; Copy content into edi
     mov rcx, rax ; 4 dword * 0x800 = 0x1000
@@ -1073,7 +1094,7 @@ IDT64_END:
 align 0x10
 IDTR64:
     dw IDT64_END - IDT64 - 1
-    dq IDT64
+    dq IDT64 + BOOT_PARTITION_BASE_ADDRESS
 
 
 ; RBX = Cluster Start (Current Cluster), R15 = Buffer

@@ -6,11 +6,11 @@
 
 
 [BITS 16]
-BOOT_PARTITION_BASE_ADDRESS equ 0x7C00
+BOOT_PARTITION_BASE_ADDRESS equ 0x1FE00
 
-IMAGE_BASE equ 0x7E00
+IMAGE_BASE equ 0x20000
 EXTENDED_BOOT_AREA_END equ 0x16C00
-[ORG IMAGE_BASE]
+[ORG 0x200] ; Offset from bootsector
 
 
 BOOTMGR_SIZE equ 0x20000
@@ -32,21 +32,32 @@ BootDrive db 0
 dq 0 ; Padding
 RealModeFunction dq 0 ; Address of function in real mode
 RealModeReturn dq 0
-KernelBufferAddress dq 0
-
-AllocationTableLba dq 0
-LastClusterChainSector dq 0xFFFFFFFFFFFFFFFF
-DataClustersStartLba dq 0
-Psf1FontAddress dq 0
+__KernelBufferAddress dq 0
+KernelBufferAddress equ __KernelBufferAddress + BOOT_PARTITION_BASE_ADDRESS
+__AllocationTableLba dq 0
+AllocationTableLba equ __AllocationTableLba + BOOT_PARTITION_BASE_ADDRESS
+__LastClusterChainSector dq 0xFFFFFFFFFFFFFFFF
+LastClusterChainSector equ __LastClusterChainSector + BOOT_PARTITION_BASE_ADDRESS
+__DataClustersStartLba dq 0
+DataClustersStartLba equ __DataClustersStartLba + BOOT_PARTITION_BASE_ADDRESS
+__Psf1FontAddress dq 0
+Psf1FontAddress equ __Psf1FontAddress + BOOT_PARTITION_BASE_ADDRESS
 dq 0
-VirtualBufferSize dq 0
+__VirtualBufferSize dq 0
+VirtualBufferSize equ __VirtualBufferSize + BOOT_PARTITION_BASE_ADDRESS
 dq 0
-ImageBase dq 0
-KeImageNumSections dw 0
-InitData dq 0
-FileImportTable dq 0
-KeSectionTable dq 0
-KernelPeHdrAddress dq 0
+__ImageBase dq 0
+ImageBase equ __ImageBase + BOOT_PARTITION_BASE_ADDRESS
+__KeImageNumSections dw 0
+KeImageNumSections equ __KeImageNumSections + BOOT_PARTITION_BASE_ADDRESS
+__InitData dq 0
+InitData equ __InitData + BOOT_PARTITION_BASE_ADDRESS
+__FileImportTable dq 0
+FileImportTable equ __FileImportTable + BOOT_PARTITION_BASE_ADDRESS
+__KeSectionTable dq 0
+KeSectionTable equ __KeSectionTable + BOOT_PARTITION_BASE_ADDRESS
+__KernelPeHdrAddress dq 0
+KernelPeHdrAddress equ __KernelPeHdrAddress + BOOT_PARTITION_BASE_ADDRESS
 ; Boot Manager Routine Tables
 
 DiskLbaPacket:
@@ -111,13 +122,9 @@ VbeModeInfo:
 
 
 align 0x10
-DiskTransferBuffer:
-    times 0x1000 db 0
+DiskTransferBuffer equ 0x2000
 
-stack_bottom:
-    times 0x2200 db 0
-stack_top:
-times 0x100 db 0
+stack_top equ 0x4800
 
 ERROR_INVALID_FS_BOOTAREA db "Invalid or Corrupt File System Boot Area", 13, 10, 0
 ERROR_UNSUPPORTED_FSBOOT_VERSION db "Unsupported File System Boot Version. BootManager Version : 1.0", 13, 10, 0
@@ -125,6 +132,13 @@ StrCPUError db "An unexpected CPU error has occured, halting...", 13, 10, 0
 
 loader_start:
     cli
+
+    mov ax, BOOT_PARTITION_BASE_ADDRESS / 0x10
+    mov ds, ax
+    mov es, ax
+    mov gs, ax
+    
+    
 
     mov [BootDrive], dl
 
@@ -150,7 +164,7 @@ loader_start:
 
     call GetMemoryMap
 
-    call SetupVesaVBE
+    ; call SetupVesaVBE
 
     jmp EnableProtectedMode
 
@@ -159,7 +173,7 @@ loader_start:
     jmp .halt
 ; This is the best method availaible on all PC's since 2002 (and some previous ones)
 
-BootLoaderMemory dq 0x100000 ; Used memory by bootloader (0x100000 As initialy used)
+BootLoaderMemory dq 0x200000 ; Used memory by bootloader (0x100000 As initialy used)
 
 MemapCopy:
     test byte [BiosSystemMemoryMap + 20], 1 ; Present Bit ACPI
@@ -250,7 +264,7 @@ GetMemoryMap:
     mov ecx, 24
     mov di, BiosSystemMemoryMap
     ; Set ignore bit if ACPI Field is not supported by BIOS
-    mov word [es:di + 20], 1
+    mov word [di + 20], 1
 
     int 0x15
 
@@ -270,7 +284,7 @@ GetMemoryMap:
         mov ecx, 24
         ; Set ignore bit if ACPI Field is not supported by BIOS
         mov di, BiosSystemMemoryMap
-        mov word [es:di + 20], 1
+        mov word [di + 20], 1
 
         int 0x15
 
@@ -292,12 +306,16 @@ CheckA20:
     push es
     mov ax, 0xFFFF
     mov es, ax
+
+    xor ax, ax
+    mov fs, ax
+
     ; DS Must be cleared
     ; Write address 0x100500 (0xFFFF:0x510) And 0x500
-    mov word [ds:0x500], 1
+    mov word [fs:0x500], 1
     mov word [es:0x510], 2 ; 0x100500
     pop es
-    cmp word [ds:0x500], 2 ; Writing to 0x100500 without A20 Will write to 0x500
+    cmp word [fs:0x500], 2 ; Writing to 0x100500 without A20 Will write to 0x500
     je .Return0
     clc ; Clear carry flag
     ret
@@ -375,26 +393,55 @@ EnableA20:
     hlt
     jmp .A20IsNotSupported
 
+[BITS 16]
+
 EnableProtectedMode:
+
+
     xor ax,ax
     push ax
     popf
-    lidt [IDT_REGISTER]
+    mov es, ax
+
+    mov ax, 0x1FE0
+    mov ds, ax
+
+    ; mov edi, GDT_BASE
+    ; mov esi, GDT
+    ; mov ecx, 0x40 ; Repetitions
+    ; rep movsw
+
+    ; mov edi, GDTR_BASE
+    ; mov esi, GDT_REGISTER
+    ; mov ecx, 0x20 ; Repetitions
+    ; rep movsw
+
     lgdt [GDT_REGISTER]
+
+    ; mov ebx, IDT_REGISTER + 0x1FE00
+    ; lidt [ebx]
     mov eax, cr0
     and eax, ~((3 << 2) | (3 << 30))
     or eax, 3 ; Set Protected Mode enable | Monitor coprocessor
     mov cr0, eax
-    
+
     jmp 0x08:ProtectedModeEntry
 
 ReEnterProtectedMode:
-    lidt [IDT_REGISTER]
+    
+    xor ax, ax
+    mov es, ax
+
+    mov ax, 0x1FE0
+    mov ds, ax
+
+    
     lgdt [GDT_REGISTER]
     mov eax, cr0
     and eax, ~((3 << 2) | (3 << 30))
     or eax, 3 ; Set Protected Mode enable | Monitor coprocessor
     mov cr0, eax
+
     jmp 0x08:SetupSegmentsAndRet
 
 
@@ -403,7 +450,7 @@ _print16:
     push ax
     push di
     mov ax, 0xe00
-	.loop:
+    .loop:
 		cmp byte [di], 0
 		je .exit
 		mov al, [di]
@@ -415,6 +462,7 @@ _print16:
 	.exit:
         pop di
         pop ax
+        ret
         cli
     .halt:
         hlt
@@ -422,7 +470,7 @@ _print16:
 align 0x10
 GDT_REGISTER:
     dw GDT_END - GDT - 1
-    dq GDT
+    dq GDT + BOOT_PARTITION_BASE_ADDRESS
 
 align 0x10
 IDT_REGISTER:
@@ -445,15 +493,15 @@ GDT:
     dq 0 ; Null segment
     .KernelCode:
         dw 0xffff
-        dw 0
-        db 0
+        dw 0xFE00
+        db 0x1
         db 10011010b
         db 11001111b
         db 0
     .KernelData:
         dw 0xffff
-        dw 0
-        db 0
+        dw 0xFE00
+        db 0x1
         db 10010010b
         db 11001111b
         db 0
@@ -589,23 +637,23 @@ Protected16BitEnterRealMode:
     and eax, ~1
     mov cr0, eax
 
+    
 
-    lidt [RealModeIdt]
-
-    jmp 0:RealModeEntry
+    jmp BOOT_PARTITION_BASE_ADDRESS/0x10:RealModeEntry
 
 
 
 RealModeEntry:
-    xor ax, ax
+
+    mov ax, 0x1FE0
     mov ds, ax
-    mov es, ax
     mov ss, ax
-    mov gs, ax
-    mov fs, ax
+
+    lidt [RealModeIdt]
 
     mov ax, [RealModeFunction]
     call ax
+
     jmp ReEnterProtectedMode
 
 
@@ -614,8 +662,9 @@ Int13:
     mov si, DiskLbaPacket
     mov ax, 0x4200
     mov dl, [BootDrive]
-
     int 0x13
+    mov eax, 0xBEFA
+    jmp $
 
     jc .err
     popa
@@ -634,8 +683,8 @@ RealModeCallEaxSaved dd 0
 %macro CallRealMode 2
     mov [RealModeCallEaxSaved], eax
     mov word [RealModeFunction], %1
-    mov word [RealModeReturn], %2
-    jmp 0x18:Protected16BitEnterRealMode
+    mov dword [RealModeReturn], %2
+    jmp 0x18:Protected16BitEnterRealMode + BOOT_PARTITION_BASE_ADDRESS
 %endmacro
 
 ; Last call to return to protected mode
@@ -646,12 +695,13 @@ SetupSegmentsAndRet:
     mov ss, ax
     mov gs, ax
     mov fs, ax
-    xor eax, eax
+
     mov eax, [RealModeCallEaxSaved]
     jmp [RealModeReturn]
 
 
 
+align 0x10
 ProtectedModeEntry:
     mov ax, 0x10
     mov ds, ax
@@ -660,22 +710,22 @@ ProtectedModeEntry:
     mov gs, ax
     mov fs, ax
 
+
     mov esp, stack_top
     mov ebp, esp
    
     ; Check BOOT_POINTER_TABLE
 
-    cmp dword [BootPointerTable], BOOT_POINTER_TABLE_MAGIC
+    cmp dword [__BootPointerTable], BOOT_POINTER_TABLE_MAGIC
     jne .InvalidFsArea
-    cmp dword [BootPointerTable + 4], BOOT_POINTER_TABLE_STRMAGIC
+    cmp dword [__BootPointerTable + 4], BOOT_POINTER_TABLE_STRMAGIC
     jne .InvalidFsArea
-    cmp word [BootPointerTable + 8], BOOT_MAJOR
+    cmp word [__BootPointerTable + 8], BOOT_MAJOR
     jne .UnsupportedFSBootVersion
-    cmp word [BootPointerTable + 10], BOOT_MINOR
+    cmp word [__BootPointerTable + 10], BOOT_MINOR
     jne .UnsupportedFSBootVersion
 
     
-
     jmp EnterLongMode
     .halt:
     hlt
@@ -805,22 +855,26 @@ NoEnoughMemory db "Loading Failed, no enough memory.", 13, 10, 0
 
 
 %include "bootldr64.asm"
-times 0x12200 - ($-$$) db 0
+times 0x12000 - ($-$$) db 0
 
 
 
 ; Basic 4MB Page table to enter long mode
 PageTable:
 .Pml4:
-dq .Pdp + 3 ; + 3 (or | 3 ) which set Present & R/W Bits
+dq .Pdp + BOOT_PARTITION_BASE_ADDRESS + 3 ; + 3 (or | 3 ) which set Present & R/W Bits
 times 511 dq 0
 .Pdp:
-dq .Pd + 3
+dq .Pd + BOOT_PARTITION_BASE_ADDRESS + 3
 times 511 dq 0
 .Pd: ; Map low 4MB
 dq 0x83
 dq 0x200083
-times 510 dq 0
+dq 0x400083
+dq 0x600083
+dq 0x800083
+
+times 512 dq 0
 ; .Pt:
 ; %assign i 0
 ; %rep 512
@@ -837,6 +891,8 @@ BOOT_MINOR equ 0
 
 times BOOTMGR_SIZE - ($-$$) db 0
 
-BootPointerTable: ; Setup in FS To eliminate FS & Disk drivers usage and acquire faster load performance 
+BootPointerTable equ __BootPointerTable + BOOT_PARTITION_BASE_ADDRESS
+
+__BootPointerTable: ; Setup in FS To eliminate FS & Disk drivers usage and acquire faster load performance 
 
 %include "bptdefs.asm"

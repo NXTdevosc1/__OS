@@ -25,7 +25,7 @@ MBR_PARTITION_ADDRESS equ BOOT_BASE + 0x1CE
 
 BootDrive db 0
 
-BOOT_PARTITION_BASE_ADDRESS equ 0x7C00
+BOOT_PARTITION_BASE_ADDRESS equ 0x1FE00
 
 BOOT_MANAGER_OFFSET equ 0x200
 
@@ -63,8 +63,9 @@ _boot:
 
 
 	; Check BOOT_MANAGER Header
-	mov bx, BOOT_PARTITION_BASE_ADDRESS + BOOT_MANAGER_OFFSET
-	
+	mov eax, BOOT_PARTITION_BASE_ADDRESS >> 4
+	mov gs, ax
+	mov bx, BOOT_MANAGER_OFFSET
 	; CMP MAGIC0
 	.magic0:
 		mov di, BOOTMGR_MAGIC0
@@ -73,7 +74,7 @@ _boot:
 			test al, al
 			jz .exit
 			mov cl, [di]
-			mov ch, [bx]
+			mov ch, [gs:bx]
 			cmp cl, ch
 			jne ErrInvalidOrCorruptedFs
 			inc di
@@ -84,24 +85,32 @@ _boot:
 
 	; CMP MAGIC1
 	.magic1:
-		mov bx, BOOT_PARTITION_BASE_ADDRESS + BOOT_MANAGER_OFFSET + 8
-		cmp word [bx], BOOT_MANAGER_MAGIC1
+		mov bx, BOOT_MANAGER_OFFSET + 8
+		cmp word [gs:bx], BOOT_MANAGER_MAGIC1
 		jne ErrInvalidOrCorruptedFs
+
+	; xor ax, ax
+	; mov gs, ax
+
 
 	; mov bx, [BOOT_PARTITION_BASE_ADDRESS + BOOT_MANAGER_OFFSET + 0x10] ; 0x10 offset of boot entry pointer
 	mov dl, [BootDrive] ; Send boot drive to BOOT_MANAGER
 
-	jmp 0x7C00
+	jmp word 0x1FE0:0
 
-READ_PART2_SEG equ 0xFE0
-READ_PART3_SEG equ 0x17E0
-READ_PART4_SEG equ 0x1FE0
+BOOT_AREA_BASE equ 0x2000
+
+READ_PART2_SEG equ 0x2800
+READ_PART3_SEG equ 0x3000
+READ_PART4_SEG equ 0x3800
+
+align 0x10
 LbaPacket:
 	db 0x10
 	db 0
 	.NumSectors dw 0x41 ; + 1 (PARTITION BOOTSECTOR) (read in 4 parts)
 	.Address dw 0
-	.Segment dw BOOT_PARTITION_BASE_ADDRESS / 0x10 ; Address 0x7C00 (BOOT_PARTITION_BASE_ADDRESS)
+	.Segment dw 0x1FE0 ; Address 0x1FE00 (BOOT_PARTITION_BASE_ADDRESS)
 	.Lba dq 0 ; Set by bootsector
 
 
@@ -124,7 +133,8 @@ LbaRead:
 	jc .err
 
 	; Parts 3 - 8
-	mov cx, 5 ; Count
+	; mov cx, 5 ; Count
+	mov cx, 5
 	mov bx, READ_PART3_SEG ; Segment (inc by 0x800)
 .loop:
 	test cx, cx
@@ -176,7 +186,7 @@ ErrInvalidOrCorruptedFs:
 	jmp _halt
 
 BOOTMGR_MAGIC0 db "BOOTMGR_",0
-InvalidOrCorruptedFs db "Invalid or corrupted file system", 13, 10, "Halting...", 13, 10, 0
+InvalidOrCorruptedFs db "Invalsid or corrupted file system", 13, 10, "Halting...", 13, 10, 0
 CouldNotReadHardDisk db "Could not read from hard disk.", 13, 10, "Halting...", 13, 10, 0
 BOOT_CODE_LENGTH equ 440
 

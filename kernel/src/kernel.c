@@ -100,6 +100,7 @@ LPWSTR KernelProcessName = L"System Kernel.";
 
 extern void __declspec(noreturn) _start() {
 	__cli();
+	while(1);
 	EnableExtendedStates();
 	SetupPageAttributeTable();
 	Pmgrt.NumProcessors = 1;
@@ -120,7 +121,6 @@ extern void __declspec(noreturn) _start() {
 	}
 	kproc = KeCreateProcess(NULL, NULL, SUBSYSTEM_NATIVE, KERNELMODE_PROCESS);
 	if(!kproc) SET_SOD_INITIALIZATION;
-
 
 
 	InitMemoryManagementSubsystem();
