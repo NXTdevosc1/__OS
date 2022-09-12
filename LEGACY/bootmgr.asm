@@ -60,6 +60,8 @@ __KernelPeHdrAddress dq 0
 KernelPeHdrAddress equ __KernelPeHdrAddress + BOOT_PARTITION_BASE_ADDRESS
 ; Boot Manager Routine Tables
 
+align 0x40
+
 DiskLbaPacket:
     .PacketSize db 0x10
     db 0
@@ -70,6 +72,9 @@ DiskLbaPacket:
     ; 64 bit address of disk transfer buffer
     dq DiskTransferBuffer
 
+align 0x10
+VbeReady dq 0 ; To check if VBE is supported and enabled
+VbeMode dq 0
 align 0x200
 
 VbeInfoBlock:
@@ -80,8 +85,6 @@ VbeInfoBlock:
     .VideoModePtr times 2 dw 0
     .TotalMemory dw 0
 
-VbeReady db 0 ; To check if VBE is supported and enabled
-VbeMode dw 0
 
 align 0x200
 VbeModeInfo:
@@ -121,22 +124,27 @@ VbeModeInfo:
 
 
 
-align 0x10
 DiskTransferBuffer equ 0x2000
 
-stack_top equ 0x4800
+stack_top equ 0x3000
 
 ERROR_INVALID_FS_BOOTAREA db "Invalid or Corrupt File System Boot Area", 13, 10, 0
 ERROR_UNSUPPORTED_FSBOOT_VERSION db "Unsupported File System Boot Version. BootManager Version : 1.0", 13, 10, 0
 StrCPUError db "An unexpected CPU error has occured, halting...", 13, 10, 0
 
+align 0x10
 loader_start:
     cli
-
     mov ax, BOOT_PARTITION_BASE_ADDRESS / 0x10
     mov ds, ax
     mov es, ax
     mov gs, ax
+
+    xor ax, ax
+    mov ss, ax
+    
+    mov sp, stack_top
+    mov bp, sp
     
     
 
@@ -163,8 +171,8 @@ loader_start:
 
 
     call GetMemoryMap
-
-    ; call SetupVesaVBE
+; 
+    call SetupVesaVBE
 
     jmp EnableProtectedMode
 
@@ -173,7 +181,7 @@ loader_start:
     jmp .halt
 ; This is the best method availaible on all PC's since 2002 (and some previous ones)
 
-BootLoaderMemory dq 0x200000 ; Used memory by bootloader (0x100000 As initialy used)
+BootLoaderMemory dq 0x800000 ; Used memory by bootloader (0x100000 As initialy used)
 
 MemapCopy:
     test byte [BiosSystemMemoryMap + 20], 1 ; Present Bit ACPI
@@ -406,20 +414,9 @@ EnableProtectedMode:
     mov ax, 0x1FE0
     mov ds, ax
 
-    ; mov edi, GDT_BASE
-    ; mov esi, GDT
-    ; mov ecx, 0x40 ; Repetitions
-    ; rep movsw
-
-    ; mov edi, GDTR_BASE
-    ; mov esi, GDT_REGISTER
-    ; mov ecx, 0x20 ; Repetitions
-    ; rep movsw
-
     lgdt [GDT_REGISTER]
 
-    ; mov ebx, IDT_REGISTER + 0x1FE00
-    ; lidt [ebx]
+    lidt [IDT_REGISTER]
     mov eax, cr0
     and eax, ~((3 << 2) | (3 << 30))
     or eax, 3 ; Set Protected Mode enable | Monitor coprocessor
@@ -526,6 +523,13 @@ GDT:
         db 0
         db 10010010b
         db 1000b << 4 ; Limit | Flags << 4
+        db 0
+    .KernelStack32:
+        dw 0xffff
+        dw 0
+        db 0
+        db 10010010b
+        db 11001111b
         db 0
 GDT_END:
 
@@ -647,7 +651,11 @@ RealModeEntry:
 
     mov ax, 0x1FE0
     mov ds, ax
+    xor ax, ax
     mov ss, ax
+    mov es, ax
+    mov gs, ax
+    mov fs, ax
 
     lidt [RealModeIdt]
 
@@ -658,16 +666,22 @@ RealModeEntry:
 
 
 Int13:
-    pusha
+    ; pusha
     mov si, DiskLbaPacket
     mov ax, 0x4200
     mov dl, [BootDrive]
+    sti
+
+    xor ah, ah
     int 0x13
-    mov eax, 0xBEFA
+    mov eax, 0xBEFE
+    hlt
     jmp $
 
+    int 0x13
+
     jc .err
-    popa
+    ; popa
     ret
 .err:
     mov di, HardDiskReadFailed
@@ -692,10 +706,11 @@ SetupSegmentsAndRet:
     mov ax, 0x10
     mov ds, ax
     mov es, ax
-    mov ss, ax
     mov gs, ax
     mov fs, ax
 
+    mov ax, 0x30
+    mov ss, ax
     mov eax, [RealModeCallEaxSaved]
     jmp [RealModeReturn]
 
@@ -705,11 +720,11 @@ align 0x10
 ProtectedModeEntry:
     mov ax, 0x10
     mov ds, ax
-    mov ss, ax
     mov es, ax
     mov gs, ax
     mov fs, ax
-
+    mov ax, 0x30
+    mov ss, ax
 
     mov esp, stack_top
     mov ebp, esp
@@ -726,6 +741,7 @@ ProtectedModeEntry:
     jne .UnsupportedFSBootVersion
 
     
+
     jmp EnterLongMode
     .halt:
     hlt

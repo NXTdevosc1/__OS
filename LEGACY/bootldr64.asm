@@ -32,8 +32,8 @@ CheckLongModeSupport:
     call _print
     jmp halt
 EnterLongMode:
-    call CheckCpuid
-    call CheckLongModeSupport
+    ; call CheckCpuid
+    ; call CheckLongModeSupport
 
 
     ; Active PAE & Page Global (PGE)
@@ -68,7 +68,7 @@ StrLongModeNotSupported db "The bootloader cannot continue, Long Mode (x64 A.K.A
 [BITS 64]
 SavedRAX dq 0
 %macro CallRealMode64 2
-    mov [SavedRAX + BOOT_PARTITION_BASE_ADDRESS], rax
+    ; mov [SavedRAX], rax
     push 0x8
     push %%protectedmode
 
@@ -78,6 +78,7 @@ SavedRAX dq 0
 
     mov ax, 0x10
     mov ds, ax
+    mov ax, 0x30
     mov ss, ax
     
     mov eax, cr0
@@ -141,8 +142,19 @@ LongModeEntry:
     mov es, ax
     mov gs, ax
     mov fs, ax
+    
+    mov rcx, 1
+    mov rdi, 0x10000000
+    mov rbx, 1
+    call DiskRead
 
+    mov ax, [loader_start + BOOT_PARTITION_BASE_ADDRESS]
+    and rax, 0xFFFF
+    jmp $
    
+
+    mov rax, 0xbb
+    jmp $
 
 
     ; Clear RFLAGS
@@ -152,6 +164,12 @@ LongModeEntry:
 
     mov rax, [MemoryMap.Count + BOOT_PARTITION_BASE_ADDRESS]
     mov rbx, MemoryMap.MemoryDescriptors + BOOT_PARTITION_BASE_ADDRESS
+
+    mov di, StrFailedToLoadResources
+    call _print64
+    call _print64
+    call _print64
+
 
 
     ; Reset unaccessible registers in Real Mode
@@ -179,7 +197,6 @@ LongModeEntry:
 
     .end0:
 
-    
     ; Load Kernel & Other files as well (R15 = Cluster Size)
     mov r15, [BOOT_PARTITION_BASE_ADDRESS + 13] ; Cluster Size of the partition
     and r15, 0xFF ; Get lower bytes only
@@ -1011,9 +1028,9 @@ DiskRead:
         test rcx, rcx
         jz .exit1
         ; do int 13
-        mov word [DiskLbaPacket.NumSectors], 8
-        mov [DiskLbaPacket.Lba], rbx
-        mov word [DiskLbaPacket.RealModeAddress], DiskTransferBuffer
+        mov word [DiskLbaPacket.NumSectors + BOOT_PARTITION_BASE_ADDRESS], 8
+        mov [DiskLbaPacket.Lba + BOOT_PARTITION_BASE_ADDRESS], rbx
+        mov word [DiskLbaPacket.RealModeAddress + BOOT_PARTITION_BASE_ADDRESS], DiskTransferBuffer
         push rcx
         push rdi
         push rbx
@@ -1037,10 +1054,10 @@ DiskRead:
     test rax, rax
     jz .NoMoreSectors
     ; Setup packet
-    mov [DiskLbaPacket.NumSectors], ax
-    mov [DiskLbaPacket.Lba], rbx
+    mov [DiskLbaPacket.NumSectors + BOOT_PARTITION_BASE_ADDRESS], ax
+    mov [DiskLbaPacket.Lba + BOOT_PARTITION_BASE_ADDRESS], rbx
     
-    mov word [DiskLbaPacket.RealModeAddress], DiskTransferBuffer
+    mov word [DiskLbaPacket.RealModeAddress + BOOT_PARTITION_BASE_ADDRESS], DiskTransferBuffer
     CallRealMode64 Int13, .R1
     
 .R1:
