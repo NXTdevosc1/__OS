@@ -126,7 +126,7 @@ VbeModeInfo:
 
 DiskTransferBuffer equ 0x2000
 
-stack_top equ 0x3000
+stack_top equ 0x7000
 
 ERROR_INVALID_FS_BOOTAREA db "Invalid or Corrupt File System Boot Area", 13, 10, 0
 ERROR_UNSUPPORTED_FSBOOT_VERSION db "Unsupported File System Boot Version. BootManager Version : 1.0", 13, 10, 0
@@ -172,7 +172,7 @@ loader_start:
 
     call GetMemoryMap
 ; 
-    call SetupVesaVBE
+    ; call SetupVesaVBE
 
     jmp EnableProtectedMode
 
@@ -641,6 +641,7 @@ Protected16BitEnterRealMode:
     and eax, ~1
     mov cr0, eax
 
+    lidt [RealModeIdt]
     
 
     jmp BOOT_PARTITION_BASE_ADDRESS/0x10:RealModeEntry
@@ -657,7 +658,6 @@ RealModeEntry:
     mov gs, ax
     mov fs, ax
 
-    lidt [RealModeIdt]
 
     mov ax, [RealModeFunction]
     call ax
@@ -666,24 +666,30 @@ RealModeEntry:
 
 
 Int13:
-    ; pusha
     mov si, DiskLbaPacket
     mov ax, 0x4200
     mov dl, [BootDrive]
-    sti
-
-    xor ah, ah
     int 0x13
-    mov eax, 0xBEFE
-    hlt
-    jmp $
-
-    int 0x13
-
+    cli
+    mov ax, 0x1FE0
+    mov ds, ax
+    xor ax, ax
+    mov ss, ax
+    mov es, ax
+    mov gs, ax
+    mov fs, ax
     jc .err
-    ; popa
+
+
     ret
 .err:
+    mov cx, [DiskLbaPacket.NumSectors]
+    mov bx, [DiskLbaPacket.PacketSize]
+    and ebx, 0xffff
+    and ecx, 0xffff
+    mov edi, [DiskLbaPacket.Lba]
+    mov ax, 0xbbb
+    jmp $
     mov di, HardDiskReadFailed
     call _print16
     .halt:
@@ -740,7 +746,7 @@ ProtectedModeEntry:
     cmp word [__BootPointerTable + 10], BOOT_MINOR
     jne .UnsupportedFSBootVersion
 
-    
+
 
     jmp EnterLongMode
     .halt:
@@ -899,8 +905,8 @@ times 512 dq 0
 ; %endrep
 
 align 0x10
-ClusterChainSector times 0x200 db 0
-
+__ClusterChainSector times 0x200 db 0
+ClusterChainSector equ __ClusterChainSector + BOOT_PARTITION_BASE_ADDRESS
 BOOT_MAJOR equ 1
 BOOT_MINOR equ 0
 

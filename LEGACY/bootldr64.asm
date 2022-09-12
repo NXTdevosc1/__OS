@@ -32,8 +32,8 @@ CheckLongModeSupport:
     call _print
     jmp halt
 EnterLongMode:
-    ; call CheckCpuid
-    ; call CheckLongModeSupport
+    call CheckCpuid
+    call CheckLongModeSupport
 
 
     ; Active PAE & Page Global (PGE)
@@ -52,6 +52,7 @@ EnterLongMode:
     or eax, 1 << 8 ; Set LME (Long Mode Enable) bit
     wrmsr
 
+        
     lidt [IDTR64 + BOOT_PARTITION_BASE_ADDRESS]
 
     ; Set CR0 With (PE, MP, PG)
@@ -59,6 +60,7 @@ EnterLongMode:
     mov eax, 3 | (1 << 31)
     mov cr0, eax
  
+
     jmp 0x20:LongModeEntry + BOOT_PARTITION_BASE_ADDRESS ; Jmp to long mode
 
 StrCpuidNotSupported db "The bootloader cannot continue, Processor does not support CPUID.", 13, 10, 0
@@ -68,7 +70,7 @@ StrLongModeNotSupported db "The bootloader cannot continue, Long Mode (x64 A.K.A
 [BITS 64]
 SavedRAX dq 0
 %macro CallRealMode64 2
-    ; mov [SavedRAX], rax
+    mov [SavedRAX + BOOT_PARTITION_BASE_ADDRESS], rax
     push 0x8
     push %%protectedmode
 
@@ -78,15 +80,17 @@ SavedRAX dq 0
 
     mov ax, 0x10
     mov ds, ax
+    mov es, ax
+
+    
     mov ax, 0x30
     mov ss, ax
     
-    mov eax, cr0
-    and eax, ~(1 << 31)
+    
+    mov eax, 3
     mov cr0, eax ; This will automatically disabled LME (And compatibility mode also)
     
     xor eax, eax
-    mov cr3, eax
     mov cr4, eax
 
     
@@ -125,7 +129,7 @@ mov ds, ax
 mov ss, ax
 mov es, ax
 
-mov rax, [SavedRAX]
+mov rax, [SavedRAX + BOOT_PARTITION_BASE_ADDRESS]
 jmp %2
 %endmacro
 
@@ -143,20 +147,6 @@ LongModeEntry:
     mov gs, ax
     mov fs, ax
     
-    mov rcx, 1
-    mov rdi, 0x10000000
-    mov rbx, 1
-    call DiskRead
-
-    mov ax, [loader_start + BOOT_PARTITION_BASE_ADDRESS]
-    and rax, 0xFFFF
-    jmp $
-   
-
-    mov rax, 0xbb
-    jmp $
-
-
     ; Clear RFLAGS
     xor rax, rax
     push rax
@@ -164,13 +154,6 @@ LongModeEntry:
 
     mov rax, [MemoryMap.Count + BOOT_PARTITION_BASE_ADDRESS]
     mov rbx, MemoryMap.MemoryDescriptors + BOOT_PARTITION_BASE_ADDRESS
-
-    mov di, StrFailedToLoadResources
-    call _print64
-    call _print64
-    call _print64
-
-
 
     ; Reset unaccessible registers in Real Mode
 
@@ -601,6 +584,7 @@ LoadPsf1Font:
 
 
     call LoadBootPointerFile
+    mov rcx, 0xba
     jmp $
     mov [Psf1FontAddress], rax
     
@@ -662,7 +646,7 @@ LoadBootPointerFile:
         inc r9 ; Index
         jmp .CmpLoop
     .ValidPath:
-    
+
         mov ecx, [rdx + BPT_ENTRY_NUM_CLUSTERS]
         mov eax, ecx
         push rdx
@@ -683,6 +667,9 @@ LoadBootPointerFile:
         shl rcx, 9
         pop rdx
         call ReadClusters
+        MOV RAX, 0XDEADBEEF
+        JMP $
+        jmp $
         
         pop rax
         jmp .Exit
@@ -701,9 +688,9 @@ LoadBootPointerFile:
     jmp .R1
 
 
+
 ; RBX = Cluster Start (Current Cluster), R15 = Buffer
 ReadClusters:
-
 push rax
 push rcx
 push rdx
@@ -714,6 +701,7 @@ push r9
 push r10
 push r11
 push r12
+
 
 mov r8, [LastClusterChainSector]
 mov r11, [DataClustersStartLba]
@@ -733,8 +721,8 @@ add rbx, [DataClustersStartLba]
 mov rcx, r12 ; Cluster Size
 mov rdi, r15
 add r15, r13 ; Increment Buffer Pointer
-
 call DiskRead
+jmp $
 pop rbx
 
 
@@ -748,6 +736,15 @@ pop rbx
     cmp r8, r9
     jne .ReadAllocationSector
 .R0:
+    push rax
+    mov rax, r9
+    call _tohex
+    mov di, HexBuffer
+    call _print64
+    mov di, NewLine
+    call _print64
+    pop rax
+
     lea rdx, [ClusterChainSector + r10]
     mov edx, [rdx]
     cmp edx, CLUSTER_END_OF_CHAIN
@@ -770,7 +767,7 @@ pop rbx
 
 .ReadAllocationSector:
     push rbx
-    mov rbx, [AllocationTableLba + BOOT_PARTITION_BASE_ADDRESS]
+    mov rbx, [AllocationTableLba]
     add rbx, r9
     mov r8, r9
 
@@ -795,6 +792,7 @@ pop rbx
     pop rcx
     pop rax
     ret
+
 
 
 ; rbx = Physical Address
@@ -1011,7 +1009,9 @@ UnsufficientMemory db "Memory Allocation Failed, Please upgrade your RAM.", 13, 
 
 ; RCX = num sectors, RDI = buffer, RBX = LBA
 DiskRead:
+
     ; calculate full read count
+    push rax
     push rbx
     push rcx
     push rdx
@@ -1021,7 +1021,6 @@ DiskRead:
     mov rax, rcx
     and rax, 7
     shr rcx, 3 ; divide by 3
-    push rax
 
     
     .loop:
@@ -1034,7 +1033,7 @@ DiskRead:
         push rcx
         push rdi
         push rbx
-
+        push rdi
         
         CallRealMode64 Int13, .R0
 .R0:
@@ -1042,6 +1041,7 @@ DiskRead:
         mov rcx, 0x200 ; 4 dword * 0x800 = 0x1000
         mov rsi, DiskTransferBuffer
         rep movsq
+        pop rdi
         pop rbx
         pop rdi
         pop rcx
@@ -1069,8 +1069,6 @@ DiskRead:
     rep movsq
 
     .NoMoreSectors:
-    xor rax, rax ; Success
-
 
     
     pop rsi
@@ -1078,11 +1076,7 @@ DiskRead:
     pop rdx
     pop rcx
     pop rbx
-    ret
-.error:
-    mov di, HardDiskReadFailed
-    call _print64
-    jmp halt64
+    pop rax
     ret
 
 times 0x11000 - ($-$$) db 0
