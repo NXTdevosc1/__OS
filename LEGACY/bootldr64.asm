@@ -152,223 +152,223 @@ LongModeEntry:
     push rax
     popf
 
-    mov rax, [MemoryMap.Count + BOOT_PARTITION_BASE_ADDRESS]
-    mov rbx, MemoryMap.MemoryDescriptors + BOOT_PARTITION_BASE_ADDRESS
+    ; mov rax, [MemoryMap.Count + BOOT_PARTITION_BASE_ADDRESS]
+    ; mov rbx, MemoryMap.MemoryDescriptors + BOOT_PARTITION_BASE_ADDRESS
 
-    ; Reset unaccessible registers in Real Mode
+    ; ; Reset unaccessible registers in Real Mode
 
-    .loop:
-        test rax, rax
-        jz .end0
+    ; .loop:
+    ;     test rax, rax
+    ;     jz .end0
 
-        mov dl, [rbx]
+    ;     mov dl, [rbx]
         
 
-        cmp dl, 1 ; Conventionnal Memory
-        jne .Skip0
-        push rbx
-        mov rdx, rbx
-        mov rbx, [rdx + 9]
-        mov rcx, [rdx + 1]
-        call IdentityMapPages
-        pop rbx
-        .Skip0:
+    ;     cmp dl, 1 ; Conventionnal Memory
+    ;     jne .Skip0
+    ;     push rbx
+    ;     mov rdx, rbx
+    ;     mov rbx, [rdx + 9]
+    ;     mov rcx, [rdx + 1]
+    ;     call IdentityMapPages
+    ;     pop rbx
+    ;     .Skip0:
 
-        add rbx, SIZE_KERNEL_MEMORY_MAP
-        dec rax
-        jmp .loop
+    ;     add rbx, SIZE_KERNEL_MEMORY_MAP
+    ;     dec rax
+    ;     jmp .loop
 
-    .end0:
+    ; .end0:
 
-    ; Load Kernel & Other files as well (R15 = Cluster Size)
-    mov r15, [BOOT_PARTITION_BASE_ADDRESS + 13] ; Cluster Size of the partition
-    and r15, 0xFF ; Get lower bytes only
+    ; ; Load Kernel & Other files as well (R15 = Cluster Size)
+    ; mov r15, [BOOT_PARTITION_BASE_ADDRESS + 13] ; Cluster Size of the partition
+    ; and r15, 0xFF ; Get lower bytes only
 
-    mov eax, [BootPointerTable + BPTOFF_KERNEL_FILE_NUM_CLUSTERS]
-    mul r15 ; Cluster Size
-    shl rax, 9 ; Multiply by 512
-    mov rcx, rax
-    shr rcx, 12 ; Divide by 12
-    inc rcx ; 1 Additionnal Page
+    ; mov eax, [BootPointerTable + BPTOFF_KERNEL_FILE_NUM_CLUSTERS]
+    ; mul r15 ; Cluster Size
+    ; shl rax, 9 ; Multiply by 512
+    ; mov rcx, rax
+    ; shr rcx, 12 ; Divide by 12
+    ; inc rcx ; 1 Additionnal Page
 
     
-    call AllocatePages
-    mov [KernelBufferAddress], rax
-    mov rbx, rax
+    ; call AllocatePages
+    ; mov [KernelBufferAddress], rax
+    ; mov rbx, rax
 
 
     
     ; RBX = Cluster Start (Current Cluster), R15 = Buffer
-    mov rax, [BootPointerTable + BPTOFF_ALLOCATION_TABLE_LBA]
-    mov [AllocationTableLba], rax
-    mov rax, [BootPointerTable + BPTOFF_DATA_CLUSTERS_LBA]
-    mov [DataClustersStartLba], rax
+    ; mov rax, [BootPointerTable + BPTOFF_ALLOCATION_TABLE_LBA]
+    ; mov [AllocationTableLba], rax
+    ; mov rax, [BootPointerTable + BPTOFF_DATA_CLUSTERS_LBA]
+    ; mov [DataClustersStartLba], rax
     
-    call LoadPsf1Font
+    ; call LoadPsf1Font
 
 
-    mov rbx, [BootPointerTable + BPTOFF_KERNEL_CLUSTER_START]
+    ; mov rbx, [BootPointerTable + BPTOFF_KERNEL_CLUSTER_START]
 
 
-    mov r15, [KernelBufferAddress]
-    call ReadClusters
+    ; mov r15, [KernelBufferAddress]
+    ; call ReadClusters
 
-; Parsing Kernel File
-    mov rax, [KernelBufferAddress]
-    cmp word [rax], 'MZ'
-    jne .InvalidKernelImage
-    ; Get PE Header Offset
-    mov edx, [rax + 0x3C]
-    add rax, rdx
-    ; Check Kernel Image Header
-    cmp dword [rax], 'PE' ; PE\0\0
-    jne .InvalidKernelImage
+; ; Parsing Kernel File
+;     mov rax, [KernelBufferAddress]
+;     cmp word [rax], 'MZ'
+;     jne .InvalidKernelImage
+;     ; Get PE Header Offset
+;     mov edx, [rax + 0x3C]
+;     add rax, rdx
+;     ; Check Kernel Image Header
+;     cmp dword [rax], 'PE' ; PE\0\0
+;     jne .InvalidKernelImage
 
-    mov [KernelPeHdrAddress], rax
+;     mov [KernelPeHdrAddress], rax
 
-    cmp word [rax + 4], 0x8664 ; Machine Type
-    jne .InvalidKernelImage
+;     cmp word [rax + 4], 0x8664 ; Machine Type
+;     jne .InvalidKernelImage
 
-    ; OPTIONNAL_HEADER
-    cmp word [rax + 24], 0x20b ; PE32+ Magic
-    jne .InvalidKernelImage
+;     ; OPTIONNAL_HEADER
+;     cmp word [rax + 24], 0x20b ; PE32+ Magic
+;     jne .InvalidKernelImage
 
-    cmp word [rax + 0x5C], 1 ; Subsystem NATIVE
-    jne .InvalidKernelImage
-    mov dx, [rax + 0x5E]
-    test dl, 0x40
-    jz .InvalidKernelImage ; Must have IMAGE_DYNAMIC_BASE
+;     cmp word [rax + 0x5C], 1 ; Subsystem NATIVE
+;     jne .InvalidKernelImage
+;     mov dx, [rax + 0x5E]
+;     test dl, 0x40
+;     jz .InvalidKernelImage ; Must have IMAGE_DYNAMIC_BASE
     
-    mov dx, [rax + 22]
-    test dl, 0x20 ; Must have LARGE_ADDRESS_AWARE
-    jz .InvalidKernelImage
+;     mov dx, [rax + 22]
+;     test dl, 0x20 ; Must have LARGE_ADDRESS_AWARE
+;     jz .InvalidKernelImage
 
-    ; Parse Sections
-    mov dx, [rax + 6] ; Num Sections
-    mov [KeImageNumSections], dx
-    xor rdx, rdx
-    mov dx, [rax + 20]
-    lea rax, [rax + 24 + rdx]
-    ; Get virtual buffer size
-    mov [KeSectionTable], rax
-    mov rdx, rax
-    xor rcx, rcx
-    mov cx, [KeImageNumSections]
+;     ; Parse Sections
+;     mov dx, [rax + 6] ; Num Sections
+;     mov [KeImageNumSections], dx
+;     xor rdx, rdx
+;     mov dx, [rax + 20]
+;     lea rax, [rax + 24 + rdx]
+;     ; Get virtual buffer size
+;     mov [KeSectionTable], rax
+;     mov rdx, rax
+;     xor rcx, rcx
+;     mov cx, [KeImageNumSections]
 
     
 
-; PATTERN : Lx (Loop x), Rx (Return x), Jx (Jmp x) Ax (Alternative JMP x)
-; e.g. L1J2 (Loop 1 Jmp 2) L1R4 (Loop 1 Return 4)
-.L0: ; Loop 0
-    test cx, cx
-    jz .E0 ; Exit 0
-    ; test SECTION_CHARACTERISTICS
+; ; PATTERN : Lx (Loop x), Rx (Return x), Jx (Jmp x) Ax (Alternative JMP x)
+; ; e.g. L1J2 (Loop 1 Jmp 2) L1R4 (Loop 1 Return 4)
+; .L0: ; Loop 0
+;     test cx, cx
+;     jz .E0 ; Exit 0
+;     ; test SECTION_CHARACTERISTICS
 
-    test dword [rdx + 36], 0x20 | 0x40 | 0x80 ; PE_SECTION_CODE | PE_SECTION_INITIALIZED_DATA | PE_SECTION_UNINITIALIZED_DATA
-    jz .L0R1
+;     test dword [rdx + 36], 0x20 | 0x40 | 0x80 ; PE_SECTION_CODE | PE_SECTION_INITIALIZED_DATA | PE_SECTION_UNINITIALIZED_DATA
+;     jz .L0R1
 
-    mov ebx, [rdx + 8] ; Virtual Size
-    cmp [rdx + 0x10], ebx ; Sizeof Raw Data
-    ja .L0J0
-.L0R0:
-    mov r8d, [rdx + 0xC] ; Virtual Address
-    add rbx, r8
-    cmp [VirtualBufferSize], rbx
-    jb .L0J1
-.L0R1:
-    dec cx
-    add rdx, 40 ; Sizeof PE_SECTION_TABLE
-    jmp .L0
-.L0J0:
-    mov ebx, [rdx + 0x10]
-    mov [rdx + 8], ebx
-    jmp .L0R0
-.L0J1:
-    mov [VirtualBufferSize], rbx
+;     mov ebx, [rdx + 8] ; Virtual Size
+;     cmp [rdx + 0x10], ebx ; Sizeof Raw Data
+;     ja .L0J0
+; .L0R0:
+;     mov r8d, [rdx + 0xC] ; Virtual Address
+;     add rbx, r8
+;     cmp [VirtualBufferSize], rbx
+;     jb .L0J1
+; .L0R1:
+;     dec cx
+;     add rdx, 40 ; Sizeof PE_SECTION_TABLE
+;     jmp .L0
+; .L0J0:
+;     mov ebx, [rdx + 0x10]
+;     mov [rdx + 8], ebx
+;     jmp .L0R0
+; .L0J1:
+;     mov [VirtualBufferSize], rbx
 
-    jmp .L0R1
-.E0:
+;     jmp .L0R1
+; .E0:
 
-    add qword [VirtualBufferSize], 0x20000 ; Padding
+    ; add qword [VirtualBufferSize], 0x20000 ; Padding
 
-    mov rax, [VirtualBufferSize]
-    mov rcx, rax
-    shr rcx, 12
-    call AllocatePages
-    mov [ImageBase], rax
+    ; mov rax, [VirtualBufferSize]
+    ; mov rcx, rax
+    ; shr rcx, 12
+    ; call AllocatePages
+    ; mov [ImageBase], rax
 
-    mov rdx, [KeSectionTable]
-    mov cx, [KeImageNumSections]
+    ; mov rdx, [KeSectionTable]
+    ; mov cx, [KeImageNumSections]
 
-; Load Virtual Buffer
+; ; Load Virtual Buffer
 
-.L1:
-    test cx, cx
-    jz .E1
-    ; test SECTION_CHARACTERISTICS
-    test dword [rdx + 36], 0x20 | 0x40 | 0x80 ; PE_SECTION_CODE | PE_SECTION_INITIALIZED_DATA | PE_SECTION_UNINITIALIZED_DATA
-    jz .L1J0
-    ; Copy Initialized Data
-    push rcx
-    mov esi, [rdx + 20]
-    add rsi, [KernelBufferAddress]
-    mov edi, [rdx + 0xC] ; Destination
-    add rdi, [ImageBase]
-    mov ecx, [rdx + 0x10]
-    test ecx, 7 ; Test Alignment
-    jz .L1A0
-    add rcx, 8
-    and ecx, ~7
-.L1A0:
+; .L1:
+;     test cx, cx
+;     jz .E1
+;     ; test SECTION_CHARACTERISTICS
+;     test dword [rdx + 36], 0x20 | 0x40 | 0x80 ; PE_SECTION_CODE | PE_SECTION_INITIALIZED_DATA | PE_SECTION_UNINITIALIZED_DATA
+;     jz .L1J0
+;     ; Copy Initialized Data
+;     push rcx
+;     mov esi, [rdx + 20]
+;     add rsi, [KernelBufferAddress]
+;     mov edi, [rdx + 0xC] ; Destination
+;     add rdi, [ImageBase]
+;     mov ecx, [rdx + 0x10]
+;     test ecx, 7 ; Test Alignment
+;     jz .L1A0
+;     add rcx, 8
+;     and ecx, ~7
+; .L1A0:
 
-    shr ecx, 3 ; Divide by 8
-    rep movsq
-;     ; Set Uninitialized data to 0
-    mov ecx, [rdx + 8] ; Virtual Size
-    sub ecx, [rdx + 0x10] ; Sizeof Raw Data
-    test ecx, 7
-    jz .L1A1
-    add rcx, 8 ; Align
-    and ecx, ~7
-.L1A1:
-    mov edi, [rdx + 0xC] ; Virtual Address
-    add rdi, [ImageBase]
-    mov esi, [rdx + 0x10]
-    add rdi, rsi
-    xor rax, rax
-    shr ecx, 3 ; Divide by 8
-    rep stosq ; Clear Data
+;     shr ecx, 3 ; Divide by 8
+;     rep movsq
+; ;     ; Set Uninitialized data to 0
+;     mov ecx, [rdx + 8] ; Virtual Size
+;     sub ecx, [rdx + 0x10] ; Sizeof Raw Data
+;     test ecx, 7
+;     jz .L1A1
+;     add rcx, 8 ; Align
+;     and ecx, ~7
+; .L1A1:
+;     mov edi, [rdx + 0xC] ; Virtual Address
+;     add rdi, [ImageBase]
+;     mov esi, [rdx + 0x10]
+;     add rdi, rsi
+;     xor rax, rax
+;     shr ecx, 3 ; Divide by 8
+;     rep stosq ; Clear Data
     
-    pop rcx
+;     pop rcx
 
-; INITDATA & FIMPORT Must be valid (0x20|0x40|0x80) Data
-    ; NASM Uses DWORD String IMMEDIATE (MAX)
-    cmp dword [rdx], 'INIT'
-    jne .L1A2
-    cmp dword [rdx + 4], 'DATA'
-    jne .L1A2
-    mov edi, [rdx + 0xC]
-    add rdi, [ImageBase]
-    mov [InitData], rdi
-    jmp .L1J0 ; Skip FIMPORT Check
-.L1A2:
-    cmp dword [rdx], 'FIMP'
-    jne .L1J0
-    cmp dword [rdx + 4], 'ORT'
-    jne .L1J0
-    mov edi, [rdx + 0xC]
-    add rdi, [ImageBase]
-    mov [FileImportTable], rdi
-.L1J0:
-    dec cx
-    add rdx, 40
-    jmp .L1
-.E1:
+; ; INITDATA & FIMPORT Must be valid (0x20|0x40|0x80) Data
+;     ; NASM Uses DWORD String IMMEDIATE (MAX)
+;     cmp dword [rdx], 'INIT'
+;     jne .L1A2
+;     cmp dword [rdx + 4], 'DATA'
+;     jne .L1A2
+;     mov edi, [rdx + 0xC]
+;     add rdi, [ImageBase]
+;     mov [InitData], rdi
+;     jmp .L1J0 ; Skip FIMPORT Check
+; .L1A2:
+;     cmp dword [rdx], 'FIMP'
+;     jne .L1J0
+;     cmp dword [rdx + 4], 'ORT'
+;     jne .L1J0
+;     mov edi, [rdx + 0xC]
+;     add rdi, [ImageBase]
+;     mov [FileImportTable], rdi
+; .L1J0:
+;     dec cx
+;     add rdx, 40
+;     jmp .L1
+; .E1:
 
-cmp qword [InitData], 0
-je .InvalidKernelImage
-cmp qword [FileImportTable], 0
-je .InvalidKernelImage
+; cmp qword [InitData], 0
+; je .InvalidKernelImage
+; cmp qword [FileImportTable], 0
+; je .InvalidKernelImage
     
 ; Relocate Kernel Image
 
@@ -560,45 +560,20 @@ jmp rax
     hlt
     jmp .R0
 .InvalidKernelImage:
-    mov di, .StrInvalidKernelImage
+    mov di, StrInvalidKernelImage
     call _print64
     jmp halt64
-.StrInvalidKernelImage db "Invalid Kernel Image, please re-install your Operating System.", 13, 10, 0
 
-%macro UNICODE_LENGTH 1 ; %1 = Unicode Str ($ must be right after Str)
-    (($ - %1) / 2) - 1
-%endmacro
+StrInvalidKernelImage db "Invalid Kernel Image, please re-install your Operating System.", 13, 10, 0
 
-__PathPsf1Font dw __utf16__("OS\Fonts\zap-light16.psf"), 0
-LenPathPsf1Font equ (($ - __PathPsf1Font - 1) / 2)
-PathPsf1Font equ __PathPsf1Font + BOOT_PARTITION_BASE_ADDRESS
+
 
 
 align 0x10
 FrameBufferDescriptor:
     times 0x100 db 0
 
-LoadPsf1Font:
-    mov rbx, PathPsf1Font
-    mov rax, LenPathPsf1Font
 
-
-    call LoadBootPointerFile
-    mov rcx, 0xba
-    jmp $
-    mov [Psf1FontAddress], rax
-    
-    ; Check Magic 0 & Magic 1
-
-    cmp byte [rax], 0x36 ; PSF1_MAGIC0
-    jne FailedToLoadResources
-    cmp byte [rax + 1], 0x04 ; PSF1_MAGIC1
-    jne FailedToLoadResources
-    ret ; Font Loaded Successfully
-FailedToLoadResources:
-
-    mov di, StrFailedToLoadResources
-    CallRealMode64 _print16, halt64
 
 StrFailedToLoadResources db "Failed to load resources. Please re-install your Operating System.", 13, 10, 0
 
@@ -607,191 +582,110 @@ StrFailedToLoadResources db "Failed to load resources. Please re-install your Op
 ; RAX = Return Address, RCX = File Size (Num Cluster * Cluster Size)
 
 
-LoadBootPointerFile:
-    push rdx
-    mov edx, [BootPointerTable + BPTOFF_ENTRIES_OFFSET]
-    add rdx, BootPointerTable
-    mov r8d, [BootPointerTable + BPTOFF_ENTRY_SIZE]
-    mov ecx, [BootPointerTable + BPTOFF_NUM_ENTRIES]
 
-.loop:
-    test ecx, ecx
-    jz FailedToLoadResources
-    cmp [rdx + BPT_ENTRY_PATH_LENGTH], ax
-    jne .ContinueSearch
-    ; Cmp Str
-    xor r9, r9 ; CMP_COUNT
-    mov r11, rbx
-    lea r12, [rdx + BPT_ENTRY_PATH]
-    .CmpLoop:
-        cmp r9, rax
-        je .ValidPath
-        mov r10w, [r11]
-        mov r13w, [r12]
-        ; Convert to lowercase if possible
-        cmp r10w, 'A'
-        jb .R0
-        cmp r10w, 'Z'
-        jbe .r10tolowercase
-        .R0:
-        cmp r13w, 'A'
-        jb .R1
-        cmp r13w, 'Z'
-        jbe .r13tolowercase
-        .R1:
-        cmp r10w, r13w
-        jne .ContinueSearch ; Invalid Path
-        add r11, 2
-        add r12, 2
-        inc r9 ; Index
-        jmp .CmpLoop
-    .ValidPath:
-
-        mov ecx, [rdx + BPT_ENTRY_NUM_CLUSTERS]
-        mov eax, ecx
-        push rdx
-        mul byte [BOOT_PARTITION_BASE_ADDRESS + 0xD]
-        pop rdx
-        mov rcx, rax
-        call AllocatePages
-        push rax
-        mov r15, rax
-        mov rbx, [rdx + BPT_ENTRY_CLUSTER_START]
-        ; File Size in cluster bytes
-        push rdx
-        mov eax, [rdx + BPT_ENTRY_NUM_CLUSTERS]
-        mov ecx, [BOOT_PARTITION_BASE_ADDRESS + 0xD]
-        and ecx, 0xFF
-        mul ecx
-        mov rcx, rax
-        shl rcx, 9
-        pop rdx
-        call ReadClusters
-        MOV RAX, 0XDEADBEEF
-        JMP $
-        jmp $
-        
-        pop rax
-        jmp .Exit
-.ContinueSearch:
-    dec ecx
-    add rdx, r8
-    jmp .loop
-.Exit:
-    pop rdx
-    ret
-.r10tolowercase:
-    add r10w, 0x20
-    jmp .R0
-.r13tolowercase:
-    add r13w, 0x20
-    jmp .R1
+; ; RBX = Cluster Start (Current Cluster), RSI = Buffer
+; ReadClusters:
+; push rax
+; push rcx
+; push rdx
+; push rdi
+; push rsi
+; push r8
+; push r9
+; push r10
+; push r11
+; push r12
 
 
+; mov r8, [LastClusterChainSector]
+; mov r11, [DataClustersStartLba]
+; mov r12, [BOOT_PARTITION_BASE_ADDRESS + 0xD] ; Cluster Size (in Sectors)
+; and r12, 0xFF
+; mov r13, r12
+; shl r13, 9 ; Multiply by 512
+; ; Read First Cluster
 
-; RBX = Cluster Start (Current Cluster), R15 = Buffer
-ReadClusters:
-push rax
-push rcx
-push rdx
-push rdi
-push rsi
-push r8
-push r9
-push r10
-push r11
-push r12
+; push rbx
+; ; Construct Physical Cluster Address
+; mov rax, rbx
+; mul r12
+; mov rbx, rax
+; add rbx, [DataClustersStartLba]
 
-
-mov r8, [LastClusterChainSector]
-mov r11, [DataClustersStartLba]
-mov r12, [BOOT_PARTITION_BASE_ADDRESS + 0xD] ; Cluster Size (in Sectors)
-and r12, 0xFF
-mov r13, r12
-shl r13, 9 ; Multiply by 512
-; Read First Cluster
-
-push rbx
-; Construct Physical Cluster Address
-mov rax, rbx
-mul r12
-mov rbx, rax
-add rbx, [DataClustersStartLba]
-
-mov rcx, r12 ; Cluster Size
-mov rdi, r15
-add r15, r13 ; Increment Buffer Pointer
-call DiskRead
-jmp $
-pop rbx
+; mov rcx, r12 ; Cluster Size
+; mov rdi, r15
+; add r15, r13 ; Increment Buffer Pointer
+; call DiskRead
+; jmp $
+; pop rbx
 
 
-.loop:
+; .loop:
 
-    mov r9, rbx
-    shr r9, 7
-    mov r10, rbx
-    and r10, 0x7F
-    shl r10, 2
-    cmp r8, r9
-    jne .ReadAllocationSector
-.R0:
-    push rax
-    mov rax, r9
-    call _tohex
-    mov di, HexBuffer
-    call _print64
-    mov di, NewLine
-    call _print64
-    pop rax
+;     mov r9, rbx
+;     shr r9, 7
+;     mov r10, rbx
+;     and r10, 0x7F
+;     shl r10, 2
+;     cmp r8, r9
+;     jne .ReadAllocationSector
+; .R0:
+;     push rax
+;     mov rax, r9
+;     call _tohex
+;     mov di, HexBuffer
+;     call _print64
+;     mov di, NewLine
+;     call _print64
+;     pop rax
 
-    lea rdx, [ClusterChainSector + r10]
-    mov edx, [rdx]
-    cmp edx, CLUSTER_END_OF_CHAIN
-    je .Exit
-    ; Otherwise read cluster
-    ; Construct Physical Cluster Address
-    push rdx ; RDX Used on mul instruction
-    mov rax, rdx
-    mul r12
-    pop rdx
-    mov rbx, rax
-    add rbx, r11
+;     lea rdx, [ClusterChainSector + r10]
+;     mov edx, [rdx]
+;     cmp edx, CLUSTER_END_OF_CHAIN
+;     je .Exit
+;     ; Otherwise read cluster
+;     ; Construct Physical Cluster Address
+;     push rdx ; RDX Used on mul instruction
+;     mov rax, rdx
+;     mul r12
+;     pop rdx
+;     mov rbx, rax
+;     add rbx, r11
 
-    mov rcx, r12 ; Cluster Size
-    mov rdi, r15
-    add r15, r13 ; Increment Buffer Pointer
-    call DiskRead
-    mov rbx, rdx
-    jmp .loop
+;     mov rcx, r12 ; Cluster Size
+;     mov rdi, r15
+;     add r15, r13 ; Increment Buffer Pointer
+;     call DiskRead
+;     mov rbx, rdx
+;     jmp .loop
 
-.ReadAllocationSector:
-    push rbx
-    mov rbx, [AllocationTableLba]
-    add rbx, r9
-    mov r8, r9
+; .ReadAllocationSector:
+;     push rbx
+;     mov rbx, [AllocationTableLba]
+;     add rbx, r9
+;     mov r8, r9
 
-    mov rcx, 1 ; 1 Sector
-    mov rdi, ClusterChainSector
+;     mov rcx, 1 ; 1 Sector
+;     mov rdi, ClusterChainSector
 
-    call DiskRead
-    pop rbx
-    jmp .R0
-.Exit:
+;     call DiskRead
+;     pop rbx
+;     jmp .R0
+; .Exit:
 
-    mov [LastClusterChainSector], r8
+;     mov [LastClusterChainSector], r8
 
-    pop r12
-    pop r11
-    pop r10
-    pop r9
-    pop r8
-    pop rsi
-    pop rdi
-    pop rdx
-    pop rcx
-    pop rax
-    ret
+;     pop r12
+;     pop r11
+;     pop r10
+;     pop r9
+;     pop r8
+;     pop rsi
+;     pop rdi
+;     pop rdx
+;     pop rcx
+;     pop rax
+;     ret
 
 
 
@@ -1007,85 +901,85 @@ _tohex:
 UnsufficientMemory db "Memory Allocation Failed, Please upgrade your RAM.", 13, 10, 0
 
 
-; RCX = num sectors, RDI = buffer, RBX = LBA
-DiskRead:
+; ; RCX = num sectors, RDI = buffer, RBX = LBA
+; DiskRead:
 
-    ; calculate full read count
-    push rax
-    push rbx
-    push rcx
-    push rdx
-    push rdi
-    push rsi
+;     ; calculate full read count
+;     push rax
+;     push rbx
+;     push rcx
+;     push rdx
+;     push rdi
+;     push rsi
 
-    mov rax, rcx
-    and rax, 7
-    shr rcx, 3 ; divide by 3
+;     mov rax, rcx
+;     and rax, 7
+;     shr rcx, 3 ; divide by 3
 
     
-    .loop:
-        test rcx, rcx
-        jz .exit1
-        ; do int 13
-        mov word [DiskLbaPacket.NumSectors + BOOT_PARTITION_BASE_ADDRESS], 8
-        mov [DiskLbaPacket.Lba + BOOT_PARTITION_BASE_ADDRESS], rbx
-        mov word [DiskLbaPacket.RealModeAddress + BOOT_PARTITION_BASE_ADDRESS], DiskTransferBuffer
-        push rcx
-        push rdi
-        push rbx
-        push rdi
+;     .loop:
+;         test rcx, rcx
+;         jz .exit1
+;         ; do int 13
+;         mov word [DiskLbaPacket.NumSectors + BOOT_PARTITION_BASE_ADDRESS], 8
+;         mov [DiskLbaPacket.Lba + BOOT_PARTITION_BASE_ADDRESS], rbx
+;         mov word [DiskLbaPacket.RealModeAddress + BOOT_PARTITION_BASE_ADDRESS], DiskTransferBuffer
+;         push rcx
+;         push rdi
+;         push rbx
+;         push rdi
         
-        CallRealMode64 Int13, .R0
-.R0:
-        ; Copy content into rdi
-        mov rcx, 0x200 ; 4 dword * 0x800 = 0x1000
-        mov rsi, DiskTransferBuffer
-        rep movsq
-        pop rdi
-        pop rbx
-        pop rdi
-        pop rcx
-        add rdi, 0x1000
-        add rbx, 8
-        dec rcx
-        jmp .loop
-    .exit1:
-    pop rax
-    test rax, rax
-    jz .NoMoreSectors
-    ; Setup packet
-    mov [DiskLbaPacket.NumSectors + BOOT_PARTITION_BASE_ADDRESS], ax
-    mov [DiskLbaPacket.Lba + BOOT_PARTITION_BASE_ADDRESS], rbx
+;         CallRealMode64 Int13, .R0
+; .R0:
+;         ; Copy content into rdi
+;         mov rcx, 0x200 ; 4 dword * 0x800 = 0x1000
+;         mov rsi, DiskTransferBuffer
+;         rep movsq
+;         pop rdi
+;         pop rbx
+;         pop rdi
+;         pop rcx
+;         add rdi, 0x1000
+;         add rbx, 8
+;         dec rcx
+;         jmp .loop
+;     .exit1:
+;     pop rax
+;     test rax, rax
+;     jz .NoMoreSectors
+;     ; Setup packet
+;     mov [DiskLbaPacket.NumSectors + BOOT_PARTITION_BASE_ADDRESS], ax
+;     mov [DiskLbaPacket.Lba + BOOT_PARTITION_BASE_ADDRESS], rbx
     
-    mov word [DiskLbaPacket.RealModeAddress + BOOT_PARTITION_BASE_ADDRESS], DiskTransferBuffer
-    CallRealMode64 Int13, .R1
+;     mov word [DiskLbaPacket.RealModeAddress + BOOT_PARTITION_BASE_ADDRESS], DiskTransferBuffer
+;     CallRealMode64 Int13, .R1
     
-.R1:
-    ; Copy content into edi
-    mov rcx, rax ; 4 dword * 0x800 = 0x1000
-    shl rcx, 9
-    mov rsi, DiskTransferBuffer
-    shr rcx, 3 ; Divide by 8
-    rep movsq
+; .R1:
+;     ; Copy content into edi
+;     mov rcx, rax ; 4 dword * 0x800 = 0x1000
+;     shl rcx, 9
+;     mov rsi, DiskTransferBuffer
+;     shr rcx, 3 ; Divide by 8
+;     rep movsq
 
-    .NoMoreSectors:
+;     .NoMoreSectors:
 
     
-    pop rsi
-    pop rdi
-    pop rdx
-    pop rcx
-    pop rbx
-    pop rax
-    ret
+;     pop rsi
+;     pop rdi
+;     pop rdx
+;     pop rcx
+;     pop rbx
+;     pop rax
+;     ret
 
-times 0x11000 - ($-$$) db 0
-ErrorHandler:
-    mov rax, 0xDEADCAFFE
-    xor rdi, rdi
-    mov di, StrCPUError
-    call _print64
-    jmp halt64
+; times 0x11000 - ($-$$) db 0
+; ErrorHandler:
+;     mov rax, 0xDEADCAFFE
+;     xor rdi, rdi
+;     mov di, StrCPUError
+;     call _print64
+;     jmp halt64
     
 
 

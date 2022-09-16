@@ -524,7 +524,7 @@ GDT:
         db 10010010b
         db 1000b << 4 ; Limit | Flags << 4
         db 0
-    .KernelStack32:
+    .KernelPhysicalMemoryAccessSegment:
         dw 0xffff
         dw 0
         db 0
@@ -664,22 +664,14 @@ RealModeEntry:
 
     jmp ReEnterProtectedMode
 
+[BITS 16]
 
 Int13:
     mov si, DiskLbaPacket
     mov ax, 0x4200
     mov dl, [BootDrive]
     int 0x13
-    cli
-    mov ax, 0x1FE0
-    mov ds, ax
-    xor ax, ax
-    mov ss, ax
-    mov es, ax
-    mov gs, ax
-    mov fs, ax
     jc .err
-
 
     ret
 .err:
@@ -688,7 +680,7 @@ Int13:
     and ebx, 0xffff
     and ecx, 0xffff
     mov edi, [DiskLbaPacket.Lba]
-    mov ax, 0xbbb
+    ; mov ax, 0xbbb
     jmp $
     mov di, HardDiskReadFailed
     call _print16
@@ -712,11 +704,12 @@ SetupSegmentsAndRet:
     mov ax, 0x10
     mov ds, ax
     mov es, ax
-    mov gs, ax
     mov fs, ax
 
     mov ax, 0x30
     mov ss, ax
+    mov gs, ax
+
     mov eax, [RealModeCallEaxSaved]
     jmp [RealModeReturn]
 
@@ -727,10 +720,11 @@ ProtectedModeEntry:
     mov ax, 0x10
     mov ds, ax
     mov es, ax
-    mov gs, ax
     mov fs, ax
+
     mov ax, 0x30
     mov ss, ax
+    mov gs, ax
 
     mov esp, stack_top
     mov ebp, esp
@@ -747,6 +741,204 @@ ProtectedModeEntry:
     jne .UnsupportedFSBootVersion
 
 
+    mov eax, [MemoryMap.Count]
+    mov ebx, MemoryMap.MemoryDescriptors
+
+
+    ; Load Kernel & Other files as well (R15 = Cluster Size)
+    mov dl, [0xD] ; Cluster Size of the partition
+    and edx, 0xFF ; Get lower bytes only
+
+    mov eax, [__BootPointerTable + BPTOFF_KERNEL_FILE_NUM_CLUSTERS]
+    mul edx ; Cluster Size
+    shl eax, 9 ; Multiply by 512
+    mov ecx, eax
+    shr ecx, 12 ; Divide by 12
+    inc ecx ; 1 Additionnal Page
+    call AllocatePages32
+    mov [__KernelBufferAddress], eax ; GS (Base 0) : Kernel Buffer Address
+    mov ebx, eax
+
+    mov eax, [__BootPointerTable + BPTOFF_ALLOCATION_TABLE_LBA]
+    mov [__AllocationTableLba], eax
+    mov eax, [__BootPointerTable + BPTOFF_DATA_CLUSTERS_LBA]
+    mov [__DataClustersStartLba], eax
+
+    call LoadPsf1Font
+
+
+    mov ebx, [__BootPointerTable + BPTOFF_KERNEL_CLUSTER_START]
+    mov eax, [__KernelBufferAddress]
+    call ReadClusters
+
+; Parsing Kernel File
+    mov eax, [__KernelBufferAddress]
+
+
+    cmp word [gs:eax], 'MZ'
+    jne .InvalidKernelImage
+    ; Get PE Header Offset
+    mov edx, [gs:eax + 0x3C]
+    add eax, edx
+    ; Check Kernel Image Header
+    cmp dword [gs:eax], 'PE' ; PE\0\0
+    jne .InvalidKernelImage
+
+    mov [__KernelPeHdrAddress], eax
+
+    cmp word [gs:eax + 4], 0x8664 ; Machine Type
+    jne .InvalidKernelImage
+
+    ; OPTIONNAL_HEADER
+    cmp word [gs:eax + 24], 0x20b ; PE32+ Magic
+    jne .InvalidKernelImage
+    cmp word [gs:eax + 0x5C], 1 ; Subsystem NATIVE
+    jne .InvalidKernelImage
+    mov dx, [gs:eax + 0x5E]
+    test dl, 0x40
+    jz .InvalidKernelImage ; Must have IMAGE_DYNAMIC_BASE
+    
+    mov dx, [gs:eax + 22]
+    test dl, 0x20 ; Must have LARGE_ADDRESS_AWARE
+    jz .InvalidKernelImage
+
+    ; Parse Sections
+    mov dx, [gs:eax + 6] ; Num Sections
+    mov [__KeImageNumSections], dx
+    xor edx, edx
+    mov dx, [gs:eax + 20]
+    lea eax, [eax + 24 + edx]
+    ; Get virtual buffer size
+    mov [__KeSectionTable], eax
+    mov edx, eax
+    xor ecx, ecx
+    mov cx, [__KeImageNumSections]
+
+    
+; PATTERN : Lx (Loop x), Rx (Return x), Jx (Jmp x) Ax (Alternative JMP x)
+; e.g. L1J2 (Loop 1 Jmp 2) L1R4 (Loop 1 Return 4)
+.L0: ; Loop 0
+    test cx, cx
+    jz .E0 ; Exit 0
+    ; test SECTION_CHARACTERISTICS
+
+    test dword [gs:edx + 36], 0x20 | 0x40 | 0x80 ; PE_SECTION_CODE | PE_SECTION_INITIALIZED_DATA | PE_SECTION_UNINITIALIZED_DATA
+    jz .L0R1
+
+    mov ebx, [gs:edx + 8] ; Virtual Size
+    cmp [gs:edx + 0x10], ebx ; Sizeof Raw Data
+    ja .L0J0
+.L0R0:
+    mov esi, [gs:edx + 0xC] ; Virtual Address
+    add ebx, esi
+    cmp [__VirtualBufferSize], ebx
+    jb .L0J1
+.L0R1:
+    dec cx
+    add edx, 40 ; Sizeof PE_SECTION_TABLE
+    jmp .L0
+.L0J0:
+    mov ebx, [gs:edx + 0x10]
+    mov [gs:edx + 8], ebx
+    jmp .L0R0
+.L0J1:
+    mov [__VirtualBufferSize], ebx
+
+    jmp .L0R1
+.E0:
+
+
+    add dword [__VirtualBufferSize], 0x20000 ; Padding
+
+    mov eax, [__VirtualBufferSize]
+    mov ecx, eax
+    shr ecx, 12
+    call AllocatePages32
+    mov [__ImageBase], eax
+
+    mov edx, [__KeSectionTable]
+    mov cx, [__KeImageNumSections]
+    
+
+    mov ebx, [__VirtualBufferSize]
+
+
+
+; Load Virtual Buffer
+
+.L1:
+    test cx, cx
+    jz .E1
+    ; test SECTION_CHARACTERISTICS
+    test dword [gs:edx + 36], 0x20 | 0x40 | 0x80 ; PE_SECTION_CODE | PE_SECTION_INITIALIZED_DATA | PE_SECTION_UNINITIALIZED_DATA
+    jz .L1J0
+    ; Copy Initialized Data
+    push ecx
+    mov esi, [gs:edx + 20]
+    add esi, [__KernelBufferAddress]
+    mov edi, [edx + 0xC] ; Destination
+    add edi, [ImageBase]
+    mov ecx, [edx + 0x10]
+    test ecx, 7 ; Test Alignment
+    jz .L1A0
+    add ecx, 8
+    and ecx, ~7
+.L1A0:
+
+    shr ecx, 3 ; Divide by 8
+    rep movsq
+;     ; Set Uninitialized data to 0
+    mov ecx, [gs:edx + 8] ; Virtual Size
+    sub ecx, [gs:edx + 0x10] ; Sizeof Raw Data
+    test ecx, 7
+    jz .L1A1
+    add ecx, 8 ; Align
+    and ecx, ~7
+.L1A1:
+    mov edi, [gs:edx + 0xC] ; Virtual Address
+    add edi, [__ImageBase]
+    mov esi, [rdx + 0x10]
+    add rdi, rsi
+    xor rax, rax
+    shr ecx, 3 ; Divide by 8
+    rep stosq ; Clear Data
+    
+    pop rcx
+
+; INITDATA & FIMPORT Must be valid (0x20|0x40|0x80) Data
+    ; NASM Uses DWORD String IMMEDIATE (MAX)
+    cmp dword [rdx], 'INIT'
+    jne .L1A2
+    cmp dword [rdx + 4], 'DATA'
+    jne .L1A2
+    mov edi, [rdx + 0xC]
+    add rdi, [ImageBase]
+    mov [InitData], rdi
+    jmp .L1J0 ; Skip FIMPORT Check
+.L1A2:
+    cmp dword [rdx], 'FIMP'
+    jne .L1J0
+    cmp dword [rdx + 4], 'ORT'
+    jne .L1J0
+    mov edi, [rdx + 0xC]
+    add rdi, [ImageBase]
+    mov [FileImportTable], rdi
+.L1J0:
+    dec cx
+    add rdx, 40
+    jmp .L1
+.E1:
+
+cmp qword [InitData], 0
+je .InvalidKernelImage
+cmp qword [FileImportTable], 0
+je .InvalidKernelImage
+
+
+
+    mov edx, 0xfafa
+    jmp $
+
 
     jmp EnterLongMode
     .halt:
@@ -760,7 +952,10 @@ ProtectedModeEntry:
     mov di, ERROR_UNSUPPORTED_FSBOOT_VERSION
     call _print
     jmp .halt
-
+.InvalidKernelImage:
+    mov di, StrInvalidKernelImage
+    call _print
+    jmp halt
 
 
 NewLine db 13, 10, 0
@@ -775,11 +970,126 @@ NewLine db 13, 10, 0
         hlt
         jmp .halt
 
+PathPsf1Font dw __utf16__("OS\Fonts\zap-light16.psf"), 0
+LenPathPsf1Font equ (($ - PathPsf1Font - 1) / 2)
+
+LoadPsf1Font:
+    mov ebx, PathPsf1Font
+    mov eax, LenPathPsf1Font
+
+
+    call LoadBootPointerFile
+    mov [__Psf1FontAddress], eax
+    ; Check Magic 0 & Magic 1
+    cmp byte [gs:eax], 0x36 ; PSF1_MAGIC0
+    jne FailedToLoadResources
+    cmp byte [gs:eax + 1], 0x04 ; PSF1_MAGIC1
+    jne FailedToLoadResources
+    ret ; Font Loaded Successfully
+
+
+FailedToLoadResources:
+    mov di, StrFailedToLoadResources
+    call _print
+
+    jmp halt
+
+LoadBootPointerFile:
+    push edx
+    mov edx, [__BootPointerTable + BPTOFF_ENTRIES_OFFSET]
+    add edx, __BootPointerTable
+    mov esi, [__BootPointerTable + BPTOFF_ENTRY_SIZE]
+    mov ecx, [__BootPointerTable + BPTOFF_NUM_ENTRIES]
+.loop:
+    test ecx, ecx
+    jz FailedToLoadResources
+    cmp [edx + BPT_ENTRY_PATH_LENGTH], ax
+    jne .ContinueSearch1
+    ; Cmp Str
+
+    push ecx
+    push edx
+    push ebx
+    lea ecx, [edx + BPT_ENTRY_PATH]
+    push dword 0; CMP_COUNT
+    .CmpLoop:
+        cmp [esp], eax
+        je .ValidPath
+        mov dx, [ecx]
+        mov di, [ebx]
+
+        ; Convert to lowercase if possible
+        cmp di, 'A'
+        jb .R0
+        cmp di, 'Z'
+        jbe .r10tolowercase
+        .R0:
+        cmp dx, 'A'
+        jb .R1
+        cmp dx, 'Z'
+        jbe .r13tolowercase
+        .R1:
+        cmp di, dx
+        jne .ContinueSearch ; Invalid Path
+        add ebx, 2
+        add ecx, 2
+        inc dword [esp] ; Index
+        jmp .CmpLoop
+    .ValidPath:
+        add esp, 0x8 ; No pop needed, registers will be replaced
+        pop edx
+        add esp, 4
+        mov ecx, [edx + BPT_ENTRY_NUM_CLUSTERS]
+        mov eax, ecx
+        push edx
+        mul byte [0xD] ; BOOT_PARTITION_BASE_ADDR + 0xD
+        pop edx
+        mov ecx, eax
+        call AllocatePages32
+        push eax
+        mov ebx, [edx + BPT_ENTRY_CLUSTER_START]
+        ; File Size in cluster bytes
+        push edx
+        mov eax, [edx + BPT_ENTRY_NUM_CLUSTERS]
+        mov ecx, [0xD]
+        and ecx, 0xFF
+        mul ecx
+        mov ecx, eax
+        shl ecx, 9
+        pop edx
+        pop eax
+        call ReadClusters
+        
+        pop edx
+        ret
+.ContinueSearch:
+    add esp, 4 ; POP Counter
+    pop ebx
+    pop edx
+    pop ecx
+    mov eax, 0xbbb
+    jmp $
+
+.ContinueSearch1:
+    dec ecx
+    add edx, esi
+    jmp .loop
+
+.r10tolowercase:
+    add di, 0x20
+    jmp .R0
+.r13tolowercase:
+    add dx, 0x20
+    jmp .R1
+
 
 
 halt:
     hlt
     jmp halt
+
+
+    
 ; Allocates Constant Pages that cannot be freed up
 ; ecx = Num Pages
 ; Return value : eax = Address
@@ -909,6 +1219,219 @@ __ClusterChainSector times 0x200 db 0
 ClusterChainSector equ __ClusterChainSector + BOOT_PARTITION_BASE_ADDRESS
 BOOT_MAJOR equ 1
 BOOT_MINOR equ 0
+
+
+[BITS 32]
+; EBX = Cluster Start (Current Cluster), EAX = Buffer
+ReadClusters:
+pusha
+
+
+mov edi, [0xD] ; Cluster Size (in Sectors)
+and edi, 0xFF
+mov esi, edi
+shl esi, 9 ; Multiply by 512
+; Read First Cluster
+
+push ebx
+; Construct Physical Cluster Address
+push eax
+mov eax, ebx
+mul edi
+mov ebx, eax
+pop eax
+add ebx, [__DataClustersStartLba]
+
+mov ecx, edi ; Cluster Size
+mov edi, eax
+call DiskRead
+add eax, esi ; Increment Buffer Pointer
+pop ebx
+
+mov ecx, [__LastClusterChainSector]
+
+.loop:
+
+    mov edx, ebx
+    shr ebx, 7
+    and edx, 0x7F
+    shl edx, 2
+    cmp ecx, ebx
+    jne .ReadAllocationSector
+.R0:
+
+
+    lea edx, [__ClusterChainSector + edx]
+    mov edx, [edx]
+    cmp edx, CLUSTER_END_OF_CHAIN
+    je .Exit
+
+;     ; Otherwise read cluster
+;     ; Construct Physical Cluster Address
+    push eax
+    push edx ; RDX Used on mul instruction
+
+    mov eax, edx
+    mov dl, [0xD]
+    and edx, 0xFF
+    mul edx
+    pop edx ; EAX = EDX * [CLUSTER_SIZE] = CLUSTER * CLUSTER_SIZE
+    
+    ; EBX = LBA_START
+    mov ebx, eax
+    pop eax
+    add ebx, [__DataClustersStartLba]
+    push ecx
+    mov cl, [0xD] ; Cluster Size
+    and ecx, 0xFF
+    mov edi, eax
+    call DiskRead
+    shl ecx, 9
+    add eax, ecx ; Increment Buffer Pointer
+    pop ecx
+    mov ebx, edx
+    jmp .loop
+
+.ReadAllocationSector:
+    push edx
+    push ebx
+    mov edx, [__AllocationTableLba]
+    add edx, ebx
+    mov ecx, ebx
+    mov ebx, edx
+    push ecx
+
+    mov ecx, 1 ; 1 Sector
+    mov edi, __ClusterChainSector + BOOT_PARTITION_BASE_ADDRESS
+    call DiskRead
+    pop ecx
+    pop ebx
+    pop edx
+    jmp .R0
+.Exit:
+
+    mov [__LastClusterChainSector], ecx
+
+    popa
+    ret
+
+
+; RCX = num sectors, RDI = buffer (Physical Address), RBX = LBA
+DiskRead:
+    ; calculate full read count
+    pusha
+    mov eax, ecx
+    and eax, 7
+    shr ecx, 3 ; divide by 3
+
+    
+    .loop:
+        test ecx, ecx
+        jz .exit1
+        ; do int 13
+        mov word [DiskLbaPacket.NumSectors], 8
+        mov [DiskLbaPacket.Lba], ebx
+        mov word [DiskLbaPacket.RealModeAddress], DiskTransferBuffer
+        push ecx
+        push edi
+        push ebx
+        
+        CallRealMode Int13, .R0
+.R0:
+        ; Copy content into rdi
+        mov ecx, 0x400 ; 4 dword * 0x800 = 0x1000
+        push ds
+        mov ax, 0x30
+        mov ds, ax
+        mov es, ax
+
+        mov esi, DiskTransferBuffer
+        mov edi, [esp + 4]
+        rep movsd ; EDI, ESI Incremented by 0x1000
+        pop ds
+        pop ebx
+        add esp, 4 ; EDI ALREADY POPPED
+        pop ecx
+        add ebx, 8
+        dec ecx
+        jmp .loop
+    .exit1:
+    test eax, eax
+    jz .NoMoreSectors
+    ; Setup packet
+
+    mov [DiskLbaPacket.NumSectors], ax
+    mov [DiskLbaPacket.Lba], ebx
+    
+    mov word [DiskLbaPacket.RealModeAddress], DiskTransferBuffer
+    
+    CallRealMode Int13, .R1
+    
+.R1:
+    ; Copy content into edi
+    mov ecx, eax ; 4 dword * 0x800 = 0x1000
+    shl ecx, 9 ; * 512 / 4 or << 9 >> 2
+    push ds
+    mov ax, 0x30
+    mov ds, ax
+    mov es, ax
+    mov esi, DiskTransferBuffer
+    shr ecx, 2 ; Divide by 8
+    ; EDI Already present
+    rep movsd
+    pop ds
+    .NoMoreSectors:
+
+    
+    popa
+    ret
+
+_tohex32:
+    ; Save registers
+    pusha
+
+    xor ecx, ecx ; size variable
+    mov edx, eax ; ValTmp  
+.SizeLoop:
+    inc ecx
+    shr edx, 4
+    test edx, edx
+    jz .ConvertNumber
+    jmp .SizeLoop
+.ConvertNumber:
+    xor edi, edi ; i = 0; i < size; i++
+    
+    lea esi, [HexBuffer - 1 + ecx] ; _Buffer += size - 1
+.ConvertLoop:
+    cmp edi, ecx
+    je .Exit
+    inc edi
+    
+    mov bl, al ; unsigned char c = _Value & 0xF
+    and bl, 0xF
+    cmp bl, 0xA
+    jb .ZeroPlusC ; _Buffer[size - (i + 1)] = '0' + c;
+    jmp .A_PlusC
+    .ConvertCharExit:
+    shr eax, 4
+    dec esi
+    jmp .ConvertLoop
+.ZeroPlusC:
+    add bl, '0'
+    mov [esi], bl
+    jmp .ConvertCharExit
+.A_PlusC:
+    sub bl, 0xA
+    add bl, 'A'
+    mov [esi], bl
+    jmp .ConvertCharExit
+.Exit:
+    lea esi, [HexBuffer + ecx]
+    mov byte [esi], 0 ; Ending Character /0
+
+    
+    popa
+    ret
 
 
 times BOOTMGR_SIZE - ($-$$) db 0
