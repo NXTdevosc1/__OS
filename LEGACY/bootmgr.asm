@@ -171,8 +171,6 @@ loader_start:
 
 
     call GetMemoryMap
-; 
-    ; call SetupVesaVBE
 
     jmp EnableProtectedMode
 
@@ -539,35 +537,27 @@ SetupVesaVBE:
  
     pusha
 
-    xor ax, ax
-    mov ds, ax
+    mov ax, 0x1FE0
     mov es, ax
 
     mov ax, 0x4F00
     mov di, VbeInfoBlock
-    push ds
-    push es
-    push gs
-    push fs
 
     int 0x10
 
-    pop fs
-    pop gs
-    pop es
-    pop ds
 
     cmp ax, 0x4F ; With Status = 0
     mov di, VesaVbeNotSupported
     jne SetFailureMessage
 
-    
+
+
     cmp dword [VbeInfoBlock.VbeSignature], 'VESA'
     jne SetFailureMessage
-    xor bx, bx
+    
     mov bx, [VbeInfoBlock.VideoModePtr]; Count for loop
     mov gs, [VbeInfoBlock.VideoModePtr + 2]
-    
+
     .loop:
         mov eax, 0x4F01
         mov cx, [gs:bx]
@@ -632,6 +622,7 @@ SetupVesaVBE:
 SetFailureMessage:
     call _print16
     .halt:
+    mov eax, 0xbeef
     cli
     hlt
     jmp .halt
@@ -680,7 +671,7 @@ Int13:
     and ebx, 0xffff
     and ecx, 0xffff
     mov edi, [DiskLbaPacket.Lba]
-    ; mov ax, 0xbbb
+    mov esi, 0xbbb
     jmp $
     mov di, HardDiskReadFailed
     call _print16
@@ -866,6 +857,9 @@ ProtectedModeEntry:
 
 ; Load Virtual Buffer
 
+mov ax, 0x30
+mov es, ax;  For rep stos
+
 .L1:
     test cx, cx
     jz .E1
@@ -876,17 +870,21 @@ ProtectedModeEntry:
     push ecx
     mov esi, [gs:edx + 20]
     add esi, [__KernelBufferAddress]
-    mov edi, [edx + 0xC] ; Destination
-    add edi, [ImageBase]
-    mov ecx, [edx + 0x10]
+    mov edi, [gs:edx + 0xC] ; Destination
+    add edi, [__ImageBase]
+    mov ecx, [gs:edx + 0x10]
     test ecx, 7 ; Test Alignment
     jz .L1A0
     add ecx, 8
     and ecx, ~7
 .L1A0:
+    mov ax, 0x30
+    mov ds, ax
+    shr ecx, 2 ; Divide by 4
+    rep movsd
+    mov ax, 0x10
+    mov ds, ax
 
-    shr ecx, 3 ; Divide by 8
-    rep movsq
 ;     ; Set Uninitialized data to 0
     mov ecx, [gs:edx + 8] ; Virtual Size
     sub ecx, [gs:edx + 0x10] ; Sizeof Raw Data
@@ -897,50 +895,83 @@ ProtectedModeEntry:
 .L1A1:
     mov edi, [gs:edx + 0xC] ; Virtual Address
     add edi, [__ImageBase]
-    mov esi, [rdx + 0x10]
-    add rdi, rsi
-    xor rax, rax
-    shr ecx, 3 ; Divide by 8
-    rep stosq ; Clear Data
+    mov esi, [gs:edx + 0x10]
+    add edi, esi
+    xor eax, eax
+    shr ecx, 2 ; Divide by 4
+    rep stosd ; Clear Data
     
-    pop rcx
+    pop ecx
 
 ; INITDATA & FIMPORT Must be valid (0x20|0x40|0x80) Data
     ; NASM Uses DWORD String IMMEDIATE (MAX)
-    cmp dword [rdx], 'INIT'
+    cmp dword [gs:edx], 'INIT'
     jne .L1A2
-    cmp dword [rdx + 4], 'DATA'
+    cmp dword [gs:edx + 4], 'DATA'
     jne .L1A2
-    mov edi, [rdx + 0xC]
-    add rdi, [ImageBase]
-    mov [InitData], rdi
+    mov edi, [gs:edx + 0xC]
+    add edi, [__ImageBase]
+    mov [__InitData], edi
     jmp .L1J0 ; Skip FIMPORT Check
 .L1A2:
-    cmp dword [rdx], 'FIMP'
+    cmp dword [gs:edx], 'FIMP'
     jne .L1J0
-    cmp dword [rdx + 4], 'ORT'
+    cmp dword [gs:edx + 4], 'ORT'
     jne .L1J0
-    mov edi, [rdx + 0xC]
-    add rdi, [ImageBase]
-    mov [FileImportTable], rdi
+    mov edi, [gs:edx + 0xC]
+    add edi, [__ImageBase]
+    mov [__FileImportTable], edi
 .L1J0:
     dec cx
-    add rdx, 40
+    add edx, 40
     jmp .L1
 .E1:
 
-cmp qword [InitData], 0
+cmp dword [__InitData], 0
 je .InvalidKernelImage
-cmp qword [FileImportTable], 0
+cmp dword [__FileImportTable], 0
 je .InvalidKernelImage
 
 
+    
+; Load File Import Table
 
-    mov edx, 0xfafa
-    jmp $
+mov esi, 0x14A ; Sizeof FILE_IMPORT_ENTRY
+mov ebx, [__FileImportTable]
 
 
-    jmp EnterLongMode
+.L3:
+    cmp dword [gs:ebx], 0 ; ENDOF_TABLE
+    je .E3
+
+    ; Calculate Len Path
+    lea edi, [ebx + 30]
+    xor eax, eax
+.L3L0:
+    cmp word [gs:edi], 0
+    je .L3E0
+    inc ax
+    add edi, 2
+    jmp .L3L0
+.L3E0:
+
+    ; Load Boot Pointer File : RBX = Path, AX = LenPath
+    push ebx
+    add ebx, 30 ; Path Offset
+    push esi
+    sub ebx, 0x1FE00 ; Bootloader base address (DS)
+    call LoadBootPointerFile
+    pop esi
+    pop ebx
+    mov [gs:ebx + 4], ecx ; Loaded File Size
+    mov [gs:ebx + 0xC], eax ; Loaded File Buffer
+
+    add ebx, esi
+    jmp .L3
+.E3:
+
+    CallRealMode SetupVesaVBE, EnterLongMode
+
     .halt:
     hlt
     jmp .halt
@@ -1067,8 +1098,6 @@ LoadBootPointerFile:
     pop ebx
     pop edx
     pop ecx
-    mov eax, 0xbbb
-    jmp $
 
 .ContinueSearch1:
     dec ecx
@@ -1205,6 +1234,11 @@ dq 0x200083
 dq 0x400083
 dq 0x600083
 dq 0x800083
+dq 0xA00083
+dq 0xC00083
+dq 0xE00083
+dq 0x1000083
+
 
 times 512 dq 0
 ; .Pt:

@@ -100,6 +100,7 @@ LPWSTR KernelProcessName = L"System Kernel.";
 
 extern void __declspec(noreturn) _start() {
 	__cli();
+	GP_clear_screen(0xFF);
 	while(1);
 	EnableExtendedStates();
 	SetupPageAttributeTable();

@@ -22,9 +22,6 @@ extern _start
 section .text
 	KrnlEntry:
 
-		mov rax, 0xbebe
-		jmp $
-
 		mov rsp, _KernelStackTop
 		mov rbp, rsp
 		pushfq

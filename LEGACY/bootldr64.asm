@@ -66,78 +66,7 @@ EnterLongMode:
 StrCpuidNotSupported db "The bootloader cannot continue, Processor does not support CPUID.", 13, 10, 0
 StrLongModeNotSupported db "The bootloader cannot continue, Long Mode (x64 A.K.A 64 BIT Mode) Not Supported.", 13, 10, 0
 
-
 [BITS 64]
-SavedRAX dq 0
-%macro CallRealMode64 2
-    mov [SavedRAX + BOOT_PARTITION_BASE_ADDRESS], rax
-    push 0x8
-    push %%protectedmode
-
-    retfq
-[BITS 32]
-%%protectedmode:
-
-    mov ax, 0x10
-    mov ds, ax
-    mov es, ax
-
-    
-    mov ax, 0x30
-    mov ss, ax
-    
-    
-    mov eax, 3
-    mov cr0, eax ; This will automatically disabled LME (And compatibility mode also)
-    
-    xor eax, eax
-    mov cr4, eax
-
-    
-    CallRealMode %1, %%tolongmode
-%%tolongmode:
-; Active PAE & Page Global (PGE)
-    
-    mov eax, PageTable + BOOT_PARTITION_BASE_ADDRESS
-    mov cr3, eax
-
-    mov eax, (1 << 5) | (1 << 7)
-    mov cr4, eax
-
-    push ecx
-    push edx
-    ; Activate Long Mode
-    mov ecx, 0xC0000080 ; EFER_MSR
-    rdmsr
-    or eax, 1 << 8 ; Set LME (Long Mode Enable) bit
-    wrmsr
-    pop edx
-    pop ecx
-    mov eax, 3 | (1 << 31) ; Set PE | MP | PG Bits
-    mov cr0, eax
-
-    lidt [IDTR64 + BOOT_PARTITION_BASE_ADDRESS]
-
-    
-    jmp 0x20:%%exit + BOOT_PARTITION_BASE_ADDRESS
-
-[BITS 64]
-%%exit:
-
-mov ax, 0x28
-mov ds, ax
-mov ss, ax
-mov es, ax
-
-mov rax, [SavedRAX + BOOT_PARTITION_BASE_ADDRESS]
-jmp %2
-%endmacro
-
-
-_print64:
-    CallRealMode64 _print16, .r
-    .r:
-    ret
 
 LongModeEntry:
     mov ax, 0x28
@@ -152,239 +81,46 @@ LongModeEntry:
     push rax
     popf
 
-    ; mov rax, [MemoryMap.Count + BOOT_PARTITION_BASE_ADDRESS]
-    ; mov rbx, MemoryMap.MemoryDescriptors + BOOT_PARTITION_BASE_ADDRESS
-
-    ; ; Reset unaccessible registers in Real Mode
-
-    ; .loop:
-    ;     test rax, rax
-    ;     jz .end0
-
-    ;     mov dl, [rbx]
+    mov rax, [MemoryMap.Count + BOOT_PARTITION_BASE_ADDRESS]
+    mov rbx, MemoryMap.MemoryDescriptors + BOOT_PARTITION_BASE_ADDRESS
+    ; Reset unaccessible registers in Real Mode
+    .loop:
+        test rax, rax
+        jz .end0
+        mov dl, [rbx]
         
-
-    ;     cmp dl, 1 ; Conventionnal Memory
-    ;     jne .Skip0
-    ;     push rbx
-    ;     mov rdx, rbx
-    ;     mov rbx, [rdx + 9]
-    ;     mov rcx, [rdx + 1]
-    ;     call IdentityMapPages
-    ;     pop rbx
-    ;     .Skip0:
-
-    ;     add rbx, SIZE_KERNEL_MEMORY_MAP
-    ;     dec rax
-    ;     jmp .loop
-
-    ; .end0:
-
-    ; ; Load Kernel & Other files as well (R15 = Cluster Size)
-    ; mov r15, [BOOT_PARTITION_BASE_ADDRESS + 13] ; Cluster Size of the partition
-    ; and r15, 0xFF ; Get lower bytes only
-
-    ; mov eax, [BootPointerTable + BPTOFF_KERNEL_FILE_NUM_CLUSTERS]
-    ; mul r15 ; Cluster Size
-    ; shl rax, 9 ; Multiply by 512
-    ; mov rcx, rax
-    ; shr rcx, 12 ; Divide by 12
-    ; inc rcx ; 1 Additionnal Page
-
-    
-    ; call AllocatePages
-    ; mov [KernelBufferAddress], rax
-    ; mov rbx, rax
+        cmp dl, 1 ; Conventionnal Memory
+        jne .Skip0
+        push rbx
+        mov rdx, rbx
+        mov rbx, [rdx + 9]
+        mov rcx, [rdx + 1]
+        call IdentityMapPages
+        pop rbx
+        .Skip0:
+        add rbx, SIZE_KERNEL_MEMORY_MAP
+        dec rax
+        jmp .loop
+    .end0:
 
 
-    
-    ; RBX = Cluster Start (Current Cluster), R15 = Buffer
-    ; mov rax, [BootPointerTable + BPTOFF_ALLOCATION_TABLE_LBA]
-    ; mov [AllocationTableLba], rax
-    ; mov rax, [BootPointerTable + BPTOFF_DATA_CLUSTERS_LBA]
-    ; mov [DataClustersStartLba], rax
-    
-    ; call LoadPsf1Font
 
-
-    ; mov rbx, [BootPointerTable + BPTOFF_KERNEL_CLUSTER_START]
-
-
-    ; mov r15, [KernelBufferAddress]
-    ; call ReadClusters
-
-; ; Parsing Kernel File
-;     mov rax, [KernelBufferAddress]
-;     cmp word [rax], 'MZ'
-;     jne .InvalidKernelImage
-;     ; Get PE Header Offset
-;     mov edx, [rax + 0x3C]
-;     add rax, rdx
-;     ; Check Kernel Image Header
-;     cmp dword [rax], 'PE' ; PE\0\0
-;     jne .InvalidKernelImage
-
-;     mov [KernelPeHdrAddress], rax
-
-;     cmp word [rax + 4], 0x8664 ; Machine Type
-;     jne .InvalidKernelImage
-
-;     ; OPTIONNAL_HEADER
-;     cmp word [rax + 24], 0x20b ; PE32+ Magic
-;     jne .InvalidKernelImage
-
-;     cmp word [rax + 0x5C], 1 ; Subsystem NATIVE
-;     jne .InvalidKernelImage
-;     mov dx, [rax + 0x5E]
-;     test dl, 0x40
-;     jz .InvalidKernelImage ; Must have IMAGE_DYNAMIC_BASE
-    
-;     mov dx, [rax + 22]
-;     test dl, 0x20 ; Must have LARGE_ADDRESS_AWARE
-;     jz .InvalidKernelImage
-
-;     ; Parse Sections
-;     mov dx, [rax + 6] ; Num Sections
-;     mov [KeImageNumSections], dx
-;     xor rdx, rdx
-;     mov dx, [rax + 20]
-;     lea rax, [rax + 24 + rdx]
-;     ; Get virtual buffer size
-;     mov [KeSectionTable], rax
-;     mov rdx, rax
-;     xor rcx, rcx
-;     mov cx, [KeImageNumSections]
-
-    
-
-; ; PATTERN : Lx (Loop x), Rx (Return x), Jx (Jmp x) Ax (Alternative JMP x)
-; ; e.g. L1J2 (Loop 1 Jmp 2) L1R4 (Loop 1 Return 4)
-; .L0: ; Loop 0
-;     test cx, cx
-;     jz .E0 ; Exit 0
-;     ; test SECTION_CHARACTERISTICS
-
-;     test dword [rdx + 36], 0x20 | 0x40 | 0x80 ; PE_SECTION_CODE | PE_SECTION_INITIALIZED_DATA | PE_SECTION_UNINITIALIZED_DATA
-;     jz .L0R1
-
-;     mov ebx, [rdx + 8] ; Virtual Size
-;     cmp [rdx + 0x10], ebx ; Sizeof Raw Data
-;     ja .L0J0
-; .L0R0:
-;     mov r8d, [rdx + 0xC] ; Virtual Address
-;     add rbx, r8
-;     cmp [VirtualBufferSize], rbx
-;     jb .L0J1
-; .L0R1:
-;     dec cx
-;     add rdx, 40 ; Sizeof PE_SECTION_TABLE
-;     jmp .L0
-; .L0J0:
-;     mov ebx, [rdx + 0x10]
-;     mov [rdx + 8], ebx
-;     jmp .L0R0
-; .L0J1:
-;     mov [VirtualBufferSize], rbx
-
-;     jmp .L0R1
-; .E0:
-
-    ; add qword [VirtualBufferSize], 0x20000 ; Padding
-
-    ; mov rax, [VirtualBufferSize]
-    ; mov rcx, rax
-    ; shr rcx, 12
-    ; call AllocatePages
-    ; mov [ImageBase], rax
-
-    ; mov rdx, [KeSectionTable]
-    ; mov cx, [KeImageNumSections]
-
-; ; Load Virtual Buffer
-
-; .L1:
-;     test cx, cx
-;     jz .E1
-;     ; test SECTION_CHARACTERISTICS
-;     test dword [rdx + 36], 0x20 | 0x40 | 0x80 ; PE_SECTION_CODE | PE_SECTION_INITIALIZED_DATA | PE_SECTION_UNINITIALIZED_DATA
-;     jz .L1J0
-;     ; Copy Initialized Data
-;     push rcx
-;     mov esi, [rdx + 20]
-;     add rsi, [KernelBufferAddress]
-;     mov edi, [rdx + 0xC] ; Destination
-;     add rdi, [ImageBase]
-;     mov ecx, [rdx + 0x10]
-;     test ecx, 7 ; Test Alignment
-;     jz .L1A0
-;     add rcx, 8
-;     and ecx, ~7
-; .L1A0:
-
-;     shr ecx, 3 ; Divide by 8
-;     rep movsq
-; ;     ; Set Uninitialized data to 0
-;     mov ecx, [rdx + 8] ; Virtual Size
-;     sub ecx, [rdx + 0x10] ; Sizeof Raw Data
-;     test ecx, 7
-;     jz .L1A1
-;     add rcx, 8 ; Align
-;     and ecx, ~7
-; .L1A1:
-;     mov edi, [rdx + 0xC] ; Virtual Address
-;     add rdi, [ImageBase]
-;     mov esi, [rdx + 0x10]
-;     add rdi, rsi
-;     xor rax, rax
-;     shr ecx, 3 ; Divide by 8
-;     rep stosq ; Clear Data
-    
-;     pop rcx
-
-; ; INITDATA & FIMPORT Must be valid (0x20|0x40|0x80) Data
-;     ; NASM Uses DWORD String IMMEDIATE (MAX)
-;     cmp dword [rdx], 'INIT'
-;     jne .L1A2
-;     cmp dword [rdx + 4], 'DATA'
-;     jne .L1A2
-;     mov edi, [rdx + 0xC]
-;     add rdi, [ImageBase]
-;     mov [InitData], rdi
-;     jmp .L1J0 ; Skip FIMPORT Check
-; .L1A2:
-;     cmp dword [rdx], 'FIMP'
-;     jne .L1J0
-;     cmp dword [rdx + 4], 'ORT'
-;     jne .L1J0
-;     mov edi, [rdx + 0xC]
-;     add rdi, [ImageBase]
-;     mov [FileImportTable], rdi
-; .L1J0:
-;     dec cx
-;     add rdx, 40
-;     jmp .L1
-; .E1:
-
-; cmp qword [InitData], 0
-; je .InvalidKernelImage
-; cmp qword [FileImportTable], 0
-; je .InvalidKernelImage
-    
 ; Relocate Kernel Image
 
 mov rax, [KernelPeHdrAddress]
 add rax, 176 ; Base Relocation Table
 
+    
+; Relocate Kernel Image
+mov rax, [KernelPeHdrAddress]
+add rax, 176 ; Base Relocation Table
 ; StartBlock
 mov ebx, [rax]
 add rbx, [ImageBase]
-
 ; EndSection
 mov ecx, [rax + 4]
 add rcx, rbx
-
 xor r9, r9 ; Keep high 32 bits clear
-
 ; Get PE_IMAGE_BASE
 mov r15, [KernelPeHdrAddress]
 mov r15, [r15 + 48] ; Image Base
@@ -393,7 +129,6 @@ mov r15, [r15 + 48] ; Image Base
     cmp rbx, rcx
     jae .E2
 	; if (!RelocationBlock->PageRva || !RelocationBlock->BlockSize) break;
-
     cmp dword [rbx], 0
     je .E2
     cmp dword [rbx + 4], 0
@@ -407,13 +142,13 @@ mov r15, [r15 + 48] ; Image Base
     
     lea rdx, [rbx + 8] ; Relocation Entries Start
     ; R8 = Num Entries (Decrement)
+
 .L2L1:
     test r8d, r8d
     jz .L2E0
     mov r9w, [rdx]
     ; Compare Type
     mov r10w, r9w
-
     shr r10w, 12 ; Get Type
     cmp r10w, 10 ; IMAGE_REL_BASED_DIR64
     jne .L2L1A0
@@ -434,75 +169,36 @@ mov r15, [r15 + 48] ; Image Base
     add rdx, 2
     dec r8d
     jmp .L2L1
-
 .L2E0:
     mov edx, [rbx + 4]
     add rbx, rdx
     jmp .L2
 .E2:
 
-; Load File Import Table
-
-mov r8, 0x14A ; Sizeof FILE_IMPORT_ENTRY
-mov rbx, [FileImportTable]
-
-
-.L3:
-    cmp dword [rbx], 0 ; ENDOF_TABLE
-    je .E3
-
-    ; Calculate Len Path
-    lea rdi, [rbx + 30]
-    xor rax, rax
-.L3L0:
-    cmp word [rdi], 0
-    je .L3E0
-    inc ax
-    add rdi, 2
-    jmp .L3L0
-.L3E0:
-
-    ; Load Boot Pointer File : RBX = Path, AX = LenPath
-    push rbx
-    add rbx, 30 ; Path Offset
-    push r8
-    call LoadBootPointerFile
-    pop r8
-    pop rbx
-    mov [rbx + 4], rcx ; Loaded File Size
-    mov [rbx + 0xC], rax ; Loaded File Buffer
-
-    add rbx, r8
-    jmp .L3
-.E3:
-
-; Initialize VESA/VBE
-; CallRealMode64 SetupVesaVBE, .E4
-
-.E4:
-
 ; Setup Frame Buffer Descriptor
-    mov ax, [VbeModeInfo.Width]
-    mov [FrameBufferDescriptor + 4], ax ; Horizontal Resolution
-    mov ax, [VbeModeInfo.Height]
-    mov [FrameBufferDescriptor + 8], ax ; Vertical Resolution
-    mov dword [FrameBufferDescriptor + 0xC], 0x10000 ; Version
-    mov eax, [VbeModeInfo.FrameBufferAddress]
-    mov ecx, [VbeModeInfo.OffsetScreenMemory]
+    mov ax, [VbeModeInfo.Width + BOOT_PARTITION_BASE_ADDRESS]
+    
+    mov [FrameBufferDescriptor + BOOT_PARTITION_BASE_ADDRESS + 4], ax ; Horizontal Resolution
+    mov ax, [VbeModeInfo.Height + BOOT_PARTITION_BASE_ADDRESS]
+    mov [FrameBufferDescriptor + BOOT_PARTITION_BASE_ADDRESS + 8], ax ; Vertical Resolution
+    mov dword [FrameBufferDescriptor + BOOT_PARTITION_BASE_ADDRESS + 0xC], 0x10000 ; Version
+    mov eax, [VbeModeInfo.FrameBufferAddress + BOOT_PARTITION_BASE_ADDRESS]
+    mov ecx, [VbeModeInfo.OffsetScreenMemory + BOOT_PARTITION_BASE_ADDRESS]
     add rax, rcx
-    mov [FrameBufferDescriptor + 0x10], rax ; FrameBufferBase
+    mov [FrameBufferDescriptor + BOOT_PARTITION_BASE_ADDRESS + 0x10], rax ; FrameBufferBase
     ; Frame Buffer Size
+
     xor rax, rax
-    mov ax, [VbeModeInfo.Pitch]
-    mov ecx, [FrameBufferDescriptor + 8]
-    mov [FrameBufferDescriptor + 48], rax ; Pitch
+    mov ax, [VbeModeInfo.Pitch + BOOT_PARTITION_BASE_ADDRESS]
+    mov ecx, [FrameBufferDescriptor + BOOT_PARTITION_BASE_ADDRESS + 8]
+    mov [FrameBufferDescriptor + BOOT_PARTITION_BASE_ADDRESS + 48], rax ; Pitch
     mul rcx
-    mov [FrameBufferDescriptor + 0x18], rax ; FrameBufferSize
+    mov [FrameBufferDescriptor + BOOT_PARTITION_BASE_ADDRESS + 0x18], rax ; FrameBufferSize
     
     ; Color Depth, Refresh Rate
-    mov ax, [VbeModeInfo.BitsPerPixel]
-    mov [FrameBufferDescriptor + 0x20], ax
-    mov dword [FrameBufferDescriptor + 0x24], 60 ; 60 FPS (Assumming)
+    mov ax, [VbeModeInfo.BitsPerPixel + BOOT_PARTITION_BASE_ADDRESS]
+    mov [FrameBufferDescriptor + BOOT_PARTITION_BASE_ADDRESS + 0x20], ax
+    mov dword [FrameBufferDescriptor + BOOT_PARTITION_BASE_ADDRESS + 0x24], 60 ; 60 FPS (Assumming)
 
 
 
@@ -516,9 +212,9 @@ xor rax, rax
 rep stosq
 
 mov rax, [InitData]
-mov qword [rax], MemoryMap
+mov qword [rax], MemoryMap + BOOT_PARTITION_BASE_ADDRESS
 mov qword [rax + 8], 1 ; NumFrameBuffer
-mov qword [rax + 0x10], FrameBufferDescriptor
+mov qword [rax + 0x10], FrameBufferDescriptor + BOOT_PARTITION_BASE_ADDRESS
 mov rbx, [Psf1FontAddress]
 mov [rax + 0x18], rbx ; StartFont
 mov rbx, [ImageBase]
@@ -541,13 +237,12 @@ add rax, [ImageBase]
 
 
 ; Map Frame Buffer (Temporary for testing)
-mov rbx, [FrameBufferDescriptor + 0x10] ; FB Base
-mov rcx, [FrameBufferDescriptor + 0x18] ; FB Size
+mov rbx, [FrameBufferDescriptor + BOOT_PARTITION_BASE_ADDRESS + 0x10] ; FB Base
+mov rcx, [FrameBufferDescriptor + BOOT_PARTITION_BASE_ADDRESS + 0x18] ; FB Size
 shr rcx, 12 ; Divide by 0x1000
 inc rcx ; Padding
 
 call IdentityMapPages
-
 
 
 wbinvd
@@ -559,10 +254,6 @@ jmp rax
     cli
     hlt
     jmp .R0
-.InvalidKernelImage:
-    mov di, StrInvalidKernelImage
-    call _print64
-    jmp halt64
 
 StrInvalidKernelImage db "Invalid Kernel Image, please re-install your Operating System.", 13, 10, 0
 
@@ -576,117 +267,6 @@ FrameBufferDescriptor:
 
 
 StrFailedToLoadResources db "Failed to load resources. Please re-install your Operating System.", 13, 10, 0
-
-; RBX = Path, AX = LenPath
-; FUNCTION : RDX = ADDRESS OF CURRENT ENTRY, R8 = ENTRY_SIZE, RCX = REMAINING_ENTRIES
-; RAX = Return Address, RCX = File Size (Num Cluster * Cluster Size)
-
-
-
-; ; RBX = Cluster Start (Current Cluster), RSI = Buffer
-; ReadClusters:
-; push rax
-; push rcx
-; push rdx
-; push rdi
-; push rsi
-; push r8
-; push r9
-; push r10
-; push r11
-; push r12
-
-
-; mov r8, [LastClusterChainSector]
-; mov r11, [DataClustersStartLba]
-; mov r12, [BOOT_PARTITION_BASE_ADDRESS + 0xD] ; Cluster Size (in Sectors)
-; and r12, 0xFF
-; mov r13, r12
-; shl r13, 9 ; Multiply by 512
-; ; Read First Cluster
-
-; push rbx
-; ; Construct Physical Cluster Address
-; mov rax, rbx
-; mul r12
-; mov rbx, rax
-; add rbx, [DataClustersStartLba]
-
-; mov rcx, r12 ; Cluster Size
-; mov rdi, r15
-; add r15, r13 ; Increment Buffer Pointer
-; call DiskRead
-; jmp $
-; pop rbx
-
-
-; .loop:
-
-;     mov r9, rbx
-;     shr r9, 7
-;     mov r10, rbx
-;     and r10, 0x7F
-;     shl r10, 2
-;     cmp r8, r9
-;     jne .ReadAllocationSector
-; .R0:
-;     push rax
-;     mov rax, r9
-;     call _tohex
-;     mov di, HexBuffer
-;     call _print64
-;     mov di, NewLine
-;     call _print64
-;     pop rax
-
-;     lea rdx, [ClusterChainSector + r10]
-;     mov edx, [rdx]
-;     cmp edx, CLUSTER_END_OF_CHAIN
-;     je .Exit
-;     ; Otherwise read cluster
-;     ; Construct Physical Cluster Address
-;     push rdx ; RDX Used on mul instruction
-;     mov rax, rdx
-;     mul r12
-;     pop rdx
-;     mov rbx, rax
-;     add rbx, r11
-
-;     mov rcx, r12 ; Cluster Size
-;     mov rdi, r15
-;     add r15, r13 ; Increment Buffer Pointer
-;     call DiskRead
-;     mov rbx, rdx
-;     jmp .loop
-
-; .ReadAllocationSector:
-;     push rbx
-;     mov rbx, [AllocationTableLba]
-;     add rbx, r9
-;     mov r8, r9
-
-;     mov rcx, 1 ; 1 Sector
-;     mov rdi, ClusterChainSector
-
-;     call DiskRead
-;     pop rbx
-;     jmp .R0
-; .Exit:
-
-;     mov [LastClusterChainSector], r8
-
-;     pop r12
-;     pop r11
-;     pop r10
-;     pop r9
-;     pop r8
-;     pop rsi
-;     pop rdi
-;     pop rdx
-;     pop rcx
-;     pop rax
-;     ret
-
 
 
 ; rbx = Physical Address
@@ -817,7 +397,7 @@ AllocatePages:
     mov rax, [rbx + 9]
     sub [rbx + 1], rcx
     shl rcx, 12
-    add [BootLoaderMemory + BOOT_PARTITION_BASE_ADDRESS], rcx
+    add [BootLoaderMemory], rcx
     add [rbx + 9], rcx
     jmp .Exit ; Return Address
     .ContinueSearch:
@@ -829,13 +409,14 @@ AllocatePages:
     pop rcx
     pop rdx
     pop rbx
+
     ret ; Return rax
 .err:
-    mov di, UnsufficientMemory
-    call _print64
+    mov rcx, 1
     jmp halt64
 
 halt64:
+    mov rax, 0xdeadcafe
     hlt
     jmp halt64
 _tohex:
@@ -901,87 +482,6 @@ _tohex:
 UnsufficientMemory db "Memory Allocation Failed, Please upgrade your RAM.", 13, 10, 0
 
 
-; ; RCX = num sectors, RDI = buffer, RBX = LBA
-; DiskRead:
-
-;     ; calculate full read count
-;     push rax
-;     push rbx
-;     push rcx
-;     push rdx
-;     push rdi
-;     push rsi
-
-;     mov rax, rcx
-;     and rax, 7
-;     shr rcx, 3 ; divide by 3
-
-    
-;     .loop:
-;         test rcx, rcx
-;         jz .exit1
-;         ; do int 13
-;         mov word [DiskLbaPacket.NumSectors + BOOT_PARTITION_BASE_ADDRESS], 8
-;         mov [DiskLbaPacket.Lba + BOOT_PARTITION_BASE_ADDRESS], rbx
-;         mov word [DiskLbaPacket.RealModeAddress + BOOT_PARTITION_BASE_ADDRESS], DiskTransferBuffer
-;         push rcx
-;         push rdi
-;         push rbx
-;         push rdi
-        
-;         CallRealMode64 Int13, .R0
-; .R0:
-;         ; Copy content into rdi
-;         mov rcx, 0x200 ; 4 dword * 0x800 = 0x1000
-;         mov rsi, DiskTransferBuffer
-;         rep movsq
-;         pop rdi
-;         pop rbx
-;         pop rdi
-;         pop rcx
-;         add rdi, 0x1000
-;         add rbx, 8
-;         dec rcx
-;         jmp .loop
-;     .exit1:
-;     pop rax
-;     test rax, rax
-;     jz .NoMoreSectors
-;     ; Setup packet
-;     mov [DiskLbaPacket.NumSectors + BOOT_PARTITION_BASE_ADDRESS], ax
-;     mov [DiskLbaPacket.Lba + BOOT_PARTITION_BASE_ADDRESS], rbx
-    
-;     mov word [DiskLbaPacket.RealModeAddress + BOOT_PARTITION_BASE_ADDRESS], DiskTransferBuffer
-;     CallRealMode64 Int13, .R1
-    
-; .R1:
-;     ; Copy content into edi
-;     mov rcx, rax ; 4 dword * 0x800 = 0x1000
-;     shl rcx, 9
-;     mov rsi, DiskTransferBuffer
-;     shr rcx, 3 ; Divide by 8
-;     rep movsq
-
-;     .NoMoreSectors:
-
-    
-;     pop rsi
-;     pop rdi
-;     pop rdx
-;     pop rcx
-;     pop rbx
-;     pop rax
-;     ret
-
-; times 0x11000 - ($-$$) db 0
-; ErrorHandler:
-;     mov rax, 0xDEADCAFFE
-;     xor rdi, rdi
-;     mov di, StrCPUError
-;     call _print64
-;     jmp halt64
-    
-
 
 align 0x10
 IDT64:
@@ -998,8 +498,8 @@ IDT64_END:
 
 align 0x10
 IDTR64:
-    dw IDT64_END - IDT64 - 1
-    dq IDT64 + BOOT_PARTITION_BASE_ADDRESS
+    dw 0
+    dq 0
 
 
 ; RBX = Cluster Start (Current Cluster), R15 = Buffer
