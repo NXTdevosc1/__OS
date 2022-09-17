@@ -1,5 +1,6 @@
 #pragma once
-// #include <immintrin.h>
+#include <intrin.h>
+#include <immintrin.h>
 #include <stdint.h>
 
 typedef struct _CPU_MANAGEMENT_TABLE CPU_MANAGEMENT_TABLE;
@@ -172,7 +173,7 @@ void CpuSetupManagementTable(UINT64 CpuCount);
 extern void SMP_TRAMPOLINE();
 extern uint64_t SMP_TRAMPOLINE_END;
 
-extern void EnableExtendedStates();
+void EnableCpuFeatures();
 
 extern double __sqrt(double val);
 

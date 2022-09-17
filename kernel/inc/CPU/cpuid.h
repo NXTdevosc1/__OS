@@ -39,7 +39,7 @@ void __cpuid(CPUID_INFO* CpuInfo, int FunctionId);
 #define CPUID1_ECX_AVX (1 << 28)
 #define CPUID1_ECX_F16C (1 << 29)
 #define CPUID1_ECX_RDRAND (1 << 30)
-
+#define CPUID1_ECX_HYPERVISOR_PRESENT (1 << 31) // Always 0 on physical cpus
 // CPUID [EAX = 1] EDX:
 
 #define CPUID1_EDX_FPU 1

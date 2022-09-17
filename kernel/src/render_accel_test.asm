@@ -3,7 +3,7 @@
 section .text
 
 global _SSE_ComputeBezier
-
+global _AVX_ComputeBezier
 ; r8 = k, < RDX
 ; r11 = i, < R9
 ; R10 = RCX = Beta
@@ -111,4 +111,51 @@ _SSE_ComputeBezierW:
 .Exit:
     movaps xmm0, [rcx]
     cvtsd2si rax, xmm0
+    ret
+
+; r8 = k, < RDX
+; r11 = i, < R9
+; R10 = RCX = Beta
+; YMM1 = 1 - percent
+; YMM2 = Percent
+
+; (float* beta:RCX, UINT NumCordinates:EDX, float percent:XMM2);
+; Computing definitions are present in _SSE_ComputeBezier
+_AVX_ComputeBezier:
+    mov r8, 1
+    mov r9, rdx
+    
+    cvtsi2ss xmm1, r8
+    subss xmm1, xmm2
+    sub rsp, 8
+    movq [rsp], xmm1
+    vbroadcastss ymm1, [rsp]
+    sub rsp, 8
+    movups [rsp], xmm2
+    vbroadcastss ymm2, [rsp]
+    add rsp, 0x10 ; Pop stack
+.loop0:
+    cmp r8, rdx
+    je .Exit
+    inc r8
+    dec r9
+    xor r11, r11
+    mov r10, rcx
+    .loop1:
+        cmp r11, r9
+        jae .loop0
+        vmovaps ymm0, ymm1
+        vmovups ymm3, [r10]
+        vmulps ymm0, ymm3
+        vmovaps ymm3, ymm2
+        vmovups ymm4, [r10 + 4]
+        vmulps ymm3, ymm4
+        vaddps ymm0, ymm3
+        vmovups [r10], ymm0
+        add r10, 0x20
+        add r11, 8
+        jmp .loop1
+.Exit:
+    movups xmm0, [rcx]
+    cvtss2si rax, xmm0
     ret

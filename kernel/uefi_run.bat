@@ -1,1 +1,1 @@
-qemu-system-x86_64 -accel hax -cpu SandyBridge-v2 -device usb-ehci -device usb-kbd -device usb-mouse -smp 1,sockets=1,cores=1,threads=1 -cpu max -m 4G -vga vmware -no-reboot -no-shutdown  -monitor stdio -drive file=../LEGACY/os.img,format=raw -drive if=pflash,format=raw,unit=0,file=OVMF.fd,readonly=on
+qemu-system-x86_64 -device usb-ehci -device usb-kbd -device usb-mouse -smp 1,sockets=1,cores=1,threads=1 -cpu max -m 4G -vga vmware -no-reboot -no-shutdown  -monitor stdio -drive file=../LEGACY/os.img,format=raw -drive if=pflash,format=raw,unit=0,file=OVMF.fd,readonly=on

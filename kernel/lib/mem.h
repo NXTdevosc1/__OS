@@ -6,7 +6,10 @@
 #include <krnltypes.h>
 
 extern void __fastcall _SSE_Memset(LPVOID Address, UINT64 Value, UINT64 Count);
+extern void __fastcall _SSE_MemsetUnaligned(LPVOID Address, UINT64 Value, UINT64 Count);
+
 extern void __fastcall _AVX_Memset(LPVOID Address, UINT64 Value, UINT64 Count);
+extern void __fastcall _AVX_MemsetUnaligned(LPVOID Address, UINT64 Value, UINT64 Count);
 
 LPVOID (__fastcall *memset)(LPVOID ptr, uint8_t value, size_t size);
 LPVOID __fastcall _Wrap_SSE_Memset(LPVOID ptr, UINT64 value, size_t size);
@@ -16,6 +19,7 @@ LPVOID __fastcall _r8_SSE_Memset(LPVOID ptr, uint8_t value, size_t size);
 LPVOID __fastcall _r8_AVX_Memset(LPVOID ptr, uint8_t value, size_t size);
 
 void (__fastcall *_SIMD_Memset)(LPVOID ptr, UINT64 Value, UINT64 Count);
+
 
 void memset16(LPVOID ptr, uint16_t value, size_t size);
 void memset32(LPVOID ptr, uint32_t value, size_t size);

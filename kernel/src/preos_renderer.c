@@ -17,8 +17,8 @@ extern inline void GP_set_pixel(unsigned int x, unsigned int y, unsigned int col
 	
 }
 void GP_draw_rect(unsigned short x, unsigned short y, unsigned short width, unsigned short height,unsigned int background_color){
-	unsigned short yheight = y;
-	for(unsigned short i = 0;i<height;i++, yheight++){
+	UINT64 yheight = y;
+	for(UINT64 i = 0;i<height;i++, yheight++){
 		memset32((void*)(InitData.fb->FrameBufferBase + (x << 2) + (yheight * (InitData.fb->HorizontalResolution * 4))), background_color, width);
         /*for(unsigned long long b = x;b<=x+width;b++){
             *(uint32_t*)((uint64_t*)(InitData.fb->FrameBufferBase+(b*4)+(InitData.fb->HorizontalResolutiom * 4*a))) = background_color;
@@ -102,16 +102,28 @@ void GP_sf_put_char(const char ch, unsigned int color, unsigned int x, unsigned 
 	}
 }
 
-extern inline void _SSE_BezierCopyCords(double* dest, double* src, UINT8 NumCords);
-extern inline UINT64 _SSE_ComputeBezier(float* beta, UINT NumCordinates, float percent);
-extern inline UINT64 GetBezierPoint(float* cordinates, float* beta, UINT8 NumCordinates, float percent){
-	memcpy(beta, cordinates, NumCordinates * sizeof(float));
-	// for(register UINT k = 1;k < NumCordinates;k++) {
+
+// Vectorized function of :
+/*
+// for(register UINT k = 1;k < NumCordinates;k++) {
 	// 	for(register UINT i = 0;i<NumCordinates - k;i++) {
 	// 		beta[i] = (1 - percent) * beta[i] + percent * beta[i + 1];
 	// 	}
 	// }
-	return _SSE_ComputeBezier(beta, NumCordinates, percent);
+
+// in eather SSE, AVX or AVX512
+// the performance increase by the extension level
+*/
+extern UINT64 __fastcall _SSE_ComputeBezier(float* beta, UINT NumCordinates, float percent);
+extern UINT64 __fastcall _AVX_ComputeBezier(float* beta, UINT NumCordinates, float percent);
+UINT64 __fastcall GetBezierPoint(float* cordinates, float* beta, UINT8 NumCordinates, float percent){
+	memcpy(beta, cordinates, NumCordinates << 2);
+	if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
+		return _SSE_ComputeBezier(beta, NumCordinates, percent);
+	} else if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
+		return _AVX_ComputeBezier(beta, NumCordinates, percent);
+	}
+	return 0;
 	// _SSE_BezierCopyCords(beta, cordinates, NumCordinates);
 	// return _SSE_ComputeBezier(beta, NumCordinates, percent);
 }
@@ -163,7 +175,6 @@ void LineTo(INT64 x0, INT64 y0, INT64 x1, INT64 y1, UINT32 Color) {
 
 	for(;;) {
 		GP_set_pixel(x0, y0, Color);
-		for(UINT b = 0;b<0x10000;b++);
 		if(x0 == x1 && y0 == y1) break;
 		double e2 = 2 * error;
 		if(e2 >= dy) {

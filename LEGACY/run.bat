@@ -13,4 +13,4 @@ nasm -O0 partbootsect.asm -f bin -o x86_64/partbootsect.bin
 copy "..\drivers\fat32\dll\fat32.dll" fat32.dll
 imgsetupnoadmin fstest
 
-qemu-system-x86_64 -accel hax -cpu SandyBridge-v2 -m 2G -smp 1,cores=1,threads=1 -machine q35 -monitor stdio -drive file=os.img,format=raw -device qemu-xhci -device usb-kbd
+qemu-system-x86_64 -accel hax -cpu max,xsave=on,avx=on,vmx=off,avx2=on,avx512f=on,avx512dq=on -m 2G -smp 1,cores=1,threads=1 -machine q35 -monitor stdio -drive file=os.img,format=raw -device qemu-xhci -device usb-kbd

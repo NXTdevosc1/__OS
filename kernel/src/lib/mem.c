@@ -7,42 +7,40 @@
 void (__fastcall *_SIMD_Memset)(LPVOID ptr, UINT64 Value, UINT64 Count) = _SSE_Memset;
 
 LPVOID __fastcall _Wrap_SSE_Memset(LPVOID ptr, UINT64 value, size_t size){
-    __repstos(ptr, value, size);
-    return NULL;
     if(size < 0x10) {
         __repstos(ptr, value, size);
+        
         return NULL;
-    }
-    if((UINT64)ptr & 0xF) {
-        __repstos(ptr, value, 0x10 - ((UINT64)ptr & 0xF));
-        size-= 0x10 - ((UINT64)ptr & 0xF);
-        (UINT64)ptr += 0x10;
-        (UINT64)ptr &= ~0x10;
     }
     if(size & 0xF) {
         __repstos(ptr, value, size & 0xF);
+        (char*)ptr += (size & 0xF);
         size-= 0x10 - ((UINT64)size & 0xF);
     }
-    _SSE_Memset(ptr, value, size);
+    if((UINT64)ptr & 0xF) {
+        _SSE_MemsetUnaligned(ptr, value, size);
+    } else {
+        _SSE_Memset(ptr, value, size);
+    }
     return NULL;
 }
+
 
 LPVOID __fastcall _Wrap_AVX_Memset(LPVOID ptr, UINT64 value, size_t size) {
     if(size < 0x20) {
         __repstos(ptr, value, size);
         return NULL;
     }
-    if((UINT64)ptr & 0xF) {
-        __repstos(ptr, value, 0x10 - ((UINT64)ptr & 0xF));
-        size-= 0x10 - ((UINT64)ptr & 0xF);
-        (UINT64)ptr += 0x10;
-        (UINT64)ptr &= ~0x10;
-    }
     if(size & 0x1F) {
         __repstos(ptr, value, size & 0x1F);
         (char*)ptr += (size & 0x1F);
+        size -= 0x20 - (size & 0x1F);
     }
-    _AVX_Memset(ptr, value, size);
+    if((UINT64)ptr & 0x1F) {
+        _AVX_MemsetUnaligned(ptr, value, size);
+    } else {
+        _AVX_Memset(ptr, value, size);
+    }
     
     return NULL;
 }

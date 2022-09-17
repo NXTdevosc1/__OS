@@ -78,12 +78,13 @@ __SyncBitmapAllocate:
 _SSE_Memset:
 	movq xmm0, rdx
 	movlhps xmm0, xmm0
+	shr r8, 4
 .loop:
 	test r8, r8
 	jz .Exit
 	movdqa [rcx], xmm0
 	add rcx, 0x10
-	sub r8, 0x10
+	dec r8
 	jmp .loop
 .Exit:
 	ret
@@ -103,16 +104,15 @@ _SSE_Memcopy:
 _AVX_Memset:
 
 	push rdx
-	push rdx
-	vmovdqu ymm0, [rsp]
-	pop rdx
-	pop rdx
+	vbroadcastsd ymm0, [rsp]
+	add rsp, 8
+	shr r8, 5 ; Divide by 32
 .loop:
 	test r8, r8
 	jz .Exit
 	vmovdqa [rcx], ymm0
 	add rcx, 0x20
-	sub r8, 0x20
+	dec r8
 	jmp .loop
 .Exit:
 	ret

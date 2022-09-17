@@ -161,7 +161,7 @@ void KeInitOptimizedComputing() {
 		memset = _r8_SSE_Memset;
 	} else if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
 		_SIMD_Memset = _AVX_Memset;
-		// memset = _r8_AVX_Memset;
+		memset = _r8_AVX_Memset;
 	} else if(ExtensionLevel & EXTENSION_LEVEL_AVX512) {
 
 	}

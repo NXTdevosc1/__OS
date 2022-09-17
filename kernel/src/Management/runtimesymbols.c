@@ -55,6 +55,7 @@ KERNELSTATUS KERNELAPI SystemDebugPrint(LPWSTR Format, ...){
     
     UINT   StackOff = 0;
     UINT8   FormatIndex = 0;
+
     // Calculate Result Length
     ZeroMemory(_DEBUGPRINT_FORMATTED, 0x100);
     for(UINT8 i = 0;i< Len;){
@@ -131,6 +132,8 @@ KERNELSTATUS KERNELAPI SystemDebugPrint(LPWSTR Format, ...){
             i++;
         }
     }
+
+
 
     // Format string
 

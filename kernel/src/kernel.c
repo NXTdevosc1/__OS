@@ -96,30 +96,20 @@ void th() {
 LPWSTR KernelProcessName = L"System Kernel.";
 
 
-
+char* ExtensionLevelStr[2] = {"SSE", "AVX"};
 
 extern void __declspec(noreturn) _start() {
 	__cli();
 	GP_clear_screen(0xFF);
-	while(1);
-	EnableExtendedStates();
+	EnableCpuFeatures();
+	if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
+		GP_draw_sf_text("Extension level : AVX", 0xFFFFFF, 20, 20);
+	} else {
+		GP_draw_sf_text("Extension level : SSE", 0xFFFFFF, 20, 20);
+	}
+	// while(1) __hlt();
 	SetupPageAttributeTable();
 	Pmgrt.NumProcessors = 1;
-	CPUID_INFO CpuIdInfo = {0};
-	__cpuid(&CpuIdInfo, 1);
-	if(CpuIdInfo.ecx & CPUID1_ECX_AVX) {
-		ExtensionLevel = EXTENSION_LEVEL_AVX;
-	}
-	__cpuid(&CpuIdInfo, 0x0D);
-	if(CpuIdInfo.eax & (1 << 6)) {
-		ExtensionLevel = EXTENSION_LEVEL_AVX512;
-		if(CpuIdInfo.eax & (1 << 7)) {
-			ExtensionLevel |= EXTENSION_LEVEL_HI16_ZMM;
-		}
-		if(CpuIdInfo.eax & (1 << 5)) {
-			ExtensionLevel |= EXTENSION_LEVEL_OPMASK;
-		}
-	}
 	kproc = KeCreateProcess(NULL, NULL, SUBSYSTEM_NATIVE, KERNELMODE_PROCESS);
 	if(!kproc) SET_SOD_INITIALIZATION;
 
@@ -131,6 +121,7 @@ extern void __declspec(noreturn) _start() {
 	// GP_draw_sf_text(to_hstring64((UINT64)AllocatePoolEx(kproc, 0x500, 0x1500, ALLOCATE_POOL_PHYSICAL)), 0, 400, 60);
 	
 	UINT64 Bitmap = 0x180;
+	__SyncBitmapAllocate(&Bitmap);
 	SystemDebugPrint(L"INDX : %x, BMP : %x", __SyncBitmapAllocate(&Bitmap), Bitmap);
 
 	
@@ -151,7 +142,7 @@ extern void __declspec(noreturn) _start() {
 	GP_clear_screen(0);
 
 	SystemDebugPrint(L"Starting...");
-	for(UINT c = 0;c<0x1000;c++) { 
+	for(UINT c = 0;c<0x10000;c++) { 
 	UINT64 LastX = XOff;
 	UINT64 LastY = YOff;
 
@@ -172,12 +163,7 @@ extern void __declspec(noreturn) _start() {
 	}
 	}
 	SystemDebugPrint(L"All done");
-	__cpuid(&CpuIdInfo, 1);
-	if(CpuIdInfo.edx & (1 << 16)) {
-		SystemDebugPrint(L"Page Attribute Table Supported");
-	} else {
-		SystemDebugPrint(L"Page Attribute Table Unsupported");
-	}
+
 	SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 1, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
 	SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 0x10, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
 	SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 1, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
@@ -188,7 +174,8 @@ extern void __declspec(noreturn) _start() {
 	// Initialize Kernel Page tables
 	KernelPagingInitialize();
 
-	while(1) __hlt();
+	
+
 
 	// if (!InitializeRuntimeSymbols()) SET_SOD_INITIALIZATION;
 
@@ -236,6 +223,50 @@ extern void __declspec(noreturn) _start() {
 	SIMD_InitOptimizedMemoryManagement();
 
 
+	QemuWriteSerialMessage("OSKRNLX64.exe : Allocating I/O Memory for Frame Buffer");
+	// AllocateIoMemory(0x1000, 10, 0);
+	InitData.fb->FrameBufferBase = AllocateIoMemory(InitData.fb->FrameBufferBase, (InitData.fb->FrameBufferSize >> 12) + 1, IO_MEMORY_WRITE_COMBINE);
+	QemuWriteSerialMessage("Allocated I/O Memory :");
+	QemuWriteSerialMessage(to_hstring64((UINT64)InitData.fb->FrameBufferBase));
+	
+
+	// GP_clear_screen(0xFF);
+
+	GP_draw_sf_text("EXT_LEVEL :", 0xFFFFFF, 20, 220);
+	if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
+		GP_draw_sf_text("SSE", 0xFFFFFF, 20, 240);
+	} else if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
+		GP_draw_sf_text("AVX", 0xFFFFFF, 20, 240);
+	}
+	CPUID_INFO CpuId = {0};
+	__cpuid(&CpuId, 1);
+	if(CpuId.ecx & CPUID1_ECX_HYPERVISOR_PRESENT) {
+		GP_draw_sf_text("Code running inside Hyper-Visor", 0xffffff, 20, 260);
+	}
+
+
+
+	// for(UINT64 i = 0;i<0xFFFFF00;i++);
+	// for(;;) {
+	// 	for(UINT64 x = 0;x<4;x++) {
+	// 		UINT64 f = 0;
+	// 		if(x) f = 0xff << (x - 1);
+	// 		for(UINT64 i = 0;i<0xff;i++) {
+	// 		GP_clear_screen((i << 0) | f);
+	// 		}
+			
+	// 		for(UINT64 i = 0;i<0xff;i++) {
+	// 			GP_clear_screen((i << 8) | f);
+	// 		}
+			
+	// 		for(UINT64 i = 0;i<0xff;i++) {
+	// 			GP_clear_screen((i << 16) | f);
+	// 		}
+	// 	}
+		
+	// }
+	
+	while(1) __hlt();
 	// Unmap KernelRelocate
 	// Setup I/O Memory process & thread
 	
@@ -257,34 +288,7 @@ extern void __declspec(noreturn) _start() {
 
 	// Map physical address of the frame buffer to the Kernel Space
 	
-	QemuWriteSerialMessage("OSKRNLX64.exe : Allocating I/O Memory for Frame Buffer");
-	// AllocateIoMemory(0x1000, 10, 0);
-	InitData.fb->FrameBufferBase = AllocateIoMemory(InitData.fb->FrameBufferBase, (InitData.fb->FrameBufferSize >> 12) + 1, IO_MEMORY_WRITE_COMBINE);
-	QemuWriteSerialMessage("Allocated I/O Memory :");
-	QemuWriteSerialMessage(to_hstring64((UINT64)InitData.fb->FrameBufferBase));
-	GP_clear_screen(0xFF);
-
-	char* ExtensionLevelStr[2] = {"SSE", "AVX"};
-	SystemDebugPrint(L"EXT_LEVEL : %s", ExtensionLevelStr[ExtensionLevel]);
-	for(UINT64 i = 0;i<0xFFFFF00;i++);
-	for(;;) {
-		for(UINT64 x = 0;x<4;x++) {
-			UINT64 f = 0;
-			if(x) f = 0xff << (x - 1);
-			for(UINT64 i = 0;i<0xff;i++) {
-			GP_clear_screen((i << 0) | f);
-			}
-			
-			for(UINT64 i = 0;i<0xff;i++) {
-				GP_clear_screen((i << 8) | f);
-			}
-			
-			for(UINT64 i = 0;i<0xff;i++) {
-				GP_clear_screen((i << 16) | f);
-			}
-		}
-		
-	}
+	
 	while(1);
 	LineTo(500, 200, 600, 200, 0xFF0000);
 	LineTo(600, 200, 540, 240, 0xFF0000);

@@ -134,7 +134,7 @@ void DeclareCpuHalt() {
 __declspec(align(0x1000)) USER_SYSTEM_CONFIG GlobalUserSystemConfig = { 0 };
 
 extern void SetupCPU() {
-	EnableExtendedStates();
+	EnableCpuFeatures();
 	UINT32 ProcessorId = GetCurrentProcessorId();
 	InitProcessorDescriptors(&CpuManagementTable[ProcessorId]->CpuBuffer, &CpuManagementTable[ProcessorId]->CpuBufferSize);
 	EnableApic();
