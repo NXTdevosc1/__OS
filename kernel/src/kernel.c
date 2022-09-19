@@ -116,10 +116,6 @@ extern void __declspec(noreturn) _start() {
 
 	InitMemoryManagementSubsystem();
 	// GP_clear_screen(0);
-	// GP_draw_sf_text(to_hstring64((UINT64)AllocatePool(0x500)), 0, 400, 20);
-	// GP_draw_sf_text(to_hstring64((UINT64)AllocatePool(0x20)), 0, 400, 40);
-	// GP_draw_sf_text(to_hstring64((UINT64)AllocatePoolEx(kproc, 0x500, 0x1500, ALLOCATE_POOL_PHYSICAL)), 0, 400, 60);
-	
 	UINT64 Bitmap = 0x180;
 	__SyncBitmapAllocate(&Bitmap);
 	SystemDebugPrint(L"INDX : %x, BMP : %x", __SyncBitmapAllocate(&Bitmap), Bitmap);
@@ -142,6 +138,12 @@ extern void __declspec(noreturn) _start() {
 	GP_clear_screen(0);
 
 	SystemDebugPrint(L"Starting...");
+	
+	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
+	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
+	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x1000));
+	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
+
 	for(UINT c = 0;c<0x10000;c++) { 
 	UINT64 LastX = XOff;
 	UINT64 LastY = YOff;
@@ -238,11 +240,22 @@ extern void __declspec(noreturn) _start() {
 	} else if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
 		GP_draw_sf_text("AVX", 0xFFFFFF, 20, 240);
 	}
+
 	CPUID_INFO CpuId = {0};
 	__cpuid(&CpuId, 1);
 	if(CpuId.ecx & CPUID1_ECX_HYPERVISOR_PRESENT) {
 		GP_draw_sf_text("Code running inside Hyper-Visor", 0xffffff, 20, 260);
 	}
+	__cpuidex(&CpuId, 7, 0);
+	if(CpuId.ebx & (1 << CPUID7_0_EBX_AVX2)) {
+		GP_draw_sf_text("AVX2", 0xFFFFFF, 20, 280);
+	}
+	if(CpuId.ebx & (1 << CPUID7_0_EBX_AVX512F)) {
+		GP_draw_sf_text("AVX512", 0xFFFFFF, 20, 300);
+	}
+	
+
+
 
 
 

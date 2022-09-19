@@ -4,6 +4,8 @@ section .text
 
 global _SSE_ComputeBezier
 global _AVX_ComputeBezier
+
+global _SSE_ComputeBezierW
 ; r8 = k, < RDX
 ; r11 = i, < R9
 ; R10 = RCX = Beta
@@ -79,6 +81,7 @@ _SSE_ComputeBezierW:
 
     movlhps xmm1, xmm1
     movlhps xmm2, xmm2
+    jmp $
 .loop0:
     cmp r8, rdx
     je .Exit
