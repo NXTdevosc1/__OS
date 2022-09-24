@@ -3,6 +3,8 @@
 section .text
 global _AVX_MemsetUnaligned
 
+global _SSE_MemcpyUnaligned
+
 ; RCX = Address, RDX = Value, R8 = Count (In Bytes)
 _AVX_MemsetUnaligned:
     push rdx
@@ -34,3 +36,10 @@ _SSE_MemsetUnaligned:
     jmp .loop
 .Exit:
     ret
+
+; RCX = Dest, RDX = SRC, R8 = Count
+_SSE_MemcpyUnaligned:
+    shr r8, 4 ; Divide by 16
+.loop:
+    test r8, r8
+    ; jz .

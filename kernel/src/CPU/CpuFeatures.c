@@ -24,7 +24,7 @@ void EnableCpuFeatures() {
         }
     } else {
         if(CpuId.ecx & CPUID1_ECX_AVX) {
-		        GP_draw_sf_text("AVX Supported without OSXSAVE !", 0xFFFFFF, 20, 40);
+		        GP_draw_sf_text("AVX Supported without OSXSAVE :(", 0xFFFFFF, 20, 40);
             // ExtensionLevel = EXTENSION_LEVEL_AVX;
         }
     }

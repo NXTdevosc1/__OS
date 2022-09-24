@@ -5,7 +5,7 @@
 // All Addresses must be aligned (0x10) Boundary
 
 void (__fastcall *_SIMD_Memset)(LPVOID ptr, UINT64 Value, UINT64 Count) = _SSE_Memset;
-
+LPVOID (*memset)(LPVOID ptr, UINT8 value, size_t size) = _r8_SSE_Memset;
 LPVOID __fastcall _Wrap_SSE_Memset(LPVOID ptr, UINT64 value, size_t size){
     if(size < 0x10) {
         __repstos(ptr, value, size);
@@ -59,7 +59,7 @@ LPVOID __fastcall _r8_AVX_Memset(LPVOID ptr, uint8_t value, size_t size) {
     return _Wrap_AVX_Memset(ptr, CombinedValue, size);
 }
 
-LPVOID (__fastcall *memset)(LPVOID ptr, uint8_t value, size_t size) = _r8_SSE_Memset;
+// LPVOID (__fastcall *memset)(LPVOID ptr, uint8_t value, size_t size) = _r8_SSE_Memset;
 
 LPVOID (__fastcall *MemSetArray[3]) (LPVOID ptr, UINT64 value, size_t size) = {
     _Wrap_SSE_Memset, _Wrap_AVX_Memset, NULL
@@ -73,7 +73,7 @@ void memset16(LPVOID ptr, uint16_t value, size_t size){
 }
 void memset32(LPVOID ptr, uint32_t value, size_t size){
     UINT64 CombinedValue = (UINT64)value | ((UINT64)value << 32);
-    MemSetArray[ExtensionLevel & 3](ptr, CombinedValue, size);
+    MemSetArray[ExtensionLevel & 3](ptr, CombinedValue, size << 2);
 }
 
 void memset64(LPVOID ptr, uint64_t value, size_t size){
@@ -84,6 +84,7 @@ void memset64(LPVOID ptr, uint64_t value, size_t size){
 }  
 
 LPVOID memcpy(LPVOID dest, LPCVOID src, size_t size){
+    // while(1); // memcpy does not get called with maximum optimizations (even when intrinsics are disabled)
     if (!(size % 8)) {
         memcpy64(dest, src, size >> 3);
     }

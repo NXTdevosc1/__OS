@@ -9,8 +9,8 @@ BOOL _PageFilePresent = 0;
 
 __declspec(align(0x1000)) MEMORY_MANAGEMENT_TABLE MemoryManagementTable = {0};
 
-#define DECLARE_USED_MEMORY(NumBytes) {MemoryManagementTable.UsedMemory += (NumBytes); MemoryManagementTable.AvailableMemory -= (NumBytes);}
-#define DECLARE_FREE_MEMORY(NumBytes) {MemoryManagementTable.UsedMemory -= (NumBytes); MemoryManagementTable.AvailableMemory += (NumBytes);}
+#define DECLARE_USED_MEMORY(NumBytes) MemoryManagementTable.UsedPhysicalMemory += NumBytes;
+#define DECLARE_FREE_MEMORY(NumBytes) MemoryManagementTable.UsedPhysicalMemory -= NumBytes;
 
 // Maps BIOS Map to EFI Memory Map Types
 char LegacyBiosMemoryMapToEfiMapping[8] = {
@@ -24,19 +24,6 @@ char LegacyBiosMemoryMapToEfiMapping[8] = {
     EfiUnusableMemory, // Persistent Memory
 };
 
-// SSE Variants
-extern RFMEMORY_SEGMENT _SSE_FetchMemoryCacheLine(MEMORY_BLOCK_CACHE_LINE* CacheLine);
-extern LPVOID __fastcall _SSE_AllocatePhysicalPage(char* PageBitmap, UINT64 BitmapSize, PAGE* PageArray);
-// AVX Variants
-extern RFMEMORY_SEGMENT _AVX_FetchMemoryCacheLine(MEMORY_BLOCK_CACHE_LINE* CacheLine);
-// AVX512 Variants
-extern RFMEMORY_SEGMENT _AVX512_FetchMemoryCacheLine(MEMORY_BLOCK_CACHE_LINE* CacheLine);
-
-// SIMD Function List
-RFMEMORY_SEGMENT (*_SIMD_FetchMemoryCacheLine)(MEMORY_BLOCK_CACHE_LINE* CacheLine) = _SSE_FetchMemoryCacheLine;
-RFMEMORY_SEGMENT (*_SIMD_FetchUnusedSegmentsUncached)(MEMORY_SEGMENT_LIST_HEAD* ListHead) = NULL;
-LPVOID (__fastcall *_SIMD_AllocatePhysicalPage) (char* PageBitmap, UINT64 BitmapSize, PAGE* PageArray) = _SSE_AllocatePhysicalPage;
-// ---------------------------
 
 
 
@@ -63,11 +50,10 @@ void InitMemoryManagementSubsystem() {
                 Memory->PageCount--;
             }
             MemoryManagementTable.PageArraySize+=Memory->PageCount;
-            MemoryManagementTable.AvailableMemory += (Memory->PageCount << 12);
+            MemoryManagementTable.PhysicalMemory += (Memory->PageCount << 12);
         }
     }
-    if(MemoryManagementTable.AvailableMemory < 0x40000000) SOD(0, "Unsufficient Memory"); // Memory Must be >= 1GB
-
+    if(MemoryManagementTable.PhysicalMemory < 0x40000000) SOD(0, "Unsufficient Memory"); // Memory Must be >= 1GB
     UINT64 NumPages = ((sizeof(PAGE) * MemoryManagementTable.PageArraySize) >> 12) + 1;
     UINT64 BitmapOffset = NumPages << 12;
     NumPages += (((MemoryManagementTable.PageArraySize + 1) >> 3) >> 12) + 10; // Bitmap
@@ -117,8 +103,7 @@ void SIMD_InitOptimizedMemoryManagement() {
     MemoryManagementTable.PageBitmap = AllocateIoMemory(MemoryManagementTable.PageBitmap, ALIGN_VALUE(MemoryManagementTable.NumBytesPageBitmap, 0x1000) >> 12, 0);
 
     // if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
-        _SIMD_FetchMemoryCacheLine = _SSE_FetchMemoryCacheLine;
-        _SIMD_AllocatePhysicalPage = _SSE_AllocatePhysicalPage;
+
     // }
     // else if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
     //     _SIMD_FetchMemoryCacheLine = _AVX_FetchMemoryCacheLine;

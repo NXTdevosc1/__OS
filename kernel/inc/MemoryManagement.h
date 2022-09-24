@@ -30,9 +30,9 @@ typedef struct _PROCESS_CONTROL_BLOCK *RFPROCESS;
 
 typedef union _PAGE {
     struct {
-        UINT64 Allocated : 1;
-        UINT64 DiskSwappingAllowed : 1;
-        UINT64 CompressingAllowed : 1;
+        UINT64 Allocated : 1; // If the page is allocated to an address space
+        UINT64 PresentInDisk : 1;
+        UINT64 Compressed : 1;
         UINT64 Reserved : 9;
         UINT64 PhysicalPageNumber : 52;
     } PageStruct;
@@ -40,16 +40,16 @@ typedef union _PAGE {
 } PAGE;
 
 typedef struct _PAGE_ALLOCATION_TABLE PAGE_ALLOCATION_TABLE;
+typedef struct _MEMORY_SEGMENT MEMORY_SEGMENT, *RFMEMORY_SEGMENT;
 
 #define PAGE_ALLOCATION_TABLE_ENTRY_COUNT 0x40
 
-typedef union _VIRTUAL_MEMORY_PAGE {
-    struct {
-        UINT64 Present : 1;
-        UINT64 Unallocated : 1; // If present && Unallocate then AllocatePages
-        UINT64 PagePtr : 62; // Reference to the 8-Byte aligned PAGE Structure
-    } Details;
-    UINT64 VirtualMemoryDescriptor;    
+typedef struct _VIRTUAL_MEMORY_PAGE {
+    UINT64 DiskPagingAllowed : 1;
+    UINT64 CompressionAllowed : 1;
+    UINT64 PagePtr : 62; // Reference to the 8-Byte aligned PAGE Structure
+    MEMORY_SEGMENT* FirstHeap;
+    MEMORY_SEGMENT* LastHeap;
 } VIRTUAL_MEMORY_PAGE;
 
 typedef struct _PAGE_ALLOCATION_TABLE {
@@ -58,18 +58,9 @@ typedef struct _PAGE_ALLOCATION_TABLE {
     PAGE_ALLOCATION_TABLE* Next;
 } PAGE_ALLOCATION_TABLE;
 
-extern PAGE* PageArray;
-
-typedef struct _MEMORY_SEGMENT MEMORY_SEGMENT, *RFMEMORY_SEGMENT;
 
 #define MEMORY_BLOCK_CACHE_COUNT 4
 #define MEMORY_BLOCK_CACHE_SIZE 0x40
-
-
-typedef struct _MEMORY_BLOCK_CACHE_LINE{
-    UINT64 AllocationBitmap;
-    RFMEMORY_SEGMENT_LIST_HEAD AvailableLists[MEMORY_BLOCK_CACHE_SIZE];
-} MEMORY_BLOCK_CACHE_LINE;
 
 #define MEMORY_LIST_HEAD_SIZE 0x40
 #define DEFAULT_MEMORY_ALIGNMENT 0x10
@@ -123,7 +114,6 @@ typedef struct _FREE_MEMORY_SEGMENT_LIST_HEAD {
     RFMEMORY_SEGMENT_LIST_HEAD* RefCacheLineSegment; // set if there is 
 } FREE_MEMORY_SEGMENT_LIST_HEAD;
 
-#define UNALLOCATED_MEMORY_SEGMENT_CACHE_SIZE 0x100
 
 #define NUM_FREE_MEMORY_LEVELS 4
 
@@ -137,7 +127,6 @@ typedef enum _FREE_MEMORY_LEVELS {
 // Used to cache and optimize memory functions
 typedef struct _MEMORY_REGION_TABLE {
     // Variables are ordered this way to keep 0x10 Bytes alignment and therefore win cpu clocks
-    MEMORY_BLOCK_CACHE_LINE UnallocatedSegmentCache;
     MEMORY_SEGMENT_LIST_HEAD SegmentListHead;
     UINT64 AllocatedEntries;
     UINT64 TotalEntries;
@@ -150,15 +139,15 @@ typedef struct _MEMORY_REGION_TABLE {
 
 // Global Memory Management Table for kernel processes and allocation source for user processes
 typedef struct _MEMORY_MANAGEMENT_TABLE {
-    UINT64 AvailableMemory; // Physical Memory
-    UINT64 UsedMemory;
-    UINT64 PagingFileSize;
-    UINT64 PagedMemory;
-    UINT64 UnpageableMemory;
-    UINT64 CompressedMemorySize;
-    UINT64 UncompressibleMemory;
+    UINT64 TotalMemory;
+    UINT64 PhysicalMemory;
+    UINT64 TotalDiskMemory;
+    UINT64 TotalCompressedMemory; // Compressed physical memory
+    UINT64 UsedPhysicalMemory;
+    UINT64 UsedDiskMemory;
     UINT64 IoMemorySize;
     UINT64 PageArraySize; // In Number of entries
+    
     PAGE* PageArray;
     UINT64 NumBytesPageBitmap;
     char* PageBitmap;
@@ -169,19 +158,16 @@ extern MEMORY_MANAGEMENT_TABLE MemoryManagementTable;
 
 // Only for user processes
 typedef struct _PROCESS_MEMORY_TABLE {
-    UINT64 AvailableMemory;
-    UINT64 UsedMemory;
-    UINT64 PagedMemory;
-    UINT64 UnpageableMemory;
     UINT64 AllocatedPages;
-    UINT64 VirtualMemoryBase;
-    MEMORY_BLOCK_CACHE_LINE UnallocatedSegmentCache; // for Allocated Memory
-    MEMORY_SEGMENT_LIST_HEAD AllocatedMemory;
+    UINT64 ReservedPages;
+    UINT64 CompressedPages;
+    UINT64 DiskPages;
+
+    UINT64 UsedMemory; // Used memory from these reserved pages
     PAGE_ALLOCATION_TABLE PageAllocationTable;
-    struct {
-        MEMORY_BLOCK_CACHE_LINE UnallocatedSegmentCache; // for Free Memory
-        FREE_MEMORY_SEGMENT_LIST_HEAD SegmentListHead;
-    } FreeMemoryLevels[NUM_FREE_MEMORY_LEVELS];
+
+    MEMORY_SEGMENT_LIST_HEAD AllocatedMemory;
+    FREE_MEMORY_SEGMENT_LIST_HEAD FreeMemory[NUM_FREE_MEMORY_LEVELS];
 } PROCESS_MEMORY_TABLE;
 
 #pragma pack(pop)
@@ -229,7 +215,6 @@ RFMEMORY_SEGMENT MemMgr_FreePool(RFMEMORY_REGION_TABLE MemoryRegion, RFMEMORY_SE
 RFMEMORY_SEGMENT MemMgr_CreateInitialHeap(void* HeapAddress, UINT64 HeapLength);
 
 // Sets present bit in Memory Segment flags when Found
-RFMEMORY_SEGMENT (*_SIMD_FetchMemoryCacheLine)(MEMORY_BLOCK_CACHE_LINE* CacheLine);
 RFMEMORY_SEGMENT (*_SIMD_FetchUnusedSegmentsUncached)(MEMORY_SEGMENT_LIST_HEAD* ListHead);
 LPVOID (__fastcall *_SIMD_AllocatePhysicalPage) (char* PageBitmap, UINT64 BitmapSize, PAGE* PageArray);
 // ---------------------------

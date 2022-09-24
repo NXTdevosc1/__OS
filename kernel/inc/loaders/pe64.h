@@ -4,6 +4,7 @@
 #include <CPU/process_defs.h>
 #include <sys/drv.h>
 
+
 int GetPEhdrOffset(void* hdr);
 int PeCheckFileHeader(PE_IMAGE_HDR* hdr);
 KERNELSTATUS Pe64LoadUserApplication(LPWSTR path);

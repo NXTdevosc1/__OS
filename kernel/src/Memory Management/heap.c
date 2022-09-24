@@ -7,8 +7,9 @@ void* AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flag
         NumBytes += 0x10;
         NumBytes &= ~0xF;
     }
-    
-    if(Process->MemoryManagementTable.AvailableMemory < NumBytes) {
+
+    // Check reserved, not allocated memory
+    if(Process->MemoryManagementTable.ReservedPages < NumBytes) {
         UINT64 Pages = NumBytes >> 12;
         if(NumBytes & 0xFFF) Pages++;
 

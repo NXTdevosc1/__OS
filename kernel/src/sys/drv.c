@@ -109,7 +109,7 @@ KERNELSTATUS KERNELAPI RunDriver(RFDRIVER_OBJECT DriverObject){
 		FileImportTable[i].Type == FILE_IMPORT_DEVICE_DRIVER ||
 		FileImportTable[i].Type == FILE_SYSTEM_DRIVER)
 		{
-			if(!wstrcmp_nocs(FileImportTable[i].Path, DriverObject->DriverIdentificationCopy.DriverPath, DriverObject->DriverIdentificationCopy.DriverPathLength + 1)) continue;
+			if(!wstrcmp_nocs((const wchar_t*)FileImportTable[i].Path, DriverObject->DriverIdentificationCopy.DriverPath, DriverObject->DriverIdentificationCopy.DriverPathLength + 1)) continue;
 			Buffer = FileImportTable[i].LoadedFileBuffer;
 		}
 	}

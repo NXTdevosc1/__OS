@@ -95,7 +95,7 @@ void KernelPagingInitialize(){
 		InitData.start_font = (void*)((char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset + ((UINT64)InitData.start_font & 0xFFF));
 		DependencyOffset += 0xA000;
 
-		FILE_IMPORT_ENTRY* Entry = FileImportTable;
+		volatile FILE_IMPORT_ENTRY* Entry = FileImportTable;
 		while(Entry->Type != FILE_IMPORT_ENDOFTABLE) {
 			if(Entry->BaseName){
 				Entry->LenBaseName = wstrlen(Entry->BaseName);
@@ -158,10 +158,10 @@ void InitFeatures(){
 void KeInitOptimizedComputing() {
 	if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
 		_SIMD_Memset = _SSE_Memset;
-		memset = _r8_SSE_Memset;
+		// memset = _r8_SSE_Memset;
 	} else if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
 		_SIMD_Memset = _AVX_Memset;
-		memset = _r8_AVX_Memset;
+		// memset = _r8_AVX_Memset;
 	} else if(ExtensionLevel & EXTENSION_LEVEL_AVX512) {
 
 	}

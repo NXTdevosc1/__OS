@@ -7,7 +7,6 @@
 #include <cmos.h>
 
 
-
 void GP_clear_screen(unsigned int background_color){
 	_SIMD_Memset((LPVOID)InitData.fb->FrameBufferBase, (UINT64)background_color | ((UINT64)background_color << 32), (InitData.fb->HorizontalResolution * InitData.fb->VerticalResolution) << 2);
 }
@@ -116,7 +115,7 @@ void GP_sf_put_char(const char ch, unsigned int color, unsigned int x, unsigned 
 */
 extern UINT64 __fastcall _SSE_ComputeBezier(float* beta, UINT NumCordinates, float percent);
 extern UINT64 __fastcall _AVX_ComputeBezier(float* beta, UINT NumCordinates, float percent);
-UINT64 __fastcall GetBezierPoint(float* cordinates, float* beta, UINT8 NumCordinates, float percent){
+UINT64 GetBezierPoint(float* cordinates, float* beta, UINT8 NumCordinates, float percent){
 	memcpy(beta, cordinates, NumCordinates << 2);
 	if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
 		return _SSE_ComputeBezier(beta, NumCordinates, percent);
@@ -176,6 +175,40 @@ void LineTo(INT64 x0, INT64 y0, INT64 x1, INT64 y1, UINT32 Color) {
 	for(;;) {
 		GP_set_pixel(x0, y0, Color);
 		if(x0 == x1 && y0 == y1) break;
+		double e2 = 2 * error;
+		if(e2 >= dy) {
+			if(x0 == x1) break;
+			error = error + dy;
+			x0 = x0 + sx;
+		}
+		if(e2 <= dx) {
+			if(y0 == y1) break;
+			error = error + dx;
+			y0 = y0 + sy;
+		}
+	}
+}
+
+inline void _VertexFillBufferLine(INT64 x0, INT64 y0, INT64 x1, INT64 y1, UINT8* Buffer, UINT Pitch) {
+	// Brensenham Algorithm f(x) = mx + p
+	if(x0 == x1 && y0 == y1) return;
+
+	double dx = abs(x1 - x0);
+	double sx = x0 < x1 ? 1 : -1;
+	double dy = -abs(y1 - y0);
+	double sy = y0 < y1 ? 1 : -1;
+	double error = dx + dy;
+
+	INT64 Lasty = -1;
+	for(;;) {
+		if(x0 == x1 && y0 == y1) {
+			Buffer[x0 + y0 * Pitch]++;
+			break;
+		}
+		if(Lasty != y0) {
+			Buffer[x0 + y0 * Pitch]++;
+			Lasty = y0;
+		}
 		double e2 = 2 * error;
 		if(e2 >= dy) {
 			if(x0 == x1) break;
@@ -261,5 +294,45 @@ void TestFill(UINT16 RectX, UINT16 RectY, UINT16 RectWidth, UINT16 RectHeight, U
 		// 	SystemDebugPrint(L"______");
 
 		
+	}
+}
+UINT8 Buff[0x100 * 0x100] = {0};
+UINT8 XLinks[0x80] = {0};
+
+
+#include <Management/runtimesymbols.h>
+void FillVertex(UINT X, UINT Y, UINT NumCordinates, float* XCordinates, float* YCordinates, UINT32 Color) {
+	float LastPtX = *XCordinates, LastPtY = *YCordinates;
+	XCordinates++;
+	YCordinates++;
+	memset(Buff, 0, 0x100 * 0x100);
+	for(UINT i = 1;i<NumCordinates;i++, XCordinates++, YCordinates++) {
+		_VertexFillBufferLine(LastPtX, LastPtY, (*XCordinates), (*YCordinates), Buff, 0x100);
+		LastPtX = *XCordinates;
+		LastPtY = *YCordinates;
+	}
+	UINT8* b = Buff;
+	for(UINT _Y = 0;_Y<0x100;_Y++) {
+		UINT NumLinks = 0;
+		for(UINT _X = 0;_X<0x100;_X++,b++) {
+			if(*b) {
+				const UINT8 c = *b;
+				for(UINT i = 0;i<c;i++) {
+					XLinks[NumLinks] = _X;
+					NumLinks++;
+				}
+			}
+		}
+		if(NumLinks < 2) continue;
+		UINT8* xl = XLinks;
+		UINT8 LastX = 0;
+		
+		for(UINT i = 0;i<NumLinks;i++, xl++) {
+			if(i & 1) {
+				LineTo(X + LastX, Y + _Y, X + (*xl), Y + _Y, Color);
+			} else {
+				LastX = *xl;
+			}
+		}
 	}
 }

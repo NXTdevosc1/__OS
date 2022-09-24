@@ -2,31 +2,31 @@
 #include <CPU/cpu.h>
 #include <interrupt_manager/SOD.h>
 
-RFMEMORY_SEGMENT AllocateMemorySegment(RFMEMORY_REGION_TABLE MemoryRegion) {
-    if(MemoryRegion->UnallocatedSegmentCache.CacheLineSize) {
-        RFMEMORY_SEGMENT Segment = _SIMD_FetchMemoryCacheLine(&MemoryRegion->UnallocatedSegmentCache);
-        if(Segment) return Segment;
-    }
+// RFMEMORY_SEGMENT AllocateMemorySegment(RFMEMORY_REGION_TABLE MemoryRegion) {
+//     if(MemoryRegion->UnallocatedSegmentCache.CacheLineSize) {
+//         RFMEMORY_SEGMENT Segment = _SIMD_FetchMemoryCacheLine(&MemoryRegion->UnallocatedSegmentCache);
+//         if(Segment) return Segment;
+//     }
 
-    if(MemoryRegion->TotalEntries == MemoryRegion->AllocatedEntries) {
-        if(__SyncBitTestAndSet(&MemoryRegion->AllocateListControl, 0)) {
-            MemoryRegion->LastListHead->NextListHead = AllocatePoolEx(kproc, sizeof(MEMORY_SEGMENT_LIST_HEAD), 0, ALLOCATE_POOL_NEW_LIST_HEAD);
-            SZeroMemory(MemoryRegion->LastListHead->NextListHead);
-            MemoryRegion->LastListHead = MemoryRegion->LastListHead->NextListHead;
-            RFMEMORY_SEGMENT Segment = _SIMD_FetchUnusedSegmentsUncached(MemoryRegion->LastListHead);
-            __BitRelease(&MemoryRegion->AllocateListControl, 0);
-            return Segment;
-        } else {
-            // Prevent a return NULL if the free list is not yet allocated
-            while(MemoryRegion->AllocateListControl, 0) __Schedule();
-        }
-    }
-    return _SIMD_FetchUnusedSegmentsUncached(&MemoryRegion->SegmentListHead);
-}
+//     if(MemoryRegion->TotalEntries == MemoryRegion->AllocatedEntries) {
+//         if(__SyncBitTestAndSet(&MemoryRegion->AllocateListControl, 0)) {
+//             MemoryRegion->LastListHead->NextListHead = AllocatePoolEx(kproc, sizeof(MEMORY_SEGMENT_LIST_HEAD), 0, ALLOCATE_POOL_NEW_LIST_HEAD);
+//             SZeroMemory(MemoryRegion->LastListHead->NextListHead);
+//             MemoryRegion->LastListHead = MemoryRegion->LastListHead->NextListHead;
+//             RFMEMORY_SEGMENT Segment = _SIMD_FetchUnusedSegmentsUncached(MemoryRegion->LastListHead);
+//             __BitRelease(&MemoryRegion->AllocateListControl, 0);
+//             return Segment;
+//         } else {
+//             // Prevent a return NULL if the free list is not yet allocated
+//             while(MemoryRegion->AllocateListControl, 0) __Schedule();
+//         }
+//     }
+//     return _SIMD_FetchUnusedSegmentsUncached(&MemoryRegion->SegmentListHead);
+// }
 
 
 void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags) {
-    if(!NumPages || MemoryManagementTable.AvailableMemory < (NumPages << 12)) return NULL;
+    // if(!NumPages || MemoryManagementTable.AvailableMemory < (NumPages << 12)) return NULL;
     if(!Process) {
         if(Pmgrt.SystemInitialized) return NULL;
     }
@@ -90,35 +90,35 @@ void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags) 
 
 // Return value : Start of those pages
 void* ProcessAllocateVirtualMemory(RFPROCESS Process, UINT64 NumPages) {
-    register UINT64* Bitmap = (UINT64*)MemoryManagementTable.PageBitmap;
-    register UINT64 Size = MemoryManagementTable.NumBytesPageBitmap >> 3;
-    register INT64 VIndex = 0, PIndex = 0;
-    PAGE* PageArray = MemoryManagementTable.PageArray;
-    UINT MapFlags = PM_MAP;
-    if(Process->OperatingMode == USERMODE_PROCESS) MapFlags |= PM_USER;
-    for(register UINT64 i = 0;i<Size;i++, Bitmap++, PageArray += 64) {
-        while((PIndex = __SyncBitmapAllocate(Bitmap)) != -1) {
-            if(!NumPages) return NULL;
-            PAGE* Page = PageArray + PIndex;
-            PAGE_ALLOCATION_TABLE* Pat = &Process->MemoryManagementTable.PageAllocationTable;
-            for(UINT64 l = 0;;l++) {
-                UINT64 Vaddr = Process->MemoryManagementTable.VirtualMemoryBase + (l << 6);
+    // register UINT64* Bitmap = (UINT64*)MemoryManagementTable.PageBitmap;
+    // register UINT64 Size = MemoryManagementTable.NumBytesPageBitmap >> 3;
+    // register INT64 VIndex = 0, PIndex = 0;
+    // PAGE* PageArray = MemoryManagementTable.PageArray;
+    // UINT MapFlags = PM_MAP;
+    // if(Process->OperatingMode == USERMODE_PROCESS) MapFlags |= PM_USER;
+    // for(register UINT64 i = 0;i<Size;i++, Bitmap++, PageArray += 64) {
+    //     while((PIndex = __SyncBitmapAllocate(Bitmap)) != -1) {
+    //         if(!NumPages) return NULL;
+    //         PAGE* Page = PageArray + PIndex;
+    //         PAGE_ALLOCATION_TABLE* Pat = &Process->MemoryManagementTable.PageAllocationTable;
+    //         for(UINT64 l = 0;;l++) {
+    //             UINT64 Vaddr = Process->MemoryManagementTable.VirtualMemoryBase + (l << 6);
                 
-                if((VIndex = __SyncBitmapAllocate(&Pat->Bitmap)) != -1) {
-                    Pat->VirtualMemoryPages[VIndex].VirtualMemoryDescriptor = (UINT64)Page | 1;
-                    MapPhysicalPages(Process->PageMap, (LPVOID)(Vaddr + (VIndex << 12)), (LPVOID)(Page->PageStruct.PhysicalPageNumber << 12), 1, MapFlags);
-                    break;
-                }
-                if(!Pat->Next) {
-                    Pat->Next = _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray);
-                    if(!Pat->Next) SET_SOD_MEMORY_MANAGEMENT;
-                    Pat->Next->Next = NULL;
-                    Pat->Next->Bitmap = -1;
-                }
-                Pat = Pat->Next;
-            }
-            NumPages--;
-        }
-    }
+    //             if((VIndex = __SyncBitmapAllocate(&Pat->Bitmap)) != -1) {
+    //                 Pat->VirtualMemoryPages[VIndex].VirtualMemoryDescriptor = (UINT64)Page | 1;
+    //                 MapPhysicalPages(Process->PageMap, (LPVOID)(Vaddr + (VIndex << 12)), (LPVOID)(Page->PageStruct.PhysicalPageNumber << 12), 1, MapFlags);
+    //                 break;
+    //             }
+    //             if(!Pat->Next) {
+    //                 Pat->Next = _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray);
+    //                 if(!Pat->Next) SET_SOD_MEMORY_MANAGEMENT;
+    //                 Pat->Next->Next = NULL;
+    //                 Pat->Next->Bitmap = -1;
+    //             }
+    //             Pat = Pat->Next;
+    //         }
+    //         NumPages--;
+    //     }
+    // }
     return NULL;
 }

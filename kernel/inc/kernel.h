@@ -5,22 +5,25 @@
 #include <krnltypes.h>
 #include <ipc/ipc.h>
 #include <ipc/ipcserver.h>
+// #include <intrin.h>
+
+
 #define __DECLARE_FLT extern int _fltused = 0
 
 
-FILE_IMPORT_ENTRY FileImportTable[]; // Contains all default drivers, modules and files to run the Operating System
+volatile FILE_IMPORT_ENTRY FileImportTable[]; // Contains all default drivers, modules and files to run the Operating System
 
 extern UINT64 KeGlobalCR3;
 extern RFPROCESS kproc;
 extern RFPROCESS IdleProcess;
 extern RFPROCESS SystemInterruptsProcess;
-extern INITDATA InitData;
-extern UINT64 _krnlbase, _krnlend;
+extern volatile INITDATA InitData;
+extern volatile UINT64 _krnlbase, _krnlend;
 
 void KERNELAPI IdleThread();
 RFSERVER KernelServer;
 
-UINT ExtensionLevel;
+volatile UINT ExtensionLevel;
 
 typedef enum _EXTENSION_LEVELS {
     EXTENSION_LEVEL_SSE = 0,

@@ -42,6 +42,8 @@ void DrawOsLogo();
 void LineTo(INT64 x0, INT64 y0, INT64 x1, INT64 y1, UINT32 Color);
 
 void CalculateRgba(struct RGBA* Color, struct RGBA* Source);
-extern UINT64 __fastcall GetBezierPoint(float* cordinates, float* beta, UINT8 NumCordinates, float percent);
+extern UINT64 GetBezierPoint(float* cordinates, float* beta, UINT8 NumCordinates, float percent);
 
 void TestFill(UINT16 RectX, UINT16 RectY, UINT16 RectWidth, UINT16 RectHeight, UINT32 Color);
+
+void FillVertex(UINT X, UINT Y, UINT NumCordinates, float* XCordinates, float* YCordinates, UINT32 Color);

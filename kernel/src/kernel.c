@@ -65,10 +65,10 @@ RFSERVER KernelServer = NULL;
 PROCESS IoSpaceMemoryProcess = {0}; // This is a (non) present process that contains the heap of the IoSpace
 THREAD IoSpaceMemoryThread = {0};
 
-UINT ExtensionLevel = 0;
+volatile UINT ExtensionLevel = 0;
 
 
-__declspec(allocate(_FIMPORT)) FILE_IMPORT_ENTRY FileImportTable[0x20] = {
+__declspec(allocate(_FIMPORT)) volatile FILE_IMPORT_ENTRY FileImportTable[0x20] = {
 	{FILE_IMPORT_DATA, 0, NULL, L"", 0, L"OS\\Fonts\\segoeui.ttf"},
 	{FILE_IMPORT_DATA, 0, NULL, L"$BOOTCONFIG", 0, L"OS\\System\\KeConfig\\$BOOTCONFIG"},
 	{FILE_IMPORT_DATA, 0, NULL, L"$DRVTBL", 0, L"OS\\System\\KeConfig\\$DRVTBL"},
@@ -98,29 +98,7 @@ LPWSTR KernelProcessName = L"System Kernel.";
 
 char* ExtensionLevelStr[2] = {"SSE", "AVX"};
 
-extern void __declspec(noreturn) _start() {
-	__cli();
-	GP_clear_screen(0xFF);
-	EnableCpuFeatures();
-	if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
-		GP_draw_sf_text("Extension level : AVX", 0xFFFFFF, 20, 20);
-	} else {
-		GP_draw_sf_text("Extension level : SSE", 0xFFFFFF, 20, 20);
-	}
-	// while(1) __hlt();
-	SetupPageAttributeTable();
-	Pmgrt.NumProcessors = 1;
-	kproc = KeCreateProcess(NULL, NULL, SUBSYSTEM_NATIVE, KERNELMODE_PROCESS);
-	if(!kproc) SET_SOD_INITIALIZATION;
-
-
-	InitMemoryManagementSubsystem();
-	// GP_clear_screen(0);
-	UINT64 Bitmap = 0x180;
-	__SyncBitmapAllocate(&Bitmap);
-	SystemDebugPrint(L"INDX : %x, BMP : %x", __SyncBitmapAllocate(&Bitmap), Bitmap);
-
-	
+void TripleFaultingFunction() {
 	UINT XOff = 200;
 	UINT YOff = 300;
 	float XCords[] = {0, 50, 100, 150};
@@ -132,17 +110,6 @@ extern void __declspec(noreturn) _start() {
 	if(Distance > 2) {
 		IncValue /= (Distance - 1);
 	}
-
-	// IncValue /= 10;
-
-	GP_clear_screen(0);
-
-	SystemDebugPrint(L"Starting...");
-	
-	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
-	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
-	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x1000));
-	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
 
 	for(UINT c = 0;c<0x10000;c++) { 
 	UINT64 LastX = XOff;
@@ -164,7 +131,60 @@ extern void __declspec(noreturn) _start() {
 		LastY = Y;
 	}
 	}
+}
+
+extern void __declspec(noreturn) _start() {
+	__cli();
+	GP_clear_screen(0xFF);
+	EnableCpuFeatures();
+	if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
+		GP_draw_sf_text("Extension level : AVX", 0xFFFFFF, 20, 20);
+	} else {
+		GP_draw_sf_text("Extension level : SSE", 0xFFFFFF, 20, 20);
+	}
+	// while(1) __hlt();
+	SetupPageAttributeTable();
+	Pmgrt.NumProcessors = 1;
+	kproc = KeCreateProcess(NULL, NULL, SUBSYSTEM_NATIVE, KERNELMODE_PROCESS);
+	if(!kproc) SET_SOD_INITIALIZATION;
+
+	InitMemoryManagementSubsystem();
+	// GP_clear_screen(0);
+	UINT64 Bitmap = 0x180;
+	__SyncBitmapAllocate(&Bitmap);
+	SystemDebugPrint(L"INDX : %x, BMP : %x, EXT : %x", __SyncBitmapAllocate(&Bitmap), Bitmap, ExtensionLevel);
+
+	
+
+	// IncValue /= 10;
+
+	GP_clear_screen(0);
+
+	SystemDebugPrint(L"Starting...");
+	TripleFaultingFunction();
+	
+	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
+	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
+	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x1000));
+	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
+
+	
 	SystemDebugPrint(L"All done");
+
+	// LineTo(500, 200, 600, 200, 0xFF0000);
+	// LineTo(600, 200, 540, 240, 0xFF0000);
+	// LineTo(540, 240, 600, 280, 0xFF0000);
+	// LineTo(600, 280, 500, 280, 0xFF0000);
+	// LineTo(500, 280, 500, 200, 0xFF0000);
+
+	float testX[] = {0, 50, 100, 100, 0,   0};
+	float testY[] = {0, 50, 0,   100, 100, 0};
+
+	FillVertex(400, 400, 6, testX, testY, 0xFF);
+
+	// TestFill(450, 150, 300, 300, 0xFF0000);
+	
+	while(1);
 
 	SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 1, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
 	SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 0x10, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
@@ -303,13 +323,6 @@ extern void __declspec(noreturn) _start() {
 	
 	
 	while(1);
-	LineTo(500, 200, 600, 200, 0xFF0000);
-	LineTo(600, 200, 540, 240, 0xFF0000);
-	LineTo(540, 240, 600, 280, 0xFF0000);
-	LineTo(600, 280, 500, 280, 0xFF0000);
-	LineTo(500, 280, 500, 200, 0xFF0000);
-
-	TestFill(450, 150, 300, 300, 0xFF0000);
 	
 	// LineTo(500, 200, 500, 100, 0xFF);
 	// LineTo(500, 100, 520, 120, 0xFF);
