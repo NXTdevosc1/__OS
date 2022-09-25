@@ -115,16 +115,15 @@ void GP_sf_put_char(const char ch, unsigned int color, unsigned int x, unsigned 
 */
 extern UINT64 __fastcall _SSE_ComputeBezier(float* beta, UINT NumCordinates, float percent);
 extern UINT64 __fastcall _AVX_ComputeBezier(float* beta, UINT NumCordinates, float percent);
-UINT64 GetBezierPoint(float* cordinates, float* beta, UINT8 NumCordinates, float percent){
-	memcpy(beta, cordinates, NumCordinates << 2);
+
+UINT64 __fastcall GetBezierPoint(float* cordinates, float* beta, UINT8 NumCordinates, float percent){
+	memcpy(beta, cordinates, ((UINT64)NumCordinates) << 2);
 	if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
 		return _SSE_ComputeBezier(beta, NumCordinates, percent);
 	} else if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
 		return _AVX_ComputeBezier(beta, NumCordinates, percent);
 	}
 	return 0;
-	// _SSE_BezierCopyCords(beta, cordinates, NumCordinates);
-	// return _SSE_ComputeBezier(beta, NumCordinates, percent);
 }
 
 

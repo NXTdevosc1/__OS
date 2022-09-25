@@ -65,7 +65,7 @@ RFSERVER KernelServer = NULL;
 PROCESS IoSpaceMemoryProcess = {0}; // This is a (non) present process that contains the heap of the IoSpace
 THREAD IoSpaceMemoryThread = {0};
 
-volatile UINT ExtensionLevel = 0;
+UINT ExtensionLevel = EXTENSION_LEVEL_SSE;
 
 
 __declspec(allocate(_FIMPORT)) volatile FILE_IMPORT_ENTRY FileImportTable[0x20] = {
@@ -98,28 +98,28 @@ LPWSTR KernelProcessName = L"System Kernel.";
 
 char* ExtensionLevelStr[2] = {"SSE", "AVX"};
 
+float XCords[0x100] = {0, 50, 100, 150};
+float YCords[0x100] = {0, 50, -50, 0};
+float betabuffer[0x100] = {0};
+float IncValue = 0.1;
 void TripleFaultingFunction() {
 	UINT XOff = 200;
 	UINT YOff = 300;
-	float XCords[] = {0, 50, 100, 150};
-	float YCords[] = {0, 50, -50, 0};
-	float betabuffer[0x10] = {0};
-	float IncValue = 0.1;
 	float X0 = GetBezierPoint(XCords, betabuffer, 4, 0.1), X1 = GetBezierPoint(XCords, betabuffer, 4, 0.2), Y0 = GetBezierPoint(YCords, betabuffer, 4, 0.1), Y1 = GetBezierPoint(YCords, betabuffer, 4, 0.2);
 	double Distance = __sqrt(pow(X1 - X0, 2) + pow(Y1-Y0, 2));
 	if(Distance > 2) {
 		IncValue /= (Distance - 1);
 	}
 
-	for(UINT c = 0;c<0x10000;c++) { 
-	UINT64 LastX = XOff;
-	UINT64 LastY = YOff;
+	for(UINT c = 0;c<0x100;c++) { 
+	register UINT64 LastX = XOff;
+	register UINT64 LastY = YOff;
 
-	UINT64 X = 0;
-	UINT64 Y = 0;
+	register UINT64 X = 0;
+	register UINT64 Y = 0;
 	
 
-	for(float t = 0;t<=1;t+=IncValue) {
+	for(register float t = 0;t<=1;t+=IncValue) {
 		X = XOff + GetBezierPoint(XCords, betabuffer, 4, t);
 		Y = YOff + GetBezierPoint(YCords, betabuffer, 4, t);
 		// if(X > LastX + 1 || X < LastX - 1 || Y > LastY + 1 || Y < LastY - 1) {
@@ -133,7 +133,7 @@ void TripleFaultingFunction() {
 	}
 }
 
-extern void __declspec(noreturn) _start() {
+void __declspec(noreturn) _start() {
 	__cli();
 	GP_clear_screen(0xFF);
 	EnableCpuFeatures();
@@ -162,14 +162,20 @@ extern void __declspec(noreturn) _start() {
 
 	SystemDebugPrint(L"Starting...");
 	TripleFaultingFunction();
+	SystemDebugPrint(L"All done");
 	
 	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
 	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
 	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x1000));
 	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
+	SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 0x100, 0));
+	SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 1, 0));
+	SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 1, 0));
+	SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 1, 0));
+
+
 
 	
-	SystemDebugPrint(L"All done");
 
 	// LineTo(500, 200, 600, 200, 0xFF0000);
 	// LineTo(600, 200, 540, 240, 0xFF0000);
@@ -184,11 +190,11 @@ extern void __declspec(noreturn) _start() {
 
 	// TestFill(450, 150, 300, 300, 0xFF0000);
 	
-	while(1);
 
-	SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 1, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
-	SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 0x10, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
-	SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 1, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
+	// SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 1, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
+	// SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 0x10, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
+	// SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 1, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
+	while(1);
 	SystemDebugPrint(L"Allocate Page : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
 	SystemDebugPrint(L"Allocate Page : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
 	

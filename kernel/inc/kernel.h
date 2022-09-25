@@ -5,8 +5,8 @@
 #include <krnltypes.h>
 #include <ipc/ipc.h>
 #include <ipc/ipcserver.h>
-// #include <intrin.h>
-
+#include <intrin.h>
+#include <stdlib.h>
 
 #define __DECLARE_FLT extern int _fltused = 0
 
@@ -23,7 +23,7 @@ extern volatile UINT64 _krnlbase, _krnlend;
 void KERNELAPI IdleThread();
 RFSERVER KernelServer;
 
-volatile UINT ExtensionLevel;
+UINT ExtensionLevel;
 
 typedef enum _EXTENSION_LEVELS {
     EXTENSION_LEVEL_SSE = 0,

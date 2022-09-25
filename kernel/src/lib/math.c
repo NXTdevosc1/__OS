@@ -14,8 +14,8 @@ uint64_t powi(uint64_t num, uint16_t count){
 	return num;
 }
 
-double abs(double Val) {
-	if(Val < 0) Val *= -1;
+// double abs(double Val) {
+// 	if(Val < 0) Val *= -1;
 
-	return Val;
-}
+// 	return Val;
+// }

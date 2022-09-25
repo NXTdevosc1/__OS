@@ -1,6 +1,7 @@
 #include <MemoryManagement.h>
 #include <CPU/cpu.h>
 #include <interrupt_manager/SOD.h>
+#include <math.h>
 
 // RFMEMORY_SEGMENT AllocateMemorySegment(RFMEMORY_REGION_TABLE MemoryRegion) {
 //     if(MemoryRegion->UnallocatedSegmentCache.CacheLineSize) {
@@ -24,67 +25,75 @@
 //     return _SIMD_FetchUnusedSegmentsUncached(&MemoryRegion->SegmentListHead);
 // }
 
+BOOL AllocateContiguousMutex = 0;
 
 void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags) {
-    // if(!NumPages || MemoryManagementTable.AvailableMemory < (NumPages << 12)) return NULL;
-    if(!Process) {
-        if(Pmgrt.SystemInitialized) return NULL;
-    }
-    register UINT64* PageBitmap = (UINT64*)MemoryManagementTable.PageBitmap;
-    UINT64* FillStart = NULL;
-    UINT BitOff = 0;
-    register UINT64 CurrentPages = 0;
-    UINT64 LastPageAddress = 0; // Physical page number
-    register PAGE* Page = MemoryManagementTable.PageArray;
-    register PAGE* StartBuffer = NULL;
-    void* StartAddress = NULL;
     
-    for(UINT64 k = 0;k<MemoryManagementTable.NumBytesPageBitmap;k+=8, PageBitmap++) {
-        register UINT64 Bitmask = *PageBitmap;
-        for(UINT64 i = 0;i<0x40;i++, Page++, Bitmask >>= 1) {
-            if(!(Bitmask & 1)) {
-                if(FillStart) {
-                    FillStart = NULL;
-                    CurrentPages = 0;
-                }
-            } else {
-                if(!FillStart) {
-                    FillStart = PageBitmap;
-                    BitOff = i;
-                    StartAddress = (void*)(Page->PhysicalAddress & ~(0xFFF));
-                    StartBuffer = Page;
-                } else {
-                    if(Page->PageStruct.PhysicalPageNumber != LastPageAddress) {
-                        FillStart = NULL;
-                        CurrentPages = 0;
-                        continue;
-                    }
-                }
-                LastPageAddress = Page->PageStruct.PhysicalPageNumber + 1;
-                CurrentPages++;
-                if(NumPages == CurrentPages) {
-                    // Fill it
-                    register UINT64 x = BitOff;
-                    register UINT64 Mask = 0;
-                        UINT64* f = FillStart;
-                    for(;;f++) {
-                        Mask = *f;
-                        for(;x<0x40;x++, StartBuffer++) {
-                            if(!CurrentPages) goto Ret;
-                            Mask &= ~(1 << x);
-                            StartBuffer->PageStruct.Allocated = 1;
-                            CurrentPages--;
-                        }
-                        *f = Mask;
-                        x = 0;
-                    }
-                    Ret:
-                    *f = Mask;
-                    return StartAddress;
-                }
+    UINT64* Bmp = (UINT64*)MemoryManagementTable.PageBitmap;
+    register PAGE* Page = MemoryManagementTable.PageArray;
+    register UINT64 Max = MemoryManagementTable.NumBytesPageBitmap >> 3; // QWORD Size
+    register UINT NextIndex;
+    UINT Index;
+    
+    UINT64* PagesStartBmp = NULL;
+    UINT PagesStartIndex = 0;
+    UINT Arrival = 0;
+    void* PhysicalStart = NULL;
+
+    while(_interlockedbittestandset(&AllocateContiguousMutex, 0)) _mm_pause();
+
+    for(UINT64 i = 0;i<Max;i++, Bmp++, Page+=64) {
+        NextIndex = 0;
+        UINT64 BitMap = *Bmp;
+        while(_BitScanForward64(&Index, BitMap)) {
+            _bittestandreset64(&BitMap, Index);
+            if(Index != NextIndex) Arrival = 0;
+
+            if(!Arrival) {
+                PagesStartBmp = Bmp;
+                PagesStartIndex = Index;
+                PhysicalStart = (void*)(((PAGE*)(Page + Index))->PageStruct.PhysicalPageNumber << 12);
             }
+            Arrival++;
+            if(Arrival == NumPages) {
+                if(PagesStartBmp == Bmp) {
+                    UINT64 Num = (*Bmp) & ((UINT64)-1 << (Index + 1));
+                    Num |= (*Bmp) & ((UINT64)-1 >> (64 - PagesStartIndex));
+                    *Bmp = Num;
+                } else {
+                    // Fill bitmap
+                    if(PagesStartBmp < Bmp) {
+                        *(PagesStartBmp) &= ((UINT64)-1 >> (64 - PagesStartIndex));
+                        PagesStartBmp++;
+                        PagesStartIndex = 0;
+                        if((64 - PagesStartIndex) <= NumPages) {
+                            NumPages -= (64 - PagesStartIndex);
+                        } else NumPages = 0;
+                        SystemDebugPrint(L"X");
+                    }
+                    while(PagesStartBmp < Bmp) {
+                        *PagesStartBmp = 0;
+                        PagesStartBmp++;
+                        NumPages -= 64;
+                    }
+                    if(NumPages) {
+                        *(PagesStartBmp) &= ((UINT64)-1 << (Index + 1));
+                        SystemDebugPrint(L"C");
+
+                    }
+                }
+                SystemDebugPrint(L"PI : %d, I : %d, PBMP : %x, MBP : %x", PagesStartIndex, Index, PagesStartBmp, ((UINT64)-1 << (Index + 1)));
+                // for(UINT c = PagesStartIndex;c<=Index;c++) {
+                //     _bittestandreset64(PagesStartBmp, c);
+                // }
+                _bittestandreset(&AllocateContiguousMutex, 0);
+                return PhysicalStart;
+            }
+            NextIndex = Index + 1;
+            
         }
     }
+    _bittestandreset(&AllocateContiguousMutex, 0);
     return NULL;
 }
 

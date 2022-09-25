@@ -8,8 +8,8 @@ FOR /R "src" %%S IN (*.asm) DO (
 )
 
 set srcfiles=src/fs/*.c src/*.c "src/Memory Management/*.c" src/smbios/*.c src/acpi/*.c src/acpi/aml/*.c src/CPU/*.c src/dsk/*.c src/input/*.c src/interrupt_manager/*.c src/IO/*.c src/ipc/*.c src/lib/*.c src/loaders/*.c src/Management/*.c src/sys/*.c src/sysentry/*.c src/typography/*.c src/utils/*.c src/timedate/*.c
-set COMPILE=cl /DEFAULTLIB:no /nologo /KERNEL 
-set CFLAGS= /GS- /O2g-i- /Ilib /I../libc/drv/inc /I../UEFI/gnu-efi/inc /I../UEFI/gnu-efi/inc/x86_64 /Iinc /Ilib
+set COMPILE=cl /DEFAULTLIB:no. /KERNEL 
+set CFLAGS= /GS- /O2g- /Ilib /I../libc/drv/inc /I../UEFI/gnu-efi/inc /I../UEFI/gnu-efi/inc/x86_64 /Iinc /Ilib
 
 set OUT=/Fo:x86_64
 
@@ -19,7 +19,7 @@ set OBJFILES=x86_64/Assembly/*.obj
 @REM %COMPILE% /c %OUT%/fs/ %CFLAGS%
 @REM %COMPILE% /c src/fs/fat32/*.c %OUT%/fs/fat32/ %CFLAGS%
 
-%COMPILE% %srcfiles% %OBJFILES% /Fo:x86_64/ %CFLAGS% /Fe:oskrnlx64.exe /LD /link /DLL /MACHINE:x64 /NODEFAULTLIB /SUBSYSTEM:native /ENTRY:KrnlEntry /FIXED:no /DYNAMICBASE /LARGEADDRESSAWARE
+%COMPILE% "msvcrt.lib" "libvcruntime.lib" %srcfiles% %OBJFILES% /Fo:x86_64/ %CFLAGS% /Fe:oskrnlx64.exe /LD /link /OPT:LBR,REF /DLL /MACHINE:x64 /NODEFAULTLIB /SUBSYSTEM:native /ENTRY:KrnlEntry /FIXED:no /DYNAMICBASE /LARGEADDRESSAWARE
 
 @REM wsl cd ../UEFI/gnu-efi; make bootloader
 

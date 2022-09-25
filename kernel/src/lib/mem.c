@@ -5,7 +5,7 @@
 // All Addresses must be aligned (0x10) Boundary
 
 void (__fastcall *_SIMD_Memset)(LPVOID ptr, UINT64 Value, UINT64 Count) = _SSE_Memset;
-LPVOID (*memset)(LPVOID ptr, UINT8 value, size_t size) = _r8_SSE_Memset;
+// LPVOID (*memset)(LPVOID ptr, UINT8 value, size_t size) = _r8_SSE_Memset;
 LPVOID __fastcall _Wrap_SSE_Memset(LPVOID ptr, UINT64 value, size_t size){
     if(size < 0x10) {
         __repstos(ptr, value, size);
@@ -83,24 +83,24 @@ void memset64(LPVOID ptr, uint64_t value, size_t size){
     }
 }  
 
-LPVOID memcpy(LPVOID dest, LPCVOID src, size_t size){
-    // while(1); // memcpy does not get called with maximum optimizations (even when intrinsics are disabled)
-    if (!(size % 8)) {
-        memcpy64(dest, src, size >> 3);
-    }
-    else if (!(size % 4)) {
-        memcpy32(dest, src, size >> 2);
-    }
-    else if (!(size % 2)) {
-        memcpy16(dest, src, size >> 1);
-    }
-    else {
-        for (size_t i = 0; i < size; i++) {
-            ((uint8_t*)dest)[i] = ((uint8_t*)src)[i];
-        }
-    }
-    return NULL;
-}
+// LPVOID memcpy(LPVOID dest, LPCVOID src, size_t size){
+//     // while(1); // memcpy does not get called with maximum optimizations (even when intrinsics are disabled)
+//     if (!(size % 8)) {
+//         memcpy64(dest, src, size >> 3);
+//     }
+//     else if (!(size % 4)) {
+//         memcpy32(dest, src, size >> 2);
+//     }
+//     else if (!(size % 2)) {
+//         memcpy16(dest, src, size >> 1);
+//     }
+//     else {
+//         for (size_t i = 0; i < size; i++) {
+//             ((uint8_t*)dest)[i] = ((uint8_t*)src)[i];
+//         }
+//     }
+//     return NULL;
+// }
 
 void memcpy16(LPVOID dest, LPCVOID src, size_t size) {
     UINT16* DestW = dest;
@@ -127,9 +127,9 @@ void memcpy64(LPVOID dest, LPCVOID src, size_t size) {
 }
 
 
-int memcmp(LPVOID x, LPVOID y, size_t size){
-    for(size_t i = 0;i<size;i++){
-        if(((uint8_t*)x)[i] != ((uint8_t*)y)[i]) return 0;
-    }
-    return 1;
-}
+// int memcmp(LPVOID x, LPVOID y, size_t size){
+//     for(size_t i = 0;i<size;i++){
+//         if(((uint8_t*)x)[i] != ((uint8_t*)y)[i]) return 0;
+//     }
+//     return 1;
+// }
