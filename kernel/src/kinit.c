@@ -65,8 +65,8 @@ void KernelHeapInitialize(){
 #include <CPU/paging.h>
 
 void KernelPagingInitialize(){
+	while(1);
 	kproc->PageMap = (RFPAGEMAP)CreatePageMap(); // To be easily accessible by SMP
-
 	KeGlobalCR3 = (UINT64)kproc->PageMap;
 	
 

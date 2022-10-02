@@ -23,7 +23,6 @@
 // UINT64* (receive : RFPROCESS UserProcess)(return : UINT64 DllImageSize
 HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR* ProgramImage, PIMAGE_IMPORT_DIRECTORY ImportDirectory, void** DllImage, UINT64* DllImageSize) {
 	char* dllname = ((char*)ProgramVirtualBuffer + ImportDirectory->NameRva);
-	UINT64* ImportAddressTable = (UINT64*)((char*)ProgramVirtualBuffer + ImportDirectory->ImportAddressTableRva);
 
 	UINT64 DllNameLength = strlen(dllname);
 

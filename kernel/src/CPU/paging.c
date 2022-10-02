@@ -46,8 +46,8 @@ int MapPhysicalPages(
     UINT64 Flags
 ){
     if(((UINT64)VirtualAddress & 0xFFFF800000000000) == 0xFFFF800000000000) {
-        (UINT64)VirtualAddress &= ~ 0xFFFF000000000000;
-        (UINT64)VirtualAddress |= (UINT64)1 << 48;
+        ((UINT64)VirtualAddress) &= ~ 0xFFFF000000000000;
+        ((UINT64)VirtualAddress) |= (UINT64)1 << 48;
     }
     RFPAGEMAP Pml4Entry = (RFPAGEMAP)((UINT64)PageMap & ~(0xFFF)), PdpEntry = NULL, PdEntry = NULL, PtEntry = NULL;
     UINT64 TmpVirtualAddr = (UINT64)VirtualAddress >> 12;
@@ -209,7 +209,7 @@ void SetupPageAttributeTable() {
 
     // Set Page Attribute Table
     UINT64 Val = *(UINT64*)PageAttributeTable;
-    UINT32 EAX = Val;
-    UINT32 EDX = Val >> 32;
+    UINT32 EAX = (UINT32)Val;
+    UINT32 EDX = (UINT32)(Val >> 32);
     __WriteMsr(PAT_MSR, EAX, EDX);
 }

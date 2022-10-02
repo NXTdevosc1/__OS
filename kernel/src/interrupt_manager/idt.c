@@ -14,9 +14,9 @@
 __declspec(align(0x10)) struct IDTR idtr = { 0 };
 __declspec(align(0x1000)) struct INTERRUPT_DESCRIPTOR_TABLE KERNEL_IDT = { 0 };
 static inline void IDT_set_offset(struct IDT_ENTRY* entry, uint64_t handler){
-	entry->offset_low = handler;
-	entry->offset_mid = handler >> 16;
-	entry->offset_high = handler >> 32;
+	entry->offset_low = (UINT16)handler;
+	entry->offset_mid = (UINT16)(handler >> 16);
+	entry->offset_high = (UINT32)(handler >> 32);
 }
 
 void SetInterruptGate(
@@ -251,7 +251,7 @@ KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT 
 
 	for(UINT i = 0;i<NumIoApics;i++){
 		// get aligned ids (for e.g. IOAPIC 0 May be 5, and IOAPIC1 May be 6)
-		IoApic = QueryIoApic(i);
+		IoApic = QueryIoApic((UINT8)i);
 		unsigned char MaxRedirectionEntry = IoApicGetMaxRedirectionEntry(IoApic);
 		// SystemDebugPrint(L"IOAPIC#%d Max Redirection Entry : %d, GSYS_INT_BASE : %d", IoApic->IoApicId, MaxRedirectionEntry);
 		if(MaxRedirectionEntry >= IrqIndex) {
@@ -271,7 +271,7 @@ KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT 
 	CPU_MANAGEMENT_TABLE* CpuManagementTbl = CpuManagementTable[gIRQ_MGR_ProcessorSwitch];
 	// Allocate IRQ Control Descriptor
 	IRQ_CONTROL_DESCRIPTOR* IrqControlDescriptor = NULL;
-	for(UINT i = 0;i<NUM_IRQS_PER_PROCESSOR;i++){
+	for(UINT8 i = 0;i<NUM_IRQS_PER_PROCESSOR;i++){
 		if(!CpuManagementTbl->IrqControlTable[i].Present){
 			IrqControlDescriptor = &CpuManagementTbl->IrqControlTable[i];
 			IrqControlDescriptor->InterruptVector = 0x20 + i;
@@ -279,9 +279,9 @@ KERNELSTATUS KERNELAPI KeControlIrq(KEIRQ_ROUTINE Handler, UINT IrqNumber, UINT 
 		}
 	}
 	if(!IrqControlDescriptor) SOD(SOD_INTERRUPT_MANAGEMENT, "FAILED TO ALLOCATE IRQ HANDLER");
-	IrqControlDescriptor->VirtualIoApicId = VirtualIoApicId;
-	IrqControlDescriptor->PhysicalIrqNumber = IrqNumber;
-	IrqControlDescriptor->IoApicIrqNumber = IrqIndex;
+	IrqControlDescriptor->VirtualIoApicId = (UINT8)VirtualIoApicId;
+	IrqControlDescriptor->PhysicalIrqNumber = (UINT8)IrqNumber;
+	IrqControlDescriptor->IoApicIrqNumber = (UINT8)IrqIndex;
 	IrqControlDescriptor->Flags = Flags;
 	IrqControlDescriptor->Process = KeGetCurrentProcess();
 	IrqControlDescriptor->Handler = Handler;
@@ -337,16 +337,16 @@ IRQ_CONTROL_DESCRIPTOR* KERNELAPI RegisterIrq(UINT32 IrqSource, void* Handler, U
 	for(;;) {
 	for(UINT i = gIRQ_MGR_ProcessorSwitch;i<Pmgrt.NumProcessors;i++) {
 		IRQ_CONTROL_DESCRIPTOR* CpuMt = CpuManagementTable[i]->IrqControlTable;
-		for(UINT c = 0;c<NUM_IRQS_PER_PROCESSOR;c++, CpuMt++) {
+		for(UINT8 c = 0;c<NUM_IRQS_PER_PROCESSOR;c++, CpuMt++) {
 			if(!CpuMt->Present) {
 				CpuMt->Flags = Flags;
 				CpuMt->InterruptVector = c + 0x20;
 				SetInterruptGate(gIRQCtrlWrapPtr[c], CpuMt->InterruptVector, 0, 3, IDT_INTERRUPT_GATE, 0x08);
-				CpuMt->PhysicalIrqNumber = IrqSource;
+				CpuMt->PhysicalIrqNumber = (UINT8)IrqSource;
 				CpuMt->Process = KeGetCurrentProcess();
-				CpuMt->VirtualIoApicId = IoApicId;
+				CpuMt->VirtualIoApicId = (UINT8)IoApicId;
 				CpuMt->LapicId = CpuManagementTable[i]->ProcessorId;
-				CpuMt->Handler = Handler;
+				CpuMt->Handler = (KEIRQ_ROUTINE)Handler;
 				CpuMt->Present = 1;
 				gIRQ_MGR_ProcessorSwitch = c + 1;
 				__BitRelease(&gIRQ_MGR_MUTEX, 0);
@@ -396,7 +396,7 @@ KERNELSTATUS KERNELAPI SetInterruptService(RFDEVICE_OBJECT Device, KEIRQ_ROUTINE
             for(;;) {
                 if(CapabilityHeader->CapabilityId == PCI_CAPABILITY_ID_MSI) {
 					SystemDebugPrint(L"MSI Capability Found");
-                    for(UINT i = 0;i<sizeof(PCI_MSI_CAPABILITY_64BIT) >> 2;i++){
+                    for(UINT16 i = 0;i<sizeof(PCI_MSI_CAPABILITY_64BIT) >> 2;i++){
                         CapBuffer[i] = PciDeviceConfigurationRead32(Device, CapOffset + (i << 2));
                     }
 
@@ -428,7 +428,7 @@ KERNELSTATUS KERNELAPI SetInterruptService(RFDEVICE_OBJECT Device, KEIRQ_ROUTINE
 					} else {
 
 						Msi->MessageData = MsiVector | (1 << 14); // Assert
-						Msi->MessageAddress = (UINT64)LocalApicPhysicalAddress + (Icd->LapicId << 12);
+						Msi->MessageAddress = (DWORD)((UINT64)LocalApicPhysicalAddress + (Icd->LapicId << 12));
 						Msi->MessageControl.MsiEnable = 1;
 						Msi->Mask = 0;
 						Msi->MessageControl.MultipleMessageEnable = 0;
@@ -446,7 +446,7 @@ KERNELSTATUS KERNELAPI SetInterruptService(RFDEVICE_OBJECT Device, KEIRQ_ROUTINE
 					// while(1);
 	
 					SZeroMemory(Msi);
-                    for(UINT i = 0;i<sizeof(PCI_MSI_CAPABILITY_64BIT) >> 2;i++){
+                    for(UINT16 i = 0;i<sizeof(PCI_MSI_CAPABILITY_64BIT) >> 2;i++){
                         CapBuffer[i] = PciDeviceConfigurationRead32(Device, CapOffset + (i << 2));
                     }
                     

@@ -7,13 +7,14 @@
 void (__fastcall *_SIMD_Memset)(LPVOID ptr, UINT64 Value, UINT64 Count) = _SSE_Memset;
 // LPVOID (*memset)(LPVOID ptr, UINT8 value, size_t size) = _r8_SSE_Memset;
 LPVOID __fastcall _Wrap_SSE_Memset(LPVOID ptr, UINT64 value, size_t size){
+    if(size & 7) return NULL;
     if(size < 0x10) {
-        __repstos(ptr, value, size);
+        __repstos64(ptr, value, size >> 3);
         
         return NULL;
     }
     if(size & 0xF) {
-        __repstos(ptr, value, size & 0xF);
+        __repstos64(ptr, value, (size & 0xF) >> 3);
         (char*)ptr += (size & 0xF);
         size-= 0x10 - ((UINT64)size & 0xF);
     }
@@ -27,12 +28,13 @@ LPVOID __fastcall _Wrap_SSE_Memset(LPVOID ptr, UINT64 value, size_t size){
 
 
 LPVOID __fastcall _Wrap_AVX_Memset(LPVOID ptr, UINT64 value, size_t size) {
+    if(size & 7) return NULL;
     if(size < 0x20) {
-        __repstos(ptr, value, size);
+        __repstos64(ptr, value, size >> 3);
         return NULL;
     }
     if(size & 0x1F) {
-        __repstos(ptr, value, size & 0x1F);
+        __repstos64(ptr, value, (size & 0x1F) >> 3);
         (char*)ptr += (size & 0x1F);
         size -= 0x20 - (size & 0x1F);
     }

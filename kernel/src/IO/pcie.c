@@ -26,11 +26,11 @@ PCI_CONFIGURATION_HEADER* KERNELAPI PcieConfigurationRead(UINT16 PcieConfig, uns
 
 BOOL KERNELAPI PcieEnumerateDevices(unsigned char PciClass, unsigned char PciSubClass, unsigned char ProgramInterface, PCI_CONFIGURATION_HEADER** PConfiguarationPtrs, unsigned int Max){
 	if(!Mcfg || !PConfiguarationPtrs || !Max || PciClass == 0xFF) return FALSE;
-	PCI_DEVICE_CONFIG* DeviceConfiguration = (PCI_DEVICE_CONFIG*)(Mcfg + 1);
-	for(UINT16 PcieDevice = 0;PcieDevice < NumDeviceConfigs;PcieDevice++,DeviceConfiguration++){
-		unsigned int StartPciBusNumber = DeviceConfiguration->StartPciBusNumber;
-		unsigned int EndPciBusNumber = DeviceConfiguration->EndPciBusNumber;
-		for(unsigned int Bus = StartPciBusNumber;Bus <= EndPciBusNumber;Bus++){
+	PCI_DEVICE_CONFIG* Config = (PCI_DEVICE_CONFIG*)(Mcfg + 1);
+	for(UINT16 PcieDevice = 0;PcieDevice < NumDeviceConfigs;PcieDevice++,Config++){
+		unsigned char StartPciBusNumber = Config->StartPciBusNumber;
+		unsigned char EndPciBusNumber = Config->EndPciBusNumber;
+		for(unsigned char Bus = StartPciBusNumber;Bus <= EndPciBusNumber;Bus++){
 			if(!Max) return TRUE;
 			for(unsigned char Device = 0;Device < 32;Device++){
 				if(!Max) return TRUE;
@@ -75,9 +75,9 @@ PCI_CONFIGURATION_HEADER* KERNELAPI PcieFindDevice(UINT16 VendorId, UINT16 Devic
 	if(!Mcfg || VendorId == 0xFFFF) return NULL;
 	PCI_DEVICE_CONFIG* DeviceConfiguration = (PCI_DEVICE_CONFIG*)(Mcfg + 1);
 	for(UINT16 PcieDevice = 0;PcieDevice < NumDeviceConfigs;PcieDevice++, DeviceConfiguration++){
-		unsigned int StartPciBusNumber = DeviceConfiguration->StartPciBusNumber;
-		unsigned int EndPciBusNumber = DeviceConfiguration->EndPciBusNumber;
-		for(unsigned int Bus = StartPciBusNumber;Bus <= EndPciBusNumber;Bus++){
+		unsigned char StartPciBusNumber = DeviceConfiguration->StartPciBusNumber;
+		unsigned char EndPciBusNumber = DeviceConfiguration->EndPciBusNumber;
+		for(unsigned char Bus = StartPciBusNumber;Bus <= EndPciBusNumber;Bus++){
 			for(unsigned char Device = 0;Device < 32;Device++){
 				for(unsigned char Function = 0;Function < 8;Function++){
 					PCI_CONFIGURATION_HEADER* PciConfig = PcieConfigurationRead(PcieDevice, Bus, Device, Function);
@@ -100,7 +100,7 @@ void PciExpressInit(ACPI_SDT* Sdt){
 	if(Mcfg) SOD(0, "INVALID SYSTEM, MULTIPLE PCIE's (MCFG)");
 	Mcfg = (ACPI_MCFG*)Sdt;
 	
-	NumDeviceConfigs = (Mcfg->Sdt.Length - sizeof(ACPI_MCFG)) / sizeof(PCI_DEVICE_CONFIG); // / (16) sizeof(PCI_DEVICE_CONFIG)
+	NumDeviceConfigs = (UINT16)(Mcfg->Sdt.Length - sizeof(ACPI_MCFG)) / sizeof(PCI_DEVICE_CONFIG); // / (16) sizeof(PCI_DEVICE_CONFIG)
 	PCI_DEVICE_CONFIG* DeviceConfiguration = (PCI_DEVICE_CONFIG*)(Mcfg + 1);
 	
 	for(UINT16 DeviceConfigurationIndex = 0; DeviceConfigurationIndex<NumDeviceConfigs; DeviceConfigurationIndex++, DeviceConfiguration++){

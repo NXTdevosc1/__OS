@@ -38,7 +38,7 @@ static inline int KERNELAPI SetProcess(
     Process->ParentProcess = ParentProcess;
     Process->OperatingMode = OperatingMode;
     Process->ProcessId = ProcessId;
-    Process->Subsystem = Subsystem;
+    Process->Subsystem = (UINT8)Subsystem;
    
     // CreateMemoryTable(Process, &Process->MemoryManagementTable);
 
@@ -92,7 +92,7 @@ RFPROCESS KEXPORT KERNELAPI KeCreateProcess(RFPROCESS ParentProcess, LPWSTR Proc
     
     if(!ProcessName) ProcessName = __UnkownProcessName;
 
-    UINT16 len = wstrlen(ProcessName);
+    UINT16 len = (UINT16)wstrlen(ProcessName);
     if(!len || len > PNAME_CHARSZ_MAX) return NULL;
 
     RFPROCESS Process = Pmgrt.ProcessList;
@@ -140,7 +140,7 @@ RFPROCESS KERNELAPI GetProcessById(UINT64 ProcessId){
 
 BOOL KERNELAPI SetProcessName(RFPROCESS Process, LPWSTR ProcessName) {
     if (!Process || !ProcessName) return FALSE;
-    UINT16 len = wstrlen(ProcessName);
+    UINT16 len = (UINT16)wstrlen(ProcessName);
     if (!len || len > PNAME_CHARSZ_MAX) return FALSE;
     LPWSTR copy = AllocatePool(len + 2);
     if (!copy) SET_SOD_MEMORY_MANAGEMENT;
@@ -231,7 +231,7 @@ KERNELSTATUS KERNELAPI SetPriorityClass(RFPROCESS Process, int PriorityClass) {
     PriorityClass -= PRIORITY_CLASS_MIN;
     __SpinLockSyncBitTestAndSet(&Process->ControlMutex0, PROCESS_MUTEX0_CREATE_THREAD);
     Process->PriorityClass = PriorityClass;
-    UINT RemainingThreads = Process->NumThreads;
+    UINT64 RemainingThreads = Process->NumThreads;
     PROCESS_THREAD_LIST* ThreadList = &Process->Threads;
     while(RemainingThreads) {
         RFTHREAD* _th = ThreadList->Threads;
@@ -329,7 +329,7 @@ RFTHREAD KEXPORT KERNELAPI KeCreateThread(RFPROCESS Process, UINT64 StackSize, T
     UINT64 ThreadProcessor = Pmgrt.NextThreadProcessor;
 
     if(Flags & THREAD_CREATE_SYSTEM_IDLE) {
-        Thread->ProcessorId = ThreadProcessor;
+        Thread->ProcessorId = (UINT32)ThreadProcessor;
         if (ThreadProcessor + 1 >= Pmgrt.NumProcessors) Pmgrt.NextThreadProcessor = 0;
         else Pmgrt.NextThreadProcessor = ThreadProcessor + 1;
     }
@@ -364,7 +364,7 @@ RFTHREAD KEXPORT KERNELAPI KeCreateThread(RFPROCESS Process, UINT64 StackSize, T
     
 
     Process->StackSize += StackSize;
-    ThreadWrapperInit(Thread, StartAddress);
+    ThreadWrapperInit(Thread, (void*)StartAddress);
     
 
     

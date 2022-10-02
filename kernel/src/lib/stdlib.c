@@ -63,8 +63,8 @@ unsigned char wstrcmp(const wchar_t* x, const wchar_t* y, size_t size)
 }
 
 wchar_t* wstrcat(const wchar_t* x, const wchar_t* y){
-	uint16_t sizex = wstrlen(x);
-	uint16_t sizey = wstrlen(y);
+	uint16_t sizex = (UINT16)wstrlen(x);
+	uint16_t sizey = (UINT16)wstrlen(y);
 	wchar_t* buffer = AllocatePool((sizex+sizey)*2 + (2 /*end character code*/));
 	wchar_t* ret = buffer;
 	if(!ret) return NULL;

@@ -36,7 +36,8 @@ void SortIoApics(){
     for(UINT i = 0;i<MAX_IOAPICS;i++){
         if(NumSortedIoApics == NumIoApics) break;
         ACPI_IOAPIC* IoApic = NULL;
-        if((IoApic = QueryIoApicByPhysicalId(i))){
+        IoApic = QueryIoApicByPhysicalId((UINT8)i);
+        if(IoApic){
             MapPhysicalPages(kproc->PageMap, DWVOID IoApic->IoApicAddress, DWVOID IoApic->IoApicAddress, 1, PM_MAP | PM_CACHE_DISABLE);
             SortedIoApics[NumSortedIoApics] = IoApic;
             NumSortedIoApics++;
@@ -44,7 +45,7 @@ void SortIoApics(){
             UINT MaxRedirectionEntry = IoApicGetMaxRedirectionEntry(IoApic);
             SystemDebugPrint(L"IOAPIC #%d MAX_REDIR_ENTRY : %d, GSYS_INTBASE : %d", IoApic->IoApicId, MaxRedirectionEntry, IoApic->GlobalSysInterruptBase);
             for(UINT c = 0;c<MaxRedirectionEntry + 1;c++){
-                IoApicWriteRedirectionTable(IoApic, c, &RedirectionEntry);
+                IoApicWriteRedirectionTable(IoApic, (UINT8)c, &RedirectionEntry);
             }
             
         }
@@ -80,8 +81,8 @@ void IoApicReadRedirectionTable(ACPI_IOAPIC* IoApic, unsigned char RedirectionTa
 void IoApicWriteRedirectionTable(ACPI_IOAPIC* IoApic, unsigned char RedirectionTableIndex, RFIOAPIC_REDTBL RedirectionTable){
     if(RedirectionTableIndex > IoApicGetMaxRedirectionEntry(IoApic)) SOD(SOD_INTERRUPT_MANAGEMENT, "IOAPIC REDIR ENTRY > MAX_REDIR_ENTRIES (MAY BE A BUG, CONTACT US)");
     QWORD QRedTbl = *(QWORD*)RedirectionTable;
-    IoApicWrite(IoApic, IOAPIC_REDIRECTION_TABLE_BASE + (RedirectionTableIndex << 1), QRedTbl);
-    IoApicWrite(IoApic, IOAPIC_REDIRECTION_TABLE_BASE + (RedirectionTableIndex << 1) + 1, QRedTbl >> 32);
+    IoApicWrite(IoApic, IOAPIC_REDIRECTION_TABLE_BASE + (RedirectionTableIndex << 1), (UINT32)QRedTbl);
+    IoApicWrite(IoApic, IOAPIC_REDIRECTION_TABLE_BASE + (RedirectionTableIndex << 1) + 1, (UINT32)(QRedTbl >> 32));
 }
 
 unsigned char IoApicGetMaxRedirectionEntry(ACPI_IOAPIC* IoApic){

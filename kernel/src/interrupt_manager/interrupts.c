@@ -25,7 +25,7 @@ extern void InterruptUnsupported(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME 
 
 	for (UINT64 i = 0;i<CharacterCount;i++, CharacterIndex++) {
 		if (!((InterruptNumber / Div) % Reminder)) break;
-		Msg[CharacterIndex] = '0' + (InterruptNumber / Div) % Reminder;
+		Msg[CharacterIndex] = (char)('0' + (InterruptNumber / Div) % Reminder);
 		Div /= 10;
 		Reminder /= 10;
 	}
@@ -218,8 +218,9 @@ void INTH_DBL_FAULT(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFram
 }
 
 
-void INTH_keyboard(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFrame){	handle_keyboard(InPortB(0x60));
+void INTH_keyboard(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFrame){	
+	// handle_keyboard(InPortB(0x60));
 }
 void INTH_mouse(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFrame){
-	handle_mouse_input(InPortB(0x60));
+	// handle_mouse_input(InPortB(0x60));
 }

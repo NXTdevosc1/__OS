@@ -33,7 +33,7 @@ void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags) 
     register PAGE* Page = MemoryManagementTable.PageArray;
     register UINT64 Max = MemoryManagementTable.NumBytesPageBitmap >> 3; // QWORD Size
     register UINT NextIndex = 0;
-    UINT Index = 0;
+    unsigned long Index = 0;
     
     volatile UINT64* PagesStartBmp = NULL;
     UINT PagesStartIndex = 0;

@@ -95,6 +95,8 @@ void InitMemoryManagementSubsystem() {
     //     MemoryManagementTable.FreeMemoryLevels[i].UnallocatedSegmentCache.CacheLineSize++;
     // }
 }
+extern LPVOID __fastcall _SSE_AllocatePhysicalPage(volatile char* PageBitmap, UINT64 BitmapSize, PAGE* PageArray);
+LPVOID (__fastcall *_SIMD_AllocatePhysicalPage) (volatile char* PageBitmap, UINT64 BitmapSize, PAGE* PageArray) = _SSE_AllocatePhysicalPage;
 
 // Used after relocation
 void SIMD_InitOptimizedMemoryManagement() {

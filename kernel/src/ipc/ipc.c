@@ -235,7 +235,7 @@ BOOL KERNELAPI		 IpcGetMessage(PCLIENT Client, MSG* Message) {
 		while (!InQueue->PendingMessages) IoWait();
 		// if finished before task switch
 		MSG_OBJECT* SelectedMessage = NULL;
-		register UINT LeastId = InQueue->LeastId;
+		register UINT64 LeastId = InQueue->LeastId;
 		register UINT PossibleNextMessage = InQueue->PossibleNextMessage;
 
 		if(PossibleNextMessage != (UINT32)-1){
@@ -248,7 +248,7 @@ BOOL KERNELAPI		 IpcGetMessage(PCLIENT Client, MSG* Message) {
 			InQueue->PossibleNextMessage = (UINT32)-1;
 		}
 		if(!SelectedMessage){
-			register UINT NextPossibleMessageId = LeastId + 1;
+			register UINT64 NextPossibleMessageId = LeastId + 1;
 			for (UINT i = 0; i < InQueue->MaxMessages; i++) {
 				if (InQueue->Messages[i].Header.Pending
 				) {

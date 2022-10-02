@@ -162,7 +162,7 @@ const char* strdbl(double value, int radix)
             i++;
             buff = to_string64((UINT64)((double)value * dbl));
             buff += i;
-            for (UINT64 c = 0; c < radix; c++, i++) {
+            for (UINT64 c = 0; c < (UINT64)radix; c++, i++) {
                 doubleout[i] = buff[c];
             }
             doubleout[i] = '\0';

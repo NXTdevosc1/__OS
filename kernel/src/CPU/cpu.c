@@ -32,7 +32,7 @@ UINT64 ProcessorTablesOffset = 0;
 void InitProcessorDescriptors(void** CpuBuffer, UINT64* CpuBufferSize){
 	UINT64 _CpuBufferNumPages = 20 + TSS_IST1_NUMPAGES + TSS_IST2_NUMPAGES + TSS_IST3_NUMPAGES + SYSENTRY_STACK_NUMPAGES;
 	void* _CpuBuffer = (char*)SystemSpaceBase + SYSTEM_SPACE48_PROCESSOR_TABLES + ProcessorTablesOffset;
-	void* __Allocated = AllocatePoolEx(kproc, _CpuBufferNumPages << 12, 0x1000, ALLOCATE_POOL_PHYSICAL);
+	void* __Allocated = AllocateContiguousPages(kproc, _CpuBufferNumPages, ALLOCATE_POOL_PHYSICAL);
 	if(!__Allocated) SOD(SOD_PROCESSOR_INITIALIZATION, "Failed to allocate Processor Tables, Please Upgrade your RAM");
 	MapPhysicalPages(kproc->PageMap, _CpuBuffer, __Allocated, _CpuBufferNumPages, PM_MAP);
 	ZeroMemory(_CpuBuffer, _CpuBufferNumPages << 12);
@@ -48,7 +48,8 @@ void InitProcessorDescriptors(void** CpuBuffer, UINT64* CpuBufferSize){
 	#ifdef ___KERNEL_DEBUG___
 		DebugWrite("Checking & Enabling Process Context ID (TLB Cache Extension)");
 	#endif
-	if ((ProcessContextIdSupported = CheckProcessContextIdEnable())) {
+	ProcessContextIdSupported = CheckProcessContextIdEnable();
+	if (ProcessContextIdSupported) {
 		#ifdef ___KERNEL_DEBUG___
 		DebugWrite("Process Context ID (TLB Cache Extension) Is Supported.");
 	#endif
@@ -85,7 +86,7 @@ void CpuSetupManagementTable(UINT64 CpuCount) {
 	ZeroMemory(CpuManagementTable, (CpuCount << 3) + 0x1000);
 	UINT64 CurrentProcessor = GetCurrentProcessorId();
 	UINT64 CPU_MGMT_OFFSET = 0;
-	for (UINT64 i = 0; i < CpuCount; i++, CPU_MGMT_OFFSET+=0x8000) {
+	for (UINT32 i = 0; i < (UINT32)CpuCount; i++, CPU_MGMT_OFFSET+=0x8000) {
 		CpuManagementTable[i] = AllocatePoolEx(NULL, CPU_MGMT_NUM_PAGES << 12, 0x1000, ALLOCATE_POOL_LOW_4GB);
 		if (!CpuManagementTable[i]) SET_SOD_MEMORY_MANAGEMENT;
 		SZeroMemory(CpuManagementTable[i]);
@@ -160,7 +161,7 @@ KERNELSTATUS InitializeApicCpu(UINT64 ApicId) {
 	CpuBootStatus = 0;
 
 	*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_ERROR_STATUS) = 0;
-	*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_HIGH) = (*(uint32_t*)(LAPIC_ADDRESS + 0x310) & 0x00ffffff) | (ApicId << 24);
+	*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_HIGH) = (*(uint32_t*)(LAPIC_ADDRESS + 0x310) & 0x00ffffff) | ((UINT32)ApicId << 24);
 	*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_LOW) = (*(uint32_t*)(LAPIC_ADDRESS + 0x300) & 0xfff00000) | 0x00C500;
 
 
@@ -171,7 +172,7 @@ KERNELSTATUS InitializeApicCpu(UINT64 ApicId) {
 
 
 
-	*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_HIGH) = (*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_HIGH) & 0x00ffffff) | (ApicId << 24);
+	*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_HIGH) = (*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_HIGH) & 0x00ffffff) | ((UINT32)ApicId << 24);
 	*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_LOW) = (*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_LOW) & 0xfff00000) | 0x008500;
 
 	while (*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_LOW) & (1 << 12)) {
@@ -180,7 +181,7 @@ KERNELSTATUS InitializeApicCpu(UINT64 ApicId) {
 
 	for (uint8_t i = 0; i < 2; i++) {
 		*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_ERROR_STATUS) = 0;
-		*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_HIGH) = (*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_HIGH) & 0x00ffffff) | (ApicId << 24);
+		*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_HIGH) = (*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_HIGH) & 0x00ffffff) | ((UINT32)ApicId << 24);
 		*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_LOW) = (*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_LOW) & 0xfff0f800) | 0x000608;
 		while (*(uint32_t*)(LAPIC_ADDRESS + CPU_LAPIC_INTERRUPT_COMMAND_REGISTER_LOW) & (1 << 12)) {
 			__pause();
@@ -261,12 +262,12 @@ void LapicTimerSetupTSCDeadlineMode() {
 	*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_LVT) = 0x20 | (LAPIC_TIMER_TSC_DEADLINE_MODE); // IRQ 0 | ONE SHOT MODE
 	ApicTimerBaseQuantum = ((UINT64)1 << 63) | 0x18000;
 	__pause();
-	GP_draw_sf_text(to_hstring32(__rdtsc()), 0xffffff, 20, 40);
+	GP_draw_sf_text(to_hstring64(__rdtsc()), 0xffffff, 20, 40);
 	*(UINT32*)(LAPIC_ADDRESS + CPU_LAPIC_END_OF_INTERRUPT) = 0;
 
 	__WriteMsr(IA32_TSC_DEADLINE_MSR, (unsigned int)ApicTimerBaseQuantum, 0);
 
-	GP_draw_sf_text(to_hstring32(__rdtsc()), 0xffffff, 20, 60);
+	GP_draw_sf_text(to_hstring64(__rdtsc()), 0xffffff, 20, 60);
 
 
 	while (1);
@@ -290,9 +291,9 @@ void SetupLocalApicTimer(){
 			// Find CPU BUS SPEED
 			// Processor Info of the current Processor
 			SMBIOS_PROCESSOR_INFORMATION_STRUCTURE* ProcessorInformation = NULL;
-			UINT SmNum = SmbiosGetStructuresCount();
+			WORD SmNum = SmbiosGetStructuresCount();
 			
-			for(UINT i = 0;i<SmNum;i++) {
+			for(WORD i = 0;i<SmNum;i++) {
 				SMBIOS_STRUCTURE_HEADER* Sm = SmbiosGetStructure(i);
 				if(!Sm) SOD(SOD_INITIALIZATION, "Cannot retreive CPU Information and Bus Speed");
 				if(Sm->Type == SMBIOS_PROCESSOR_INFORMATION) {
@@ -308,7 +309,7 @@ void SetupLocalApicTimer(){
 			CpuBusSpeed = 100000000;
 			SystemDebugPrint(L"EXTERNAL_BUS_SPEED : %d", CpuBusSpeed);
 		}
-		UINT64 InitialCount = ((CpuBusSpeed) / 0x10 /*Divisor*/) / 0x800 /*Target clocks per second*/;
+		UINT32 InitialCount = (UINT32)(((CpuBusSpeed) / 0x10 /*Divisor*/) / 0x800 /*Target clocks per second*/);
 
 		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_LVT) = INT_APIC_TIMER | (LAPIC_TIMER_PERIODIC_MODE); 
 		*(UINT32*)(LAPIC_ADDRESS + LAPIC_TIMER_INITIAL_COUNT) = InitialCount;
@@ -346,7 +347,7 @@ void EnableApic() {
 	SetLocalApicBase(LocalApicPhysicalAddress);
 	
 	*(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_LOGICAL_DESTINATION_REGISTER) = 0;
-	*(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_DESTINATION_FORMAT_REGISTER) = 0xF << 28; // Flat Mode
+	*(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_DESTINATION_FORMAT_REGISTER) = (UINT32)0xF << 28; // Flat Mode
 	*(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_TASK_PRIORITY) = 0;
 
 	*(UINT32*)((char*)LocalApicPhysicalAddress + CPU_LAPIC_SPURIOUS_INTERRUPT_VECTOR) = INT_APIC_SPURIOUS | 0x100 ; // Bit 12 (do not broadcast EOI), bit 8 : APIC Enable
@@ -362,7 +363,7 @@ void EnableApic() {
 
 }
 void SetLocalApicBase(void* _Lapic) {
-	UINT32 eax = ((UINT64)_Lapic | IA32_APIC_BASE_MSR_ENABLE);
-	UINT32 edx = (UINT64)_Lapic >> 32;
+	UINT32 eax = (UINT32)((UINT64)_Lapic | IA32_APIC_BASE_MSR_ENABLE);
+	UINT32 edx = (UINT32)((UINT64)_Lapic >> 32);
 	__WriteMsr(IA32_APIC_BASE_MSR, eax, edx);
 }

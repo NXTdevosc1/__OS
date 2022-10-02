@@ -31,7 +31,7 @@ UINT KERNELAPI AmlCopyName(char* Destination, const char* Source, UINT64* NameSt
             len++;
         }
         UINT StartingCharacter = 0;
-        for(UINT i = 0;i<4 /*Lead name char + 4 characters*/;i++, Source++, nsb++){
+        for(UINT64 i = 0;i<4 /*Lead name char + 4 characters*/;i++, Source++, nsb++){
             if(!x && !i) i = nsb;
             char c = *Source;
             if(c == 0) {
@@ -100,7 +100,7 @@ char* KERNELAPI AmlParseFieldElement(char* Aml) {
     UINT64 NmBytes = 0;
 
     UINT8 FieldType = *Aml;
-    UINT i = 0; // Increment Count
+    UINT64 i = 0; // Increment Count
     switch(FieldType) {
         case FIELD_TYPE_RESERVED:
         {

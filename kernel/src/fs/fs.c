@@ -113,8 +113,8 @@ FILE KERNELAPI DefaultOpenFile(PARTITION_INSTANCE* Partition, LPWSTR Path, UINT6
     if (!FixFilePath(Copy)) return NULL;
     
     if ((Access & (FILE_OPEN_WRITE | FILE_OPEN_SET_INFORMATION))) {
-        FILE FoundFile = NULL;
-        if ((FoundFile = FindOpenFilePath(&Partition->FileList, Copy))) {
+        FILE FoundFile = FindOpenFilePath(&Partition->FileList, Copy);
+        if (FoundFile) {
             if (FoundFile->Process == Process) {
                 FoundFile->OpenAccess |= Access; // Add the new privileges
                 return FoundFile;

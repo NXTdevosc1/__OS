@@ -73,7 +73,8 @@ SMBIOS_BIOS_INFORMATION_STRUCTURE* GetBiosInformation() {
 	if (!SmbiosTable) return NULL;
 	SMBIOS_STRUCTURE_HEADER* Header = NULL;
 	for (WORD i = 0; i < SmbiosGetStructuresCount(); i++) {
-		if ((Header = SmbiosGetStructure(i)) && Header->Type == SMBIOS_BIOS_INFORMATION) {
+		Header = SmbiosGetStructure(i);
+		if (Header && Header->Type == SMBIOS_BIOS_INFORMATION) {
 			return (SMBIOS_BIOS_INFORMATION_STRUCTURE*)Header;
 		}
 	}
@@ -84,7 +85,8 @@ SMBIOS_SYSTEM_INFORMATION_STRUCTURE* GetSystemInformation() {
 	if (!SmbiosTable) return NULL;
 	SMBIOS_STRUCTURE_HEADER* Header = NULL;
 	for (WORD i = 0; i < SmbiosGetStructuresCount(); i++) {
-		if ((Header = SmbiosGetStructure(i)) && Header->Type == SMBIOS_SYSTEM_INFORMATION) {
+		Header = SmbiosGetStructure(i);
+		if (Header && Header->Type == SMBIOS_SYSTEM_INFORMATION) {
 			return (SMBIOS_SYSTEM_INFORMATION_STRUCTURE*)Header;
 		}
 	}
@@ -95,7 +97,8 @@ SMBIOS_BASE_BOARD_INFORMATION_STRUCTURE* GetBaseBoardInformation() {
 	if (!SmbiosTable) return NULL;
 	SMBIOS_STRUCTURE_HEADER* Header = NULL;
 	for (WORD i = 0; i < SmbiosGetStructuresCount(); i++) {
-		if ((Header = SmbiosGetStructure(i)) && Header->Type == SMBIOS_BASE_BOARD_INFORMATION) {
+		Header = SmbiosGetStructure(i);
+		if (Header && Header->Type == SMBIOS_BASE_BOARD_INFORMATION) {
 			return (SMBIOS_BASE_BOARD_INFORMATION_STRUCTURE*)Header;
 		}
 	}

@@ -1,4 +1,5 @@
 #include <CPU/cpu.h>
+#include <interrupt_manager/SOD.h>
 
 void ApicSpuriousInt(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME Isf) {
 	SOD(0, "APIC_SPURIOUS");

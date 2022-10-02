@@ -39,13 +39,13 @@ UINT16 KERNELAPI IoPciRead16(UINT8 BusNumber, UINT8 Device, UINT8 Function, UINT
         Val >>= (Advance) << 3;
         if(Advance == 3) {
             Val &= 0xFF;
-            Ret = Val;
+            Ret = (UINT16)Val;
             OutPort(0xCF8, Address + 4);
             Val = InPortB(0xCFC);
             Ret |= Val << 8;
         } else {
             Val &= 0xFFFF;
-            Ret = Val;
+            Ret = (UINT16)Val;
         }
         return Ret;
     } else return InPortW(0xCFC);
@@ -65,7 +65,7 @@ UINT8 KERNELAPI IoPciRead8(UINT8 BusNumber, UINT8 Device, UINT8 Function, UINT16
         UINT32 Val = InPort(0xCFC);
         Val >>= (Advance << 3);
         Val &= 0xFF;
-        return Val;
+        return (UINT8)Val;
     } else return InPortB(0xCFC);
 }
 
@@ -106,8 +106,8 @@ void KERNELAPI PciDeviceConfigurationWrite64(RFDEVICE_OBJECT DeviceObject, UINT6
     if(DeviceObject->PciAccessType == 0){
 		*(UINT64*)((char*)DeviceObject->DeviceConfiguration + Offset) = Value;
 	}else {
-		IoPciWrite32(DeviceObject->Bus, DeviceObject->DeviceNumber, DeviceObject->Function, Value, Offset);
-		IoPciWrite32(DeviceObject->Bus, DeviceObject->DeviceNumber, DeviceObject->Function, Value >> 32, Offset + 4);
+		IoPciWrite32(DeviceObject->Bus, DeviceObject->DeviceNumber, DeviceObject->Function, (UINT32)Value, Offset);
+		IoPciWrite32(DeviceObject->Bus, DeviceObject->DeviceNumber, DeviceObject->Function, (UINT32)(Value >> 32), Offset + 4);
 	}
 }
 void KERNELAPI PciDeviceConfigurationWrite32(RFDEVICE_OBJECT DeviceObject, UINT32 Value, UINT16 Offset) {
@@ -151,7 +151,7 @@ void KERNELAPI IoPciWrite32(UINT8 BusNumber, UINT8 Device, UINT8 Function, UINT3
 
         OutPort(0xCFC, Value);
     } else {
-        IoPciWrite16(BusNumber, Device, Function, Value, Offset);
+        IoPciWrite16(BusNumber, Device, Function, (UINT16)Value, Offset);
         IoPciWrite16(BusNumber, Device, Function, Value >> 16, Offset + 2);
     }
 

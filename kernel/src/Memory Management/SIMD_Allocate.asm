@@ -35,9 +35,9 @@ global _SSE_AllocatePhysicalPage
 extern MemoryManagementTable
 
 _SSE_AllocatePhysicalPage:
-    mov rbx, [rel MemoryManagementTable] ; Available Memory
-    cmp rbx, 0x1000
-    jb .ExitFailure
+    ; mov rbx, [rel MemoryManagementTable] ; Available Memory
+    ; cmp rbx, 0x1000
+    ; jb .ExitFailure
 .loop0:
     movdqa xmm0, [rcx] ; Page Bitmap
     %rep 2

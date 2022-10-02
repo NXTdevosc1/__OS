@@ -105,6 +105,8 @@ void TripleFaultingFunction() {
 	float IncValue = 0.1f;
 	UINT XOff = 200;
 	UINT YOff = 300;
+	GetBezierPoint(XCords, betabuffer, 4, 0.1f);
+	while(1);
 	UINT64 X0 = GetBezierPoint(XCords, betabuffer, 4, 0.1f), X1 = GetBezierPoint(XCords, betabuffer, 4, 0.2f), Y0 = GetBezierPoint(YCords, betabuffer, 4, 0.1f), Y1 = GetBezierPoint(YCords, betabuffer, 4, 0.2f);
 	float Distance = (float)__sqrt(pow((double)(X1 - X0), 2) + pow((double)(Y1-Y0), 2));
 	if(Distance > 2) {
@@ -142,6 +144,7 @@ void __declspec(noreturn) _start() {
 	} else {
 		GP_draw_sf_text("Extension level : SSE", 0xFFFFFF, 20, 20);
 	}
+	
 	// while(1) __hlt();
 	SetupPageAttributeTable();
 	Pmgrt.NumProcessors = 1;
@@ -150,17 +153,36 @@ void __declspec(noreturn) _start() {
 
 	InitMemoryManagementSubsystem();
 	// GP_clear_screen(0);
-	UINT64 Bitmap = 0x180;
-	__SyncBitmapAllocate(&Bitmap);
-	SystemDebugPrint(L"INDX : %x, BMP : %x, EXT : %x", __SyncBitmapAllocate(&Bitmap), Bitmap, ExtensionLevel);
+	// UINT64 Bitmap = 0x180;
+	// __SyncBitmapAllocate(&Bitmap);
+	// SystemDebugPrint(L"INDX : %x, BMP : %x, EXT : %x", __SyncBitmapAllocate(&Bitmap), Bitmap, ExtensionLevel);
 
-	
+	void* CpuBuffer = NULL;
+	UINT64 CpuBufferSize = 0;
+
+	GlobalInterruptDescriptorInitialize();
+	GlobalSysEntryTableInitialize();
+
+	SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 0x100, 0));
+	SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 1, 0));
+	SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 1, 0));
+	SystemDebugPrint(L"Single : %x", _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray));
+	SystemDebugPrint(L"Single : %x", _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray));
+
+
+	ConfigureSystemSpace();
+	// Initialize Kernel Page tables
+	KernelPagingInitialize();
+	while(1);
+
+
+	InitProcessorDescriptors(&CpuBuffer, &CpuBufferSize);
 
 	// IncValue /= 10;
 
 	GP_clear_screen(0);
 
-	SystemDebugPrint(L"Starting...");
+	// SystemDebugPrint(L"Starting...");
 	TripleFaultingFunction();
 	SystemDebugPrint(L"All done");
 	
@@ -168,10 +190,6 @@ void __declspec(noreturn) _start() {
 	// SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
 	// SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x1000));
 	// SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
-	SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 0x100, 0));
-	SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 1, 0));
-	SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 1, 0));
-	SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 1, 0));
 
 
 
@@ -182,11 +200,11 @@ void __declspec(noreturn) _start() {
 	// LineTo(540, 240, 600, 280, 0xFF0000);
 	// LineTo(600, 280, 500, 280, 0xFF0000);
 	// LineTo(500, 280, 500, 200, 0xFF0000);
-
+	while(1);
 	float testX[] = {0, 50, 100, 100, 0,   0};
 	float testY[] = {0, 50, 0,   100, 100, 0};
-
-	FillVertex(400, 400, 6, testX, testY, 0xFF);
+	LineTo(10, 10, 150, 150, 0xFF0000);
+	// FillVertex(400, 400, 6, testX, testY, 0xFF);
 
 	// TestFill(450, 150, 300, 300, 0xFF0000);
 	
@@ -194,14 +212,12 @@ void __declspec(noreturn) _start() {
 	// SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 1, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
 	// SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 0x10, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
 	// SystemDebugPrint(L"Allocate Pages : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", AllocateContiguousPages(kproc, 1, 0), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
-	while(1);
 	SystemDebugPrint(L"Allocate Page : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
 	SystemDebugPrint(L"Allocate Page : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
 	
-	ConfigureSystemSpace();
-	// Initialize Kernel Page tables
-	KernelPagingInitialize();
+	
 
+	while(1);
 	
 
 
@@ -229,8 +245,7 @@ void __declspec(noreturn) _start() {
 	#ifdef ___KERNEL_DEBUG___
 			DebugWrite("Memory Successfully Mapped. Initializing Descriptor Tables...");
 		#endif
-	void* CpuBuffer = NULL;
-	UINT64 CpuBufferSize = 0;
+	
 	
 	
 	// GlobalInterruptDescriptorInitialize();
@@ -354,11 +369,7 @@ void __declspec(noreturn) _start() {
 
 	
 	while(1) __hlt();
-	GlobalInterruptDescriptorInitialize();
-	GlobalSysEntryTableInitialize();
 
-
-	InitProcessorDescriptors(&CpuBuffer, &CpuBufferSize);
 	
 	ProcessContextIdAllocate(kproc);
 

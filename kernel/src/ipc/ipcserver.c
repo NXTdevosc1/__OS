@@ -22,7 +22,7 @@ KERNELSTATUS KERNELAPI		 IpcServerCreate(RFTHREAD Thread, UINT64 ServerIpAddress
 	}
 	SERVER_LIST* List = &ServerList;
 	for (UINT64 ListId = 0;; ListId++) {
-		for (UINT64 i = 0; i < UNITS_PER_LIST; i++) {
+		for (UINT i = 0; i < UNITS_PER_LIST; i++) {
 			if (!List->Servers[i].Present) {
 				RFSERVER Server = &List->Servers[i];
 				Server->Present = TRUE;
@@ -45,7 +45,7 @@ KERNELSTATUS KERNELAPI		 IpcServerCreate(RFTHREAD Thread, UINT64 ServerIpAddress
 					memcpy(PasswordCopy, ServerPassword, PasswordLength << 1);
 					PasswordCopy[PasswordLength] = 0;
 					Server->ServerPassword = PasswordCopy;
-					Server->LenServerPassword = PasswordLength;
+					Server->LenServerPassword = (UINT16)PasswordLength;
 				}
 
 				Server->Host->ServerClient = TRUE;

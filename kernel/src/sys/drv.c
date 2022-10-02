@@ -115,7 +115,7 @@ KERNELSTATUS KERNELAPI RunDriver(RFDRIVER_OBJECT DriverObject){
 	}
 	if(Buffer){
 		if(KERNEL_ERROR(Pe64LoadNativeApplication(Buffer, DriverObject))) return KERNEL_SERR;
-		RFTHREAD Thread = KeCreateThread(DriverObject->Process, DriverObject->StackSize, DriverObject->DriverStartup, THREAD_CREATE_SUSPEND, NULL);
+		RFTHREAD Thread = KeCreateThread(DriverObject->Process, DriverObject->StackSize, (THREAD_START_ROUTINE)DriverObject->DriverStartup, THREAD_CREATE_SUSPEND, NULL);
 		if(!Thread) SET_SOD_PROCESS_MANAGEMENT;
 		SetThreadPriority(Thread, THREAD_PRIORITY_ABOVE_NORMAL);
 		Thread->Registers.rcx = (UINT64)DriverObject;

@@ -248,8 +248,8 @@ PARTITION_INSTANCE* KERNELAPI ResolvePartition(LPWSTR Path, LPWSTR* InPartitionP
 	if (PartitionIndexerLength) {
 		// Resolve Index Number for e.g. a123:/
 		UINT64 maxchar = PartitionIndexerLength - 1;
-		UINT64 c = 0;
-		for (UINT64 i = maxchar; i >= 0; i--, c++) {
+		UINT16 c = 0;
+		for (INT64 i = maxchar; i >= 0; i--, c++) {
 			if (c) {
 				UINT64 power = powi(10 * Path[i], c);
 				PartitionId += power;

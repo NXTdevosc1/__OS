@@ -9,7 +9,7 @@ KERNELSTATUS KERNELAPI AmlReadPackage(char* Aml, UINT PackageLength){
     
     // Reading Term List
     char NameString[0x20] = {0};
-    for(UINT i = 0;i<PackageLength;i++) {
+    for(UINT64 i = 0;i<PackageLength;i++) {
         if(*Aml == AML_EXTENDED_OP) {
             INC_AML(1);
             UINT8 ExOp = *Aml;

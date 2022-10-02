@@ -5,6 +5,37 @@ global _AVX_MemsetUnaligned
 
 global _SSE_MemcpyUnaligned
 
+global memset
+global memcpy
+global memcmp
+
+; RCX = Dest, DL = Value, R8 = Count
+memset:
+    mov al, dl
+    mov rdi, rcx
+    mov rcx, r8
+    rep stosb
+    ret
+; RCX = Dest, RDX = Src, R8 = Count
+memcpy:
+    mov rsi, rdx
+    mov rdi, rcx
+    mov rcx, r8
+    rep movsb
+    ret
+; RCX = buffer1, RDX = buffer2, R8 = Count
+memcmp:
+    mov rsi, rcx
+    mov rdi, rdx
+    mov rcx, r8
+    repe cmpsb
+    jne .failed
+    mov rax, 1
+    ret
+.failed:
+    xor rax, rax
+    ret
+
 ; RCX = Address, RDX = Value, R8 = Count (In Bytes)
 _AVX_MemsetUnaligned:
     push rdx
