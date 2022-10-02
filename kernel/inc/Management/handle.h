@@ -60,7 +60,7 @@ typedef struct _HANDLE_ITERATION_STRUCTURE{
 	HANDLE_ITERATOR* HandleIterator;
 } HANDLE_ITERATION_STRUCTURE, * PHANDLE_ITERATION_STRUCTURE;
 
-HANDLE_TABLE* CreateHandleTable();
+HANDLE_TABLE* CreateHandleTable(void);
 HANDLE OpenHandle(HANDLE_TABLE* HandleTable, LPVOID Thread, UINT64 Flags, UINT64 DataType, void* Data, HANDLE_RELEASE_PROCEDURE ReleaseProcedure);
 HRESULT CloseHandle(HANDLE Handle);
 BOOL AcquireHandle(HANDLE Handle);

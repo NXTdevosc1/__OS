@@ -70,7 +70,7 @@ typedef struct _SYSTEM_SETFILE_HEADER{
 
 
 
-KERNELSTATUS KERNELAPI SystemSetfile(); // Initialize System Setfile
+KERNELSTATUS KERNELAPI SystemSetfile(void); // Initialize System Setfile
 
 
 KERNELSTATUS KERNELAPI SystemWriteEntry(UCHAR* Path, UINT16 NumBytes, void* Buffer);

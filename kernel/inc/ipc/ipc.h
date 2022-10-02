@@ -81,7 +81,7 @@ typedef struct _CLIENT_LIST_TABLE {
 	CLIENT_LIST Clients;
 } CLIENT_LIST_TABLE, *RFCLIENT_LIST_TABLE;
 
-void IpcInit();
+void IpcInit(void);
 
 BOOL KERNELAPI IpcIsValidClient(RFPROCESS Process, PCLIENT Client);
 
@@ -111,7 +111,7 @@ KERNELSTATUS KERNELAPI IpcPostThreadMessage(RFTHREAD Thread, UINT64 Message, voi
 // Get Server/Process Message
 BOOL KERNELAPI		 IpcGetMessage(PCLIENT Client, MSG* Message);
 
-//void KERNELAPI KTIpcClientThread(); // Kernel Thread (KT)
+//void KERNELAPI KTIpcClientThread(void); // Kernel Thread (KT)
 PCLIENT KERNELAPI IpcGetThreadClient(RFTHREAD Thread);
 
 BOOL KERNELAPI IpcQueryMessageHeader(PCLIENT Client, MSG_HEADER* Header);

@@ -4,7 +4,7 @@
 void AcpiFadt(UINT RsdpRevision, ACPI_FADT* Fadt) {
     if(Fadt->SMI_CommandPort){
             // If System Management Mode is supported, then take ownership of ACPI
-            OutPortB(Fadt->SMI_CommandPort, Fadt->AcpiEnable);
+            __outbyte((UINT16)Fadt->SMI_CommandPort, Fadt->AcpiEnable);
         }
         RFACPI_DSDT Dsdt = NULL;
         if(RsdpRevision == 2) {

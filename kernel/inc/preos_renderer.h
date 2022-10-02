@@ -37,7 +37,7 @@ void GP_draw_sf_text(const char* data, unsigned int color,unsigned int x,unsigne
 void GP_sf_put_char(const char ch, unsigned int color, unsigned int x, unsigned int y);
 struct RGBA calculate_rgba(struct RGBA color, uint16_t x, uint16_t y);
 void Gp_draw_sf_textW(const wchar_t* data,unsigned int color,unsigned int x,unsigned int y);
-void DrawOsLogo();
+void DrawOsLogo(void);
 
 void LineTo(INT64 x0, INT64 y0, INT64 x1, INT64 y1, UINT32 Color);
 

@@ -128,8 +128,8 @@ PE_SECTION_TABLE* Pe64GetSectionByVirtualAddress(UINT32 VirtualAddress, PE_IMAGE
 HRESULT Pe64RelocateImage(PE_IMAGE_HDR* PeImage, void* ImageBuffer, void* VirtualBuffer, void* ImageBase) {
 	PIMAGE_BASE_RELOCATION_BLOCK RelocationBlock = (PIMAGE_BASE_RELOCATION_BLOCK)((UINT64)VirtualBuffer + PeImage->OptionnalDataDirectories.BaseRelocationTable.VirtualAddress);
 	if (!ImageBase) ImageBase = VirtualBuffer;
-	char* NextBlock = (char*)RelocationBlock;
-	void* SectionEnd = NextBlock + PeImage->OptionnalDataDirectories.BaseRelocationTable.Size;
+	UINT8* NextBlock = (UINT8*)RelocationBlock;
+	UINT8* SectionEnd = NextBlock + PeImage->OptionnalDataDirectories.BaseRelocationTable.Size;
 	while (NextBlock <= SectionEnd) {
 		RelocationBlock = (PIMAGE_BASE_RELOCATION_BLOCK)NextBlock;
 		UINT32 EntriesCount = (RelocationBlock->BlockSize - sizeof(*RelocationBlock)) / 2;

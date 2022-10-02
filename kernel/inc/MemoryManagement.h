@@ -28,7 +28,7 @@ each process has the page allocation table start and end pointer, then the conti
 
 typedef struct _PROCESS_CONTROL_BLOCK *RFPROCESS;
 
-typedef union _PAGE {
+typedef volatile union _PAGE {
     struct {
         UINT64 Allocated : 1; // If the page is allocated to an address space
         UINT64 PresentInDisk : 1;
@@ -139,18 +139,18 @@ typedef struct _MEMORY_REGION_TABLE {
 
 // Global Memory Management Table for kernel processes and allocation source for user processes
 typedef struct _MEMORY_MANAGEMENT_TABLE {
-    UINT64 TotalMemory;
-    UINT64 PhysicalMemory;
-    UINT64 TotalDiskMemory;
-    UINT64 TotalCompressedMemory; // Compressed physical memory
-    UINT64 UsedPhysicalMemory;
-    UINT64 UsedDiskMemory;
-    UINT64 IoMemorySize;
+    volatile UINT64 TotalMemory;
+    volatile UINT64 PhysicalMemory;
+    volatile UINT64 TotalDiskMemory;
+    volatile UINT64 TotalCompressedMemory; // Compressed physical memory
+    volatile UINT64 UsedPhysicalMemory;
+    volatile UINT64 UsedDiskMemory;
+    volatile UINT64 IoMemorySize;
     UINT64 PageArraySize; // In Number of entries
     
     PAGE* PageArray;
     UINT64 NumBytesPageBitmap;
-    char* PageBitmap;
+    volatile char* PageBitmap;
 } MEMORY_MANAGEMENT_TABLE;
 
 extern MEMORY_MANAGEMENT_TABLE MemoryManagementTable;
@@ -158,12 +158,12 @@ extern MEMORY_MANAGEMENT_TABLE MemoryManagementTable;
 
 // Only for user processes
 typedef struct _PROCESS_MEMORY_TABLE {
-    UINT64 AllocatedPages;
-    UINT64 ReservedPages;
-    UINT64 CompressedPages;
-    UINT64 DiskPages;
+    volatile UINT64 AllocatedPages;
+    volatile UINT64 ReservedPages;
+    volatile UINT64 CompressedPages;
+    volatile UINT64 DiskPages;
 
-    UINT64 UsedMemory; // Used memory from these reserved pages
+    volatile UINT64 UsedMemory; // Used memory from these reserved pages
     PAGE_ALLOCATION_TABLE PageAllocationTable;
 
     MEMORY_SEGMENT_LIST_HEAD AllocatedMemory;
@@ -172,7 +172,7 @@ typedef struct _PROCESS_MEMORY_TABLE {
 
 #pragma pack(pop)
 
-void InitMemoryManagementSubsystem();
+void InitMemoryManagementSubsystem(void);
 RFMEMORY_SEGMENT QueryAllocatedBlockSegment(void* BlockAddress);
 RFMEMORY_SEGMENT QueryFreeBlockSegment(void* BlockAddress);
 RFMEMORY_SEGMENT AllocateMemorySegment(RFMEMORY_REGION_TABLE MemoryRegion);
@@ -200,7 +200,7 @@ void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags);
 
 #define PAGE_FILE_LOCATION "//OS/$SwapFile"
 
-void InitPagingFile(); // System PARTITION_INSTANCE Located in C:/ By default
+void InitPagingFile(void); // System PARTITION_INSTANCE Located in C:/ By default
 KERNELSTATUS PageOutPool(RFPROCESS Process, void* VirtualAddress);
 KERNELSTATUS LoadPagedPool(RFPROCESS Process, void* VirtualAddress);
 
@@ -216,7 +216,7 @@ RFMEMORY_SEGMENT MemMgr_CreateInitialHeap(void* HeapAddress, UINT64 HeapLength);
 
 // Sets present bit in Memory Segment flags when Found
 RFMEMORY_SEGMENT (*_SIMD_FetchUnusedSegmentsUncached)(MEMORY_SEGMENT_LIST_HEAD* ListHead);
-LPVOID (__fastcall *_SIMD_AllocatePhysicalPage) (char* PageBitmap, UINT64 BitmapSize, PAGE* PageArray);
+LPVOID (__fastcall *_SIMD_AllocatePhysicalPage) (volatile char* PageBitmap, UINT64 BitmapSize, PAGE* PageArray);
 // ---------------------------
 
-void SIMD_InitOptimizedMemoryManagement();
+void SIMD_InitOptimizedMemoryManagement(void);

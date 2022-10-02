@@ -21,7 +21,7 @@ uint8_t BmpImgDraw(void* _file, uint32_t x, uint32_t y){
         
         
         unsigned char*  buffer = (unsigned char*)((UINT64)_file + hdr->img_offset);
-        char* bf_row = buffer;
+        unsigned char* bf_row = buffer;
         uint64_t row_size = ((24 * hdr->width + 31)/32)*4;
         uint8_t r, g, b;
         for(uint32_t y1 = 0;y1<hdr->height;y1++){

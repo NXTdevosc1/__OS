@@ -25,17 +25,17 @@
 //     return _SIMD_FetchUnusedSegmentsUncached(&MemoryRegion->SegmentListHead);
 // }
 
-BOOL AllocateContiguousMutex = 0;
+volatile long AllocateContiguousMutex = 0;
 
 void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags) {
     
-    UINT64* Bmp = (UINT64*)MemoryManagementTable.PageBitmap;
+    volatile UINT64* Bmp = (UINT64*)MemoryManagementTable.PageBitmap;
     register PAGE* Page = MemoryManagementTable.PageArray;
     register UINT64 Max = MemoryManagementTable.NumBytesPageBitmap >> 3; // QWORD Size
-    register UINT NextIndex;
-    UINT Index;
+    register UINT NextIndex = 0;
+    UINT Index = 0;
     
-    UINT64* PagesStartBmp = NULL;
+    volatile UINT64* PagesStartBmp = NULL;
     UINT PagesStartIndex = 0;
     UINT Arrival = 0;
     void* PhysicalStart = NULL;
@@ -44,8 +44,8 @@ void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags) 
 
     for(UINT64 i = 0;i<Max;i++, Bmp++, Page+=64) {
         NextIndex = 0;
-        UINT64 BitMap = *Bmp;
-        while(_BitScanForward64(&Index, BitMap)) {
+        __int64 BitMap = *Bmp;
+        while(_BitScanForward64(&Index, (UINT64)BitMap)) {
             _bittestandreset64(&BitMap, Index);
             if(Index != NextIndex) Arrival = 0;
 
@@ -57,19 +57,25 @@ void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags) 
             Arrival++;
             if(Arrival == NumPages) {
                 if(PagesStartBmp == Bmp) {
-                    UINT64 Num = (*Bmp) & ((UINT64)-1 << (Index + 1));
-                    Num |= (*Bmp) & ((UINT64)-1 >> (64 - PagesStartIndex));
+                    // Clear bits from StartIndex to Index
+
+                    // Lowerhalf
+                    UINT64 Num = (*Bmp) & ((UINT64)-1 >> (63 - (PagesStartIndex + 1)));
+                    Num |= (*Bmp) & ((UINT64)-1 << (Index + 1));
+                    // Uperhalf
                     *Bmp = Num;
+                    
                 } else {
                     // Fill bitmap
                     if(PagesStartBmp < Bmp) {
-                        *(PagesStartBmp) &= ((UINT64)-1 >> (64 - PagesStartIndex));
-                        PagesStartBmp++;
-                        PagesStartIndex = 0;
+                        // Clear bits from StartIndex to 63
+                        *PagesStartBmp &= ((UINT64)-1 >> (63 - PagesStartIndex));
                         if((64 - PagesStartIndex) <= NumPages) {
                             NumPages -= (64 - PagesStartIndex);
                         } else NumPages = 0;
-                        SystemDebugPrint(L"X");
+                        SystemDebugPrint(L"X(%x, %x)", ((UINT64)-1 >> (63 - PagesStartIndex)), *PagesStartBmp);
+                        PagesStartIndex = 0;
+                        PagesStartBmp++;
                     }
                     while(PagesStartBmp < Bmp) {
                         *PagesStartBmp = 0;
@@ -77,23 +83,23 @@ void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags) 
                         NumPages -= 64;
                     }
                     if(NumPages) {
+                        // Clear bits from 0 to Index
                         *(PagesStartBmp) &= ((UINT64)-1 << (Index + 1));
-                        SystemDebugPrint(L"C");
-
+                        SystemDebugPrint(L"C(%x, %x)", ((UINT64)-1 << (Index + 1)), *PagesStartBmp);
                     }
                 }
-                SystemDebugPrint(L"PI : %d, I : %d, PBMP : %x, MBP : %x", PagesStartIndex, Index, PagesStartBmp, ((UINT64)-1 << (Index + 1)));
+                SystemDebugPrint(L"PI : %d, I : %d, PBMP : %x", PagesStartIndex, Index, *PagesStartBmp);
                 // for(UINT c = PagesStartIndex;c<=Index;c++) {
                 //     _bittestandreset64(PagesStartBmp, c);
                 // }
-                _bittestandreset(&AllocateContiguousMutex, 0);
+                _bittestandreset((long*)&AllocateContiguousMutex, 0);
                 return PhysicalStart;
             }
             NextIndex = Index + 1;
             
         }
     }
-    _bittestandreset(&AllocateContiguousMutex, 0);
+    _bittestandreset((long*)&AllocateContiguousMutex, 0);
     return NULL;
 }
 

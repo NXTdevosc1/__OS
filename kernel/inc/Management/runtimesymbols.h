@@ -1,6 +1,6 @@
 #pragma once
 #include <krnltypes.h>
-BOOL InitializeRuntimeSymbols();
+BOOL InitializeRuntimeSymbols(void);
 LPVOID KEXPORT KERNELAPI GetRuntimeSymbol(char* SymbolName);
 void KERNELAPI CreateRuntimeSymbol(char* SymbolName, LPVOID SymbolReference);
 

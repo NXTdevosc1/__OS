@@ -98,7 +98,7 @@ void KernelPagingInitialize(){
 		volatile FILE_IMPORT_ENTRY* Entry = FileImportTable;
 		while(Entry->Type != FILE_IMPORT_ENDOFTABLE) {
 			if(Entry->BaseName){
-				Entry->LenBaseName = wstrlen(Entry->BaseName);
+				Entry->LenBaseName = (UINT16)wstrlen(Entry->BaseName);
 			}
 			if(Entry->LoadedFileSize & 0xFFF) {
 				Entry->LoadedFileSize += 0x1000;
@@ -113,8 +113,8 @@ void KernelPagingInitialize(){
 	MapPhysicalPages(kproc->PageMap, InitData.PEDataDirectories, InitData.PEDataDirectories, 1, PM_MAP);
 	
 	// a page fault when setting PageArray, PageBitmap to high virtual memory
-	MapPhysicalPages(kproc->PageMap, MemoryManagementTable.PageArray, MemoryManagementTable.PageArray, ALIGN_VALUE(MemoryManagementTable.PageArraySize, 0x1000) >> 12, PM_MAP);
-	MapPhysicalPages(kproc->PageMap, MemoryManagementTable.PageBitmap, MemoryManagementTable.PageBitmap, ALIGN_VALUE(MemoryManagementTable.NumBytesPageBitmap, 0x1000) >> 12, PM_MAP);
+	MapPhysicalPages(kproc->PageMap, (LPVOID)MemoryManagementTable.PageArray, (LPVOID)MemoryManagementTable.PageArray, ALIGN_VALUE(MemoryManagementTable.PageArraySize, 0x1000) >> 12, PM_MAP);
+	MapPhysicalPages(kproc->PageMap, (LPVOID)MemoryManagementTable.PageBitmap, (LPVOID)MemoryManagementTable.PageBitmap, ALIGN_VALUE(MemoryManagementTable.NumBytesPageBitmap, 0x1000) >> 12, PM_MAP);
 
 
 }
@@ -125,7 +125,7 @@ void __KernelRelocate() {
 	char* ImageBase = (char*)SystemSpaceBase + SYSTEM_SPACE48_KERNEL;
 	char* NextBlock = (char*)RelocationBlock;
 	void* SectionEnd = NextBlock + InitData.PEDataDirectories->BaseRelocationTable.Size;
-	while (NextBlock <= SectionEnd) {
+	while (NextBlock <= (char*)SectionEnd) {
 		RelocationBlock = (PIMAGE_BASE_RELOCATION_BLOCK)NextBlock;
 		UINT32 EntriesCount = (RelocationBlock->BlockSize - sizeof(*RelocationBlock)) / 2;
 		NextBlock += RelocationBlock->BlockSize;

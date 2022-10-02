@@ -20,7 +20,7 @@ void RtcUpdate();
 
 RFTHREAD RtcClientThread = NULL;
 BOOL Updating = FALSE;
-void RtcClient(){
+void RtcClient(void){
 	SetThreadPriority(RtcClientThread, THREAD_PRIORITY_HIGH);
 	MSG Message = {0};
 	MSG_HEADER Header = {0};

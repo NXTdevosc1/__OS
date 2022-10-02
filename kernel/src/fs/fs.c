@@ -131,7 +131,7 @@ FILE KERNELAPI DefaultOpenFile(PARTITION_INSTANCE* Partition, LPWSTR Path, UINT6
     }
 
     FILE File = AllocateFile(&Partition->FileList);
-    File->OpenAccess = Access;
+    File->OpenAccess = (DWORD)Access;
     File->Partition = Partition;
     File->Path = Copy;
     File->PathLength = wstrlen(Copy);

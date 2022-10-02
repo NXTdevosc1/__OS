@@ -193,13 +193,13 @@ typedef struct _SMBIOS_PROCESSOR_INFORMATION_STRUCTURE{
 
 // Gets the preferred version of SMBIOS
 void SystemManagementBiosInitialize(void* _SmBIOSHeader);
-UCHAR SmbiosGetMajorVersion();
-UCHAR SmbiosGetMinorVersion();
-WORD SmbiosGetStructuresCount();
+UCHAR SmbiosGetMajorVersion(void);
+UCHAR SmbiosGetMinorVersion(void);
+WORD SmbiosGetStructuresCount(void);
 SMBIOS_STRUCTURE_HEADER* SmbiosGetStructure(WORD StructureIndex);
-SMBIOS_BIOS_INFORMATION_STRUCTURE* GetBiosInformation();
-SMBIOS_SYSTEM_INFORMATION_STRUCTURE* GetSystemInformation();
-SMBIOS_BASE_BOARD_INFORMATION_STRUCTURE* GetBaseBoardInformation();
+SMBIOS_BIOS_INFORMATION_STRUCTURE* GetBiosInformation(void);
+SMBIOS_SYSTEM_INFORMATION_STRUCTURE* GetSystemInformation(void);
+SMBIOS_BASE_BOARD_INFORMATION_STRUCTURE* GetBaseBoardInformation(void);
 char* SmbiosGetString(SMBIOS_STRUCTURE_HEADER* Header, UCHAR StringOffset);
 
 

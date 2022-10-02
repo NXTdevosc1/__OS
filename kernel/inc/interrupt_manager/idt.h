@@ -156,11 +156,11 @@ struct INTERRUPT_DESCRIPTOR_TABLE
 };
 #pragma pack(pop)
 
-void GlobalInterruptDescriptorInitialize();
-void GlobalInterruptDescriptorLoad();
-void remap_pic();
+void GlobalInterruptDescriptorInitialize(void);
+void GlobalInterruptDescriptorLoad(void);
+void remap_pic(void);
 
-extern void exit_interrupt();
+extern void exit_interrupt(void);
 
 extern void* GlobalWrapperPointer[];
 extern void* GlobalIsrPointer[];

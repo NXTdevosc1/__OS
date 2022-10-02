@@ -38,12 +38,12 @@ struct SYS_CONFIG_HDR{
     uint32_t paths_base;
     uint32_t path_offsets[];
 };
-void SysLoad();
+void SysLoad(void);
 
 extern void* SystemSpaceBase;
 extern void* LocalApicPhysicalAddress;
 
-void ConfigureSystemSpace();
+void ConfigureSystemSpace(void);
 BOOL InitSystemSpace(RFPROCESS Process);
 
 #pragma pack(pop)

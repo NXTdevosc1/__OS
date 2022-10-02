@@ -40,9 +40,9 @@ void GP_draw_border_rect(unsigned short x, unsigned short y, unsigned short widt
 	
 
 
-	for(unsigned long long a = y;a<=y+height;a++){
-        for(unsigned long long b = x;b<=x+width;b++)
-			if(a < (y+border_width) || b < (x+border_width) || b > ((x+width)-border_width) || a > ((y+height)-border_width)){
+	for(unsigned long long a = y;a<=(UINT64)(y+height);a++){
+        for(unsigned long long b = x;b<=(UINT64)(x+width);b++)
+			if(a < (UINT16)(y+border_width) || b < (UINT16)(x+border_width) || b > (UINT16)((x+width)-border_width) || a > (UINT16)((y+height)-border_width)){
             *(uint32_t*)((uint64_t*)(InitData.fb->FrameBufferBase+(b*4)+(InitData.fb->HorizontalResolution*4*a))) = border_color;
 			}else {
             *(uint32_t*)((uint64_t*)(InitData.fb->FrameBufferBase+(b*4)+(InitData.fb->HorizontalResolution*4*a))) = background_color;
@@ -52,7 +52,7 @@ void GP_draw_border_rect(unsigned short x, unsigned short y, unsigned short widt
 }
 void GP_draw_text(const char* data, struct PSF1_FONT* font,unsigned int color,unsigned int x,unsigned int y){
 	if(!data || !font) return;
-	UINT16 len = strlen(data);
+	UINT16 len = (UINT16)strlen(data);
 	if(!len) return;
 	for(int i = 0;*(char*)(data+i) != '\0';i++){
 
@@ -71,7 +71,7 @@ void GP_draw_text(const char* data, struct PSF1_FONT* font,unsigned int color,un
 }
 
 void Gp_draw_sf_textW(const wchar_t* data,unsigned int color,unsigned int x,unsigned int y){
-UINT16 len = wstrlen(data);
+UINT32 len = wstrlen(data);
 if(!len) return;
 for(int i = 0;*(short*)(data+i) != '\0';i++){
 	if(*(char*)(data+i) == '\0') continue;
@@ -133,9 +133,9 @@ void GP_draw_sf_text(const char* data, unsigned int color,unsigned int x,unsigne
 
 void CalculateRgba(struct RGBA* Color, struct RGBA* Source) {
 	if(Color->alpha >= 1) return;
-	Color->r = ((1-Color->alpha) * Source->r) + (Color->alpha * Color->r);
-	Color->g = ((1-Color->alpha) * Source->g) + (Color->alpha * Color->g);
-	Color->b = ((1-Color->alpha) * Source->b) + (Color->alpha * Color->b);
+	Color->r = (UINT8)(((1-Color->alpha) * Source->r) + (Color->alpha * Color->r));
+	Color->g = (UINT8)(((1-Color->alpha) * Source->g) + (Color->alpha * Color->g));
+	Color->b = (UINT8)(((1-Color->alpha) * Source->b) + (Color->alpha * Color->b));
 }
 
 struct RGBA calculate_rgba(struct RGBA color, uint16_t x, uint16_t y){
@@ -149,41 +149,44 @@ struct RGBA calculate_rgba(struct RGBA color, uint16_t x, uint16_t y){
 	if(color.alpha >= 1) return color;
 
 
-	ret.r = ((1-color.alpha) * back_color.r) + (color.alpha * color.r);
-	ret.g = ((1-color.alpha) * back_color.g) + (color.alpha * color.g);
-	ret.b = ((1-color.alpha) * back_color.b) + (color.alpha * color.b);
+	ret.r = (UINT8)(((1-color.alpha) * back_color.r) + (color.alpha * color.r));
+	ret.g = (UINT8)(((1-color.alpha) * back_color.g) + (color.alpha * color.g));
+	ret.b = (UINT8)(((1-color.alpha) * back_color.b) + (color.alpha * color.b));
 	ret.alpha = color.alpha;
 	return ret;
 }
 
 
 void DrawOsLogo(){
-	GP_draw_rect((InitData.fb->HorizontalResolution-150)/2,(InitData.fb->VerticalResolution - 150 - 50)/2,150,150,0xffffffff);
+	GP_draw_rect((UINT16)(InitData.fb->HorizontalResolution-150)/2,(UINT16)(InitData.fb->VerticalResolution - 150 - 50)/2,150,150,0xffffffff);
 
 }
+
+
+
 void LineTo(INT64 x0, INT64 y0, INT64 x1, INT64 y1, UINT32 Color) {
 	// Brensenham Algorithm f(x) = mx + p
 	if(x0 == x1 && y0 == y1) return;
 
-	double dx = abs(x1 - x0);
+	double dx = (double)__abs(x1 - x0);
 	double sx = x0 < x1 ? 1 : -1;
-	double dy = -abs(y1 - y0);
+	double dy = (double)-__abs(y1 - y0);
 	double sy = y0 < y1 ? 1 : -1;
 	double error = dx + dy;
 
 	for(;;) {
-		GP_set_pixel(x0, y0, Color);
+		((UINT32*)InitData.fb->FrameBufferBase)[(x0 + y0 * InitData.fb->Pitch)] = Color;
 		if(x0 == x1 && y0 == y1) break;
 		double e2 = 2 * error;
 		if(e2 >= dy) {
 			if(x0 == x1) break;
 			error = error + dy;
-			x0 = x0 + sx;
+			x0 = x0 + (INT64)sx;
 		}
 		if(e2 <= dx) {
 			if(y0 == y1) break;
 			error = error + dx;
-			y0 = y0 + sy;
+			y0 = y0 + (INT64)sy;
 		}
 	}
 }
@@ -192,9 +195,9 @@ inline void _VertexFillBufferLine(INT64 x0, INT64 y0, INT64 x1, INT64 y1, UINT8*
 	// Brensenham Algorithm f(x) = mx + p
 	if(x0 == x1 && y0 == y1) return;
 
-	double dx = abs(x1 - x0);
+	double dx = (double)__abs(x1 - x0);
 	double sx = x0 < x1 ? 1 : -1;
-	double dy = -abs(y1 - y0);
+	double dy = (double)-__abs(y1 - y0);
 	double sy = y0 < y1 ? 1 : -1;
 	double error = dx + dy;
 
@@ -212,12 +215,12 @@ inline void _VertexFillBufferLine(INT64 x0, INT64 y0, INT64 x1, INT64 y1, UINT8*
 		if(e2 >= dy) {
 			if(x0 == x1) break;
 			error = error + dy;
-			x0 = x0 + sx;
+			x0 = x0 + (INT64)sx;
 		}
 		if(e2 <= dx) {
 			if(y0 == y1) break;
 			error = error + dx;
-			y0 = y0 + sy;
+			y0 = y0 + (INT64)sy;
 		}
 	}
 }
@@ -253,7 +256,7 @@ void TestFill(UINT16 RectX, UINT16 RectY, UINT16 RectWidth, UINT16 RectHeight, U
 		
 
 		UINT Index = 0;
-		UINT TargetDoubleIntersect = -1;
+		UINT TargetDoubleIntersect = (UINT)-1;
 		QemuWriteSerialMessage("_____");
 		if((NumIntersects & 1)) {
 			TargetDoubleIntersect = NumIntersects / 2;
@@ -296,7 +299,7 @@ void TestFill(UINT16 RectX, UINT16 RectY, UINT16 RectWidth, UINT16 RectHeight, U
 	}
 }
 UINT8 Buff[0x100 * 0x100] = {0};
-UINT8 XLinks[0x80] = {0};
+UINT XLinks[0x80] = {0};
 
 
 #include <Management/runtimesymbols.h>
@@ -306,7 +309,7 @@ void FillVertex(UINT X, UINT Y, UINT NumCordinates, float* XCordinates, float* Y
 	YCordinates++;
 	memset(Buff, 0, 0x100 * 0x100);
 	for(UINT i = 1;i<NumCordinates;i++, XCordinates++, YCordinates++) {
-		_VertexFillBufferLine(LastPtX, LastPtY, (*XCordinates), (*YCordinates), Buff, 0x100);
+		_VertexFillBufferLine((INT64)LastPtX, (INT64)LastPtY, (INT64)(*XCordinates), (INT64)(*YCordinates), Buff, 0x100);
 		LastPtX = *XCordinates;
 		LastPtY = *YCordinates;
 	}
@@ -323,8 +326,8 @@ void FillVertex(UINT X, UINT Y, UINT NumCordinates, float* XCordinates, float* Y
 			}
 		}
 		if(NumLinks < 2) continue;
-		UINT8* xl = XLinks;
-		UINT8 LastX = 0;
+		UINT* xl = XLinks;
+		UINT LastX = 0;
 		
 		for(UINT i = 0;i<NumLinks;i++, xl++) {
 			if(i & 1) {

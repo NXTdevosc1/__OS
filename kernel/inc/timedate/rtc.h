@@ -25,7 +25,7 @@ typedef struct _RTC_TIME_DATE{
 #pragma pack(pop)
 
 // Setups CMOS RTC & Enables its interrupts
-void RtcInit();
-BOOL isRtcUpdating();
+void RtcInit(void);
+BOOL isRtcUpdating(void);
 KERNELSTATUS RtcGetTimeAndDate(RTC_TIME_DATE* TimeDate);
 KERNELSTATUS RtcSetTimeAndDate(RTC_TIME_DATE* TimeDate);

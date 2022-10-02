@@ -32,9 +32,9 @@ BOOL KERNELAPI _RTMapPhysicalPages(RFPROCESS Process, void* VirtualAddress, void
 BOOL KERNELAPI _RT_MapKernelMemory(void* PhysicalAddress, UINT64 NumPages, UINT64 Flags){
     return MapPhysicalPages(kproc->PageMap, PhysicalAddress, PhysicalAddress, NumPages, Flags);
 }
-UINT64 YOFF = 20;
-UINT64 __DEBUGPRINT_MUTEX = 0;
-UINT64 SDBGP_BiggestWidth = 0;
+UINT16 YOFF = 20;
+UINT32 __DEBUGPRINT_MUTEX = 0;
+UINT16 SDBGP_BiggestWidth = 0;
 
 #define MAX_FORMAT_LENGTH 0x100
 
@@ -45,10 +45,10 @@ char _DEBUGPRINT_FORMATNUMBER[0x100] = {0};
 
 KERNELSTATUS KERNELAPI SystemDebugPrint(LPWSTR Format, ...){
     if(!Format) return KERNEL_SERR_INVALID_PARAMETER;
-    UINT8 Len = wstrlen(Format);
+    UINT8 Len = (UINT8)wstrlen(Format);
     if(!Len) return KERNEL_SERR_INVALID_PARAMETER;
     RFPROCESS Process = KeGetCurrentProcess();
-    UINT RFLAGS = __getRFLAGS();
+    UINT64 RFLAGS = __getRFLAGS();
     __cli();
     // if(Process != SystemInterruptsProcess || Process != kproc) // May set a permanent spinlock on system interrupts
     //     __SpinLockSyncBitTestAndSet(&__DEBUGPRINT_MUTEX, 0);
@@ -65,7 +65,7 @@ KERNELSTATUS KERNELAPI SystemDebugPrint(LPWSTR Format, ...){
             void* Value = (void*)((UINT64)&Format + StackOff);
             if(Next[0] == 'd' && !IS_LETTER(Next[1])){
                 // write decimal number
-                int Number = *(unsigned long long*)Value;
+                int Number = (int)*(unsigned long long*)Value;
                 itoa(Number, _DEBUGPRINT_FORMATNUMBER, RADIX_DECIMAL);
                 for(UINT c = 0;_DEBUGPRINT_FORMATNUMBER[c];c++){
                     _DEBUGPRINT_FORMATTED[FormatIndex] = _DEBUGPRINT_FORMATNUMBER[c];
@@ -140,8 +140,8 @@ KERNELSTATUS KERNELAPI SystemDebugPrint(LPWSTR Format, ...){
     LPWSTR ProcessName = L"Unnamed Process.";
     if(Process->ProcessName) ProcessName = Process->ProcessName;
 
-    UINT8 PNAME_LEN = wstrlen(ProcessName);
-    Len = wstrlen(_DEBUGPRINT_FORMATTED);
+    UINT8 PNAME_LEN = (UINT8)wstrlen(ProcessName);
+    Len = (UINT8)wstrlen(_DEBUGPRINT_FORMATTED);
 
     // if(Len > 100) Len = 100;
     if(YOFF >= InitData.fb->VerticalResolution - 40){
@@ -154,7 +154,7 @@ KERNELSTATUS KERNELAPI SystemDebugPrint(LPWSTR Format, ...){
         GP_draw_rect(5, YOFF - 16 + (8 - 1), 10, 2, 0);
     }
     GP_draw_rect(20, YOFF, (Len + PNAME_LEN + 3) << 3, 16, 0);
-    if(( (Len + PNAME_LEN + 3) << 3) > SDBGP_BiggestWidth){
+    if((UINT)( (Len + PNAME_LEN + 3) << 3) > SDBGP_BiggestWidth){
         SDBGP_BiggestWidth =  (Len + PNAME_LEN + 3) << 3;
     }
     Gp_draw_sf_textW(ProcessName, 0xE29910, 20, YOFF);

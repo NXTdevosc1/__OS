@@ -9,7 +9,7 @@
 __declspec(allocate("_KRNLDBG")) __declspec(align(0x1000)) DEBUG_TABLE KernelDebugTable = { 0 };
 
 void DebugWrite(const char* Text) {
-	UINT len = strlen(Text);
+	size_t len = strlen(Text);
 	if (len > DEBUG_MAX_LOG_LENGTH) SET_SOD_DEBUG_ERROR;
 	__SpinLockSyncBitTestAndSet(&KernelDebugTable.ControlBit, 0);
 

@@ -24,7 +24,6 @@
 HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR* ProgramImage, PIMAGE_IMPORT_DIRECTORY ImportDirectory, void** DllImage, UINT64* DllImageSize) {
 	char* dllname = ((char*)ProgramVirtualBuffer + ImportDirectory->NameRva);
 	UINT64* ImportAddressTable = (UINT64*)((char*)ProgramVirtualBuffer + ImportDirectory->ImportAddressTableRva);
-	UINT64* ImportLookupTable = (UINT64*)((char*)ProgramVirtualBuffer + ImportDirectory->ImportLookupTable);
 
 	UINT64 DllNameLength = strlen(dllname);
 
@@ -48,12 +47,14 @@ HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR*
 		UserProcess = (RFPROCESS)*DllImageSize;
 	}
 
+	UINT64 VirtualBufferLength = 0x1000;
+
 	FILE DllFile = NULL;
 	char* DllBuffer = NULL;
 	char* VirtualBuffer = NULL;
 	BOOL OSKRNLX64 = FALSE;
 	PIMAGE_EXPORT_DIRECTORY ExportDirectory = NULL;
-
+	PE_IMAGE_HDR* PeImage = NULL;
 	SystemDebugPrint(L"Loading DLL...");
 	if (DllNameLength == sizeof(IMPORT_OSKRNLX64) - 1/*strlen(oskrnlx64.exe)*/  && memcmp(dllname, IMPORT_OSKRNLX64, sizeof(IMPORT_OSKRNLX64) - 1)) {
 		// return Pe64LinkKernelSymbols(ProgramVirtualBuffer, ProgramImage, ImportDirectory);
@@ -95,7 +96,7 @@ HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR*
 	int PeHeaderOffset = GetPEhdrOffset(DllBuffer);
 	if (!PeHeaderOffset) return -1;
 
-	PE_IMAGE_HDR* PeImage = (PE_IMAGE_HDR*)(DllBuffer + PeHeaderOffset);
+	PeImage = (PE_IMAGE_HDR*)(DllBuffer + PeHeaderOffset);
 
 	if (!PeCheckFileHeader(PeImage) || PeImage->SizeofOptionnalHeader != SIZEOF_OPTIONNAL_HEADER_DATA_DIRECTORIES ||
 		PeImage->ThirdHeader.NumDataDirectories != OPTIONNAL_NUM_DATA_DIRECTORIES
@@ -117,7 +118,7 @@ HRESULT Pe64LoadDll(void* ImageBuffer, void* ProgramVirtualBuffer, PE_IMAGE_HDR*
 	
 		PE_SECTION_TABLE* Section = (PE_SECTION_TABLE*)((char*)&PeImage->OptionnalHeader + PeImage->SizeofOptionnalHeader);
 
-		UINT64 VirtualBufferLength = 0x1000;
+		
 		{
 			PE_SECTION_TABLE* s = Section;
 			for (UINT16 i = 0; i < PeImage->NumSections; i++, s++) {

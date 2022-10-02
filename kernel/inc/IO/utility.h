@@ -1,7 +1,7 @@
 #pragma once
 
-void pic_end_master();
-void pic_end_slave();
+void pic_end_master(void);
+void pic_end_slave(void);
 
 
 extern void OutPortB(unsigned short Port, unsigned char Value);

@@ -13,7 +13,7 @@ int MapPhysicalPages(
     UINT64 Flags
 );
 
-RFPAGEMAP CreatePageMap();
+RFPAGEMAP CreatePageMap(void);
 
 // ntoskrnl.lib Definitions
 int KEXPORT KERNELAPI KeMapMemory(
@@ -32,4 +32,4 @@ int KEXPORT KERNELAPI KeMapProcessMemory(
 
 LPVOID KEXPORT KERNELAPI KeResolvePhysicalAddress(RFPROCESS Process, const void* VirtualAddress);
 
-void SetupPageAttributeTable();
+void SetupPageAttributeTable(void);

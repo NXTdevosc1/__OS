@@ -111,7 +111,9 @@ BOOL KERNELAPI	IpcClientDestroy(PCLIENT Client) {
 	StartHandleIteration(Client->Process->Handles, &Iterator);
 	HANDLE Handle = NULL;
 	// Data = Server, Data1 = Client
-	while ((Handle = GetNextHandle(&Iterator))) {
+	for(;;) {
+		Handle = GetNextHandle(&Iterator);
+		if(!Handle) break;
 		if (Handle->DataType == HANDLE_SERVER_CONNECTION && Handle->Data1 == Client) {
 			IpcServerDisconnect((RFSERVER)Handle->Data, Client);
 		}

@@ -98,15 +98,15 @@ LPWSTR KernelProcessName = L"System Kernel.";
 
 char* ExtensionLevelStr[2] = {"SSE", "AVX"};
 
-float XCords[0x100] = {0, 50, 100, 150};
-float YCords[0x100] = {0, 50, -50, 0};
-float betabuffer[0x100] = {0};
-float IncValue = 0.1;
 void TripleFaultingFunction() {
+	float XCords[0x100] = {0, 50, 100, 150};
+	float YCords[0x100] = {0, 50, -50, 0};
+	float betabuffer[0x100] = {0};
+	float IncValue = 0.1f;
 	UINT XOff = 200;
 	UINT YOff = 300;
-	float X0 = GetBezierPoint(XCords, betabuffer, 4, 0.1), X1 = GetBezierPoint(XCords, betabuffer, 4, 0.2), Y0 = GetBezierPoint(YCords, betabuffer, 4, 0.1), Y1 = GetBezierPoint(YCords, betabuffer, 4, 0.2);
-	double Distance = __sqrt(pow(X1 - X0, 2) + pow(Y1-Y0, 2));
+	UINT64 X0 = GetBezierPoint(XCords, betabuffer, 4, 0.1f), X1 = GetBezierPoint(XCords, betabuffer, 4, 0.2f), Y0 = GetBezierPoint(YCords, betabuffer, 4, 0.1f), Y1 = GetBezierPoint(YCords, betabuffer, 4, 0.2f);
+	float Distance = (float)__sqrt(pow((double)(X1 - X0), 2) + pow((double)(Y1-Y0), 2));
 	if(Distance > 2) {
 		IncValue /= (Distance - 1);
 	}
@@ -164,10 +164,10 @@ void __declspec(noreturn) _start() {
 	TripleFaultingFunction();
 	SystemDebugPrint(L"All done");
 	
-	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
-	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
-	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x1000));
-	SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
+	// SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
+	// SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
+	// SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x1000));
+	// SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));
 	SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 0x100, 0));
 	SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 1, 0));
 	SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 1, 0));
@@ -241,7 +241,7 @@ void __declspec(noreturn) _start() {
 
 	
 
-	void* __KeReloc = KernelRelocate;
+	void* __KeReloc = (void*)KernelRelocate;
 	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 1, PM_MAP);
 	KernelRelocate(); // CR3 Will be automatically set with the new kernel one
 	KeInitOptimizedComputing();
@@ -530,7 +530,7 @@ __setCR3((UINT64)kproc->PageMap);
 		MapPhysicalPages(kproc->PageMap, SMP_BOOT_ADDR, SMP_BOOT_ADDR, 1, PM_MAP);
 		UINT64 SmpCodeSize = (UINT64)&SMP_TRAMPOLINE_END - (UINT64)SMP_TRAMPOLINE;
 		SystemDebugPrint(L"SMP Trampoline Size : %x", SmpCodeSize);
-		memcpy(SMP_BOOT_ADDR, SMP_TRAMPOLINE, SmpCodeSize);
+		memcpy(SMP_BOOT_ADDR, (const void*)SMP_TRAMPOLINE, SmpCodeSize);
 
 		*(UINT64*)0x120000 = (UINT64)kproc->PageMap;
 
@@ -665,20 +665,20 @@ __setCR3((UINT64)kproc->PageMap);
 		// Use MEMORY MAPPED Configuration
 		for(UINT64 PcieConfig = 0;PcieConfig < NumPcieConfigs;PcieConfig++){
 			
-			for(UINT Bus = 0;Bus < 8;Bus++){
-				for(UINT Device = 0;Device < 32;Device++){
+			for(UINT8 Bus = 0;Bus < 8;Bus++){
+				for(UINT8 Device = 0;Device < 32;Device++){
 
 					// Check if its a multifunction device
-					UINT NumFunctions = 8;
-					PCI_CONFIGURATION_HEADER* RootDeviceConfig = PcieConfigurationRead(PcieConfig, Bus, Device, 0);
+					UINT8 NumFunctions = 8;
+					PCI_CONFIGURATION_HEADER* RootDeviceConfig = PcieConfigurationRead((UINT16)PcieConfig, Bus, Device, 0);
 					unsigned char DeviceHeaderType = RootDeviceConfig->HeaderType;
 					if(DeviceHeaderType == 0xFF) continue; // device is not present
 					if(!(DeviceHeaderType & 0x80)){
 						NumFunctions = 1; // Device is not multifunction
 					}
 
-					for(UINT Function = 0;Function < NumFunctions;Function++){
-						PCI_CONFIGURATION_HEADER* DeviceConfiguration = PcieConfigurationRead(PcieConfig, Bus, Device, Function);
+					for(UINT8 Function = 0;Function < NumFunctions;Function++){
+						PCI_CONFIGURATION_HEADER* DeviceConfiguration = PcieConfigurationRead((UINT16)PcieConfig, Bus, Device, Function);
 						DeviceHeaderType = DeviceConfiguration->HeaderType;
 						if(DeviceHeaderType == 0xFF) continue;
 						if((DeviceHeaderType & ~(0x80)) == 0){
@@ -693,14 +693,14 @@ __setCR3((UINT64)kproc->PageMap);
 
 	}else {
 		// Otherwise use the IO PCI Configuration
-		for(UINT Bus = 0;Bus < 8;Bus++){
-			for(UINT Device = 0;Device<32;Device++){
+		for(UINT8 Bus = 0;Bus < 8;Bus++){
+			for(UINT8 Device = 0;Device<32;Device++){
 				UINT8 HeaderType = IoPciRead8(Bus, Device, 0, PCI_HEADER_TYPE);
-				UINT NumFunctions = 8;
+				UINT8 NumFunctions = 8;
 				if(HeaderType == 0xFF) continue;
 				if(!(HeaderType & 0x80)) NumFunctions = 1;
 
-				for(UINT Function = 0;Function < NumFunctions;Function++){
+				for(UINT8 Function = 0;Function < NumFunctions;Function++){
 					HeaderType = IoPciRead8(Bus, Device, Function, PCI_HEADER_TYPE);
 					if(HeaderType == 0xFF) continue;
 					if((HeaderType & ~(0x80)) == 0) {

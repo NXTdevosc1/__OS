@@ -164,34 +164,34 @@ void KEXPORT KERNELAPI Sleep(UINT64 Milliseconds);
 void KEXPORT KERNELAPI MicroSleep(UINT64 Microseconds);
 
 KERNELSTATUS InitializeApicCpu(UINT64 ApicId);
-void SetupLocalApicTimer();
+void SetupLocalApicTimer(void);
 
-void DeclareCpuHalt();
+void DeclareCpuHalt(void);
 
 void CpuSetupManagementTable(UINT64 CpuCount);
 
-extern void SMP_TRAMPOLINE();
+extern void SMP_TRAMPOLINE(void);
 extern uint64_t SMP_TRAMPOLINE_END;
 
-void EnableCpuFeatures();
+void EnableCpuFeatures(void);
 
 extern double __sqrt(double val);
 
 
 // Setup booted SMP Cpu's
 
-extern void __Schedule(); // throw an INT_SCHEDULE
+extern void __Schedule(void); // throw an INT_SCHEDULE
 
 extern void __ldmxcsr(unsigned int mxcsr);
-extern unsigned int __stmxcsr();
+extern unsigned int __stmxcsr(void);
 
-extern void SetupCPU();
+extern void SetupCPU(void);
 
 extern void __InvalidatePage(void* Address);
 
-extern unsigned long long __rdtsc();
+extern unsigned long long __rdtsc(void);
 
-extern void __wbinvd(); // write back invalidate cache
+extern void __wbinvd(void); // write back invalidate cache
 
 extern void __repstos(void* Address, unsigned char Value, unsigned long long Count);
 extern void __repstos16(void* Address, unsigned short Value, unsigned long long Count);
@@ -204,7 +204,7 @@ void SendProcessorInterrupt(UINT ApicId, char InterruptNumber);
 void IpiSend(UINT ApicId, UINT Command);
 void IpiBroadcast(UINT Command, BOOL SelfSend);
 
-void EnableApic();
+void EnableApic(void);
 void SetLocalApicBase(void* _Lapic);
 
 extern struct GDT gdt;
@@ -278,13 +278,13 @@ extern void _Xmemset128(void* ptr, unsigned long long val, size_t size);
 extern void _Xmemset256(void* ptr, unsigned long long val, size_t size);
 extern void _Xmemset512(void* ptr, unsigned long long val, size_t size);
 
-// extern void __cli();
-// extern void __sti();
-extern void __hlt();
-extern void __pause();
+// extern void __cli(void);
+// extern void __sti(void);
+extern void __hlt(void);
+extern void __pause(void);
 
 extern void __setCR3(unsigned long long CR3);
-extern unsigned long long __getCR3();
+extern unsigned long long __getCR3(void);
 
 extern void __lidt(void* idtr);
 extern void __lgdt(void* gdtr);
@@ -293,15 +293,15 @@ void __cpuidex(CPUID_INFO* CpuInfo, int FunctionId, int SubfunctionId);
 extern void __ReadMsr(unsigned int msr, unsigned int* eax, unsigned int* edx);
 extern void __WriteMsr(unsigned int msr, unsigned int eax, unsigned int edx);
 
-extern unsigned int GetCurrentProcessorId();
-extern unsigned long long __getCR2();
+extern unsigned int GetCurrentProcessorId(void);
+extern unsigned long long __getCR2(void);
 extern void __setRFLAGS(unsigned long long RFLAGS);
-extern unsigned long long __getRFLAGS();
+extern unsigned long long __getRFLAGS(void);
 
 
 extern void __SpinLockSyncBitTestAndSet(void* Address, UINT16 BitOffset);
 extern BOOL __SyncBitTestAndSet(void* Address, UINT16 BitOffset); // return 1 if success, 0 if fail
-// Previous bit content is storred in carry flag (__getRFLAGS()) to test content of CF
+// Previous bit content is storred in carry flag (__getRFLAGS(void)) to test content of CF
 extern void __BitRelease(void* Address, UINT16 BitOffset); // Does not need synchronization
 
 extern void __SyncIncrement64(UINT64* Address);

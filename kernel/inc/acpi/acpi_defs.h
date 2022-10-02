@@ -4,10 +4,10 @@
 #pragma pack(push, 1)
 
 typedef struct _ACPI_RSDP_DESCRIPTOR{
-	char Signature[8];
-	char Checksum;
-	char OEMId[6];
-	char Revision;
+	UINT8 Signature[8];
+	UINT8 Checksum;
+	UINT8 OEMId[6];
+	UINT8 Revision;
 	UINT32 RsdtAddress;
 } ACPI_RSDP_DESCRIPTOR;
 
@@ -15,18 +15,18 @@ typedef struct _ACPI_EXTENDED_RSDP_DESCRIPTOR {
     ACPI_RSDP_DESCRIPTOR RsdpDescriptor;
     UINT32 Length;
     UINT64 XsdtAddress;
-    char ExtendedChecksum;
-    char Reserved[3];
+    UINT8 ExtendedChecksum;
+    UINT8 Reserved[3];
 } ACPI_EXTENDED_RSDP_DESCRIPTOR;
 
 
 typedef struct _ACPI_SDT{
-	char Signature[4];
+	UINT8 Signature[4];
 	UINT32 Length;
-	char Revision;
-	char Checksum;
-	char OEMID[6];
-	char OEMTableId[8];
+	UINT8 Revision;
+	UINT8 Checksum;
+	UINT8 OEMID[6];
+	UINT8 OEMTableId[8];
 	UINT32 OEMRevision;
 	UINT32 CreatorId;
 	UINT32 CreatorRevision;	
@@ -75,15 +75,15 @@ typedef struct _ACPI_FADT{
     UINT32 Dsdt;
  
     // field used in ACPI 1.0; no longer in use, for compatibility only
-    char  Reserved;
+    UINT8  Reserved;
  
-    char  PreferredPowerManagementProfile;
+    UINT8  PreferredPowerManagementProfile;
     UINT16 SCI_Interrupt;
     UINT32 SMI_CommandPort;
-    char  AcpiEnable;
-    char  AcpiDisable;
-    char  S4BIOS_REQ;
-    char  PSTATE_Control;
+    UINT8  AcpiEnable;
+    UINT8  AcpiDisable;
+    UINT8  S4BIOS_REQ;
+    UINT8  PSTATE_Control;
     UINT32 PM1aEventBlock;
     UINT32 PM1bEventBlock;
     UINT32 PM1aControlBlock;
@@ -92,35 +92,35 @@ typedef struct _ACPI_FADT{
     UINT32 PMTimerBlock;
     UINT32 GPE0Block;
     UINT32 GPE1Block;
-    char  PM1EventLength;
-    char  PM1ControlLength;
-    char  PM2ControlLength;
-    char  PMTimerLength;
-    char  GPE0Length;
-    char  GPE1Length;
-    char  GPE1Base;
-    char  CStateControl;
+    UINT8  PM1EventLength;
+    UINT8  PM1ControlLength;
+    UINT8  PM2ControlLength;
+    UINT8  PMTimerLength;
+    UINT8  GPE0Length;
+    UINT8  GPE1Length;
+    UINT8  GPE1Base;
+    UINT8  CStateControl;
     UINT16 WorstC2Latency;
     UINT16 WorstC3Latency;
     UINT16 FlushSize;
     UINT16 FlushStride;
-    char  DutyOffset;
-    char  DutyWidth;
-    char  DayAlarm;
-    char  MonthAlarm;
-    char  Century;
+    UINT8  DutyOffset;
+    UINT8  DutyWidth;
+    UINT8  DayAlarm;
+    UINT8  MonthAlarm;
+    UINT8  Century;
  
     // reserved in ACPI 1.0; used since ACPI 2.0+
     UINT16 BootArchitectureFlags;
  
-    char  Reserved2;
+    UINT8  Reserved2;
     UINT32 Flags;
  
     // 12 byte structure; see below for details
     ACPI_GENERIC_ADDRESS_STRUCTURE ResetReg;
  
-    char  ResetValue;
-    char  Reserved3[3];
+    UINT8  ResetValue;
+    UINT8  Reserved3[3];
  
     // 64bit pointers - Available on ACPI 2.0+
     UINT64                X_FirmwareControl;

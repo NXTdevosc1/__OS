@@ -99,6 +99,6 @@ typedef struct _ACPI_LAPICX2{
 #pragma pack(pop)
 
 void AcpiReadMadt(ACPI_SDT* Sdt);
-UINT32 AcpiGetNumProcessors();
+UINT32 AcpiGetNumProcessors(void);
 
 UINT GetRedirectedIrq(UINT IrqNumber, UINT* IrqFlags);

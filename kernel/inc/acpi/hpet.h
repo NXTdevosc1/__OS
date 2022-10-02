@@ -76,8 +76,8 @@ typedef struct {
 
 void HpetInitialize(ACPI_HPET* Hpet);
 // Return value : HPET Presence 1 = Present
-BOOL HpetConfigure();
+BOOL HpetConfigure(void);
 
 
-UINT64 KEXPORT KERNELAPI GetHighPrecisionTimeSinceBoot();
-UINT64 KEXPORT KERNELAPI GetHighPerformanceTimerFrequency();
+UINT64 KEXPORT KERNELAPI GetHighPrecisionTimeSinceBoot(void);
+UINT64 KEXPORT KERNELAPI GetHighPerformanceTimerFrequency(void);

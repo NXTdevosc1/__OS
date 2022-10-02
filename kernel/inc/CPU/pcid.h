@@ -21,6 +21,6 @@ BOOL ProcessContextIdAllocate(RFPROCESS Process);
 BOOL ProcessContextIdFree(RFPROCESS Process);
 
 // returns true if pcid is supported
-extern BOOL CheckProcessContextIdEnable();
-extern void ProcessContextIdDisable();
-extern BOOL CheckInvPcidSupport();
+extern BOOL CheckProcessContextIdEnable(void);
+extern void ProcessContextIdDisable(void);
+extern BOOL CheckInvPcidSupport(void);

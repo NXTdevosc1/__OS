@@ -2,7 +2,7 @@
 #include <fs/fs.h>
 #include <kernel.h>
 #include <CPU/cpu.h>
-
+#include <interrupt_manager/SOD.h>
 FILE PageFile = NULL;
 BOOL _PageFilePresent = 0;
 
@@ -34,7 +34,7 @@ void InitMemoryManagementSubsystem() {
     for(UINT64 i = 0;i<InitData.MemoryMap->Count;i++, Memory++) {
         if(!InitData.uefi) {
             if(Memory->Type > 7) {
-                Memory->Type = -1;
+                Memory->Type = 0xFF;
                 continue;
             }
             Memory->Type = LegacyBiosMemoryMapToEfiMapping[Memory->Type];
@@ -67,7 +67,7 @@ void InitMemoryManagementSubsystem() {
         if(Memory->Type == EfiConventionalMemory && Memory->PageCount >= NumPages) {
             MemoryManagementTable.PageArray = (PAGE*)Memory->PhysicalStart;
             MemoryManagementTable.PageBitmap = (char*)Memory->PhysicalStart + BitmapOffset;
-            (char*)Memory->PhysicalStart+=(NumPages << 12);
+            (UINT64)Memory->PhysicalStart+=(NumPages << 12);
             Memory->PageCount -= NumPages;
             DECLARE_USED_MEMORY(NumPages << 12);
             break;
@@ -86,7 +86,7 @@ void InitMemoryManagementSubsystem() {
     }
     // Zero Page Bitmap
     MemoryManagementTable.NumBytesPageBitmap = ((((MemoryManagementTable.PageArraySize + 1) >> 12) >> 3) << 12) + 0x80; // Padding 0x80
-    memset(MemoryManagementTable.PageBitmap, 0xFF, MemoryManagementTable.NumBytesPageBitmap);
+    memset((void*)MemoryManagementTable.PageBitmap, 0xFF, MemoryManagementTable.NumBytesPageBitmap);
     // // Declare all the free segments in the cache
     // for(int i = 0;i<NUM_FREE_MEMORY_LEVELS;i++) {
     //     MemoryManagementTable.FreeMemoryLevels[i].UnallocatedSegmentCache.CachedMemorySegments[i] = 
@@ -99,8 +99,8 @@ void InitMemoryManagementSubsystem() {
 // Used after relocation
 void SIMD_InitOptimizedMemoryManagement() {
     // Relocate variables
-    MemoryManagementTable.PageArray = AllocateIoMemory(MemoryManagementTable.PageArray, ALIGN_VALUE(MemoryManagementTable.PageArraySize, 0x1000) >> 12, 0);
-    MemoryManagementTable.PageBitmap = AllocateIoMemory(MemoryManagementTable.PageBitmap, ALIGN_VALUE(MemoryManagementTable.NumBytesPageBitmap, 0x1000) >> 12, 0);
+    MemoryManagementTable.PageArray = (PAGE*)AllocateIoMemory((LPVOID)MemoryManagementTable.PageArray, ALIGN_VALUE(MemoryManagementTable.PageArraySize, 0x1000) >> 12, 0);
+    MemoryManagementTable.PageBitmap = (volatile char*)AllocateIoMemory((LPVOID)MemoryManagementTable.PageBitmap, ALIGN_VALUE(MemoryManagementTable.NumBytesPageBitmap, 0x1000) >> 12, 0);
 
     // if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
 

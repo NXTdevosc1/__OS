@@ -20,8 +20,8 @@ Bits 7:6 - Select Channel
 
 // PIT will operate on 50HZ Speed (best found speed for the highest precision)
 
-void PitEnable();
-void PitDisable();
+void PitEnable(void);
+void PitDisable(void);
 void PitInterruptHandler(RFDRIVER_OBJECT DriverObject, RFINTERRUPT_INFORMATION InterruptInformation);
 void PitWait(DWORD Clocks);
 

@@ -34,6 +34,6 @@ PCI_CONFIGURATION_HEADER* KERNELAPI PcieFindDevice(UINT16 VendorId, UINT16 Devic
 BOOL KERNELAPI PcieEnumerateDevices(unsigned char PciClass, unsigned char PciSubClass, unsigned char ProgramInterface, PCI_CONFIGURATION_HEADER** PConfiguarationPtrs, unsigned int Max);
 PCI_CONFIGURATION_HEADER* KERNELAPI PcieConfigurationRead(UINT16 PcieConfig, unsigned char Bus, unsigned char Device, unsigned char Function);
 
-BOOL KERNELAPI GetPcieCompatibility();
+BOOL KERNELAPI GetPcieCompatibility(void);
 
-UINT64 GetNumPciExpressConfigurations();
+UINT64 GetNumPciExpressConfigurations(void);

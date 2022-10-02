@@ -4,4 +4,4 @@
 
 void handle_keyboard(uint8_t kb_code);
 
-void init_ps2_keyboard();
+void init_ps2_keyboard(void);

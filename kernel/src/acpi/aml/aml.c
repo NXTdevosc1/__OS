@@ -50,9 +50,9 @@ void AcpiReadDsdt(RFACPI_DSDT Dsdt){
             else {
                 UINT BitOff = 4;
 
-                for(UINT i = 0;i<FollowingBytes;i++) {
+                for(UINT c = 0;c<FollowingBytes;c++) {
                     
-                    PkgLength |= ((UINT32)Aml[i] & 0xff) << BitOff;
+                    PkgLength |= ((UINT32)Aml[c] & 0xff) << BitOff;
                     BitOff+=8;
                 }
 

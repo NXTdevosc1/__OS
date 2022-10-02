@@ -66,7 +66,7 @@ void HpetInitialize(ACPI_HPET* Hpet) {
     Regs->GeneralConfiguration &= ~HPET_ENABLE;
     Regs->GeneralConfiguration |= HPET_LEGACY_REPLACEMENT_ROUTE_ENABLE;
 
-    UINT AdditionalTimers = Regs->GeneralCapabilitiesAndId >> HPET_NUM_TIMERS;
+    UINT AdditionalTimers = (UINT32)(Regs->GeneralCapabilitiesAndId >> HPET_NUM_TIMERS);
     AdditionalTimers &= 0x1F;
     AdditionalTimers -= 2; // Not - 3 because NUM_TMR = Last timer which is NumTimers - 1
     SystemDebugPrint(L"Additional Timers : %d , Address Space : %x | Address : %x | Access Size : %x",AdditionalTimers, Hpet->Address.AddressSpace, Hpet->Address.Address, Hpet->Address.AccessSize);
@@ -102,7 +102,7 @@ BOOL HpetConfigure() {
     UINT IntFlags = 0;
     UINT32 IntNum = GetRedirectedIrq(0, &IntFlags); // IRQ 0 In IOAPIC Input (Probably 2)
 
-    UINT32 Cnf = Regs->Timer0ConfigurationAndCapability;
+    UINT32 Cnf = (UINT32)Regs->Timer0ConfigurationAndCapability;
     Cnf &= ~(0x1F << TIMER_INTERRUPT_ROUTE);
     Cnf |= IntNum << TIMER_INTERRUPT_ROUTE;
     Regs->Timer0ConfigurationAndCapability = Cnf;

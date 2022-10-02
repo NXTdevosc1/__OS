@@ -4,7 +4,6 @@
 #endif
 #include <stdint.h>
 #include <krnltypes.h>
-#include <intrin.h>
 
 
 extern void __fastcall _SSE_Memset(LPVOID Address, UINT64 Value, UINT64 Count);
@@ -35,6 +34,24 @@ void memset64(LPVOID ptr, uint64_t value, size_t size);
 void memcpy16(LPVOID dest, LPCVOID src, size_t size);
 void memcpy32(LPVOID dest, LPCVOID src, size_t size);
 void memcpy64(LPVOID dest, LPCVOID src, size_t size);
+
+void *memset(
+   void *dest,
+   int c,
+   size_t count
+);
+
+void *memcpy(
+   void *dest,
+   const void *src,
+   size_t count
+);
+
+int memcmp(
+   const void *buffer1,
+   const void *buffer2,
+   size_t count
+);
 
 // int memcmp(LPVOID x, LPVOID y, size_t size);
 #define ZeroMemory(ptr, len) memset(ptr, 0, len)

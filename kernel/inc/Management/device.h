@@ -34,6 +34,7 @@ typedef struct _DEVICE_OBJECT {
 	UINT32 DeviceSubclass;
 	UINT32 ProgramInterface;
 	UINT32 DeviceType;
+	UINT32 Pad0;
 	UINT64 VendorId;
 	UINT64 DeviceId;
 	LPVOID DeviceConfiguration; // For ex. In PCI, this is the mmio address of the header
@@ -41,6 +42,7 @@ typedef struct _DEVICE_OBJECT {
 	UINT8 DeviceNumber;
 	UINT8 Function;
 	UINT8 PciAccessType; // 0 = MMIO, 1 = IO
+	DWORD Pad1;
 	RFDRIVER_OBJECT Driver;
 	void* ControlInterface;
 	void* ExtensionPointer; // an optionnal structure for additionnal info about the device

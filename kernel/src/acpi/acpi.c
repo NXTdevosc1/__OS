@@ -26,7 +26,7 @@ static const char* ACPI_SIG[] = {
 	"SSDT","XSDT","MCFG"
 };
 
-BOOL OemLogoDrawn = FALSE;
+UINT8 OemLogoDrawn = FALSE;
 
 
 uint8_t sig_cmp(char* sig1, char* sig2){
@@ -86,7 +86,7 @@ void AcpiInit(void* RsdpAddress){
 		SystemDebugPrint(L"RSDP_REVISION : %d", RsdpRevision);
 	if(RsdpRevision == 2) {
 		if(!is_valid_rsdp_checksum(RsdpAddress,sizeof(ACPI_RSDP_DESCRIPTOR))
-		|| !is_valid_rsdp_checksum((void*)(&Rsdp->RsdpDescriptor + 1), Rsdp->Length-sizeof(ACPI_RSDP_DESCRIPTOR)))
+		|| !is_valid_rsdp_checksum((void*)(&Rsdp->RsdpDescriptor + 1), (UINT8)(Rsdp->Length-sizeof(ACPI_RSDP_DESCRIPTOR))))
 		{
 			SET_SOD_INVALID_ACPI_TABLE;
 		}
@@ -223,7 +223,7 @@ UINT32 AcpiReadTimer(){
 			return *(DWORD*)RequiredFadtTable->X_PMTimerBlock.Address;
 		}else if(RequiredFadtTable->X_PMTimerBlock.AddressSpace == 1){
 			// IO
-			return InPort(RequiredFadtTable->X_PMTimerBlock.Address);
+			return InPort((UINT16)RequiredFadtTable->X_PMTimerBlock.Address);
 		}else return 0;
 	}
 	return 0;

@@ -13,7 +13,7 @@
 UINT64 GlobalThreadPreemptionPriorities[];
 
 
-typedef void (__cdecl *THREAD_START_ROUTINE)();
+typedef void (__cdecl *THREAD_START_ROUTINE)(void);
 
 #define __STACK_PUSH(Stack, Var) Stack = (UINT64)Stack - 8; *(UINT64*)(Stack) = (UINT64)Var
 #define KERNELRUNTIMEDLLW L"kernelruntime.dll"
@@ -36,34 +36,34 @@ int KERNELAPI TerminateCurrentThread(int ExitCode);
 int KERNELAPI TerminateProcess(RFPROCESS process, int ExitCode);
 int KERNELAPI TerminateThread(RFTHREAD thread, int ExitCode);
 
-RFPROCESS KEXPORT KERNELAPI KeGetCurrentProcess();
-RFTHREAD KEXPORT KERNELAPI KeGetCurrentThread();
+RFPROCESS KEXPORT KERNELAPI KeGetCurrentProcess(void);
+RFTHREAD KEXPORT KERNELAPI KeGetCurrentThread(void);
 RFTHREAD KEXPORT KERNELAPI KeGetProcessorIdleThread(UINT64 ProcessorId);
 
-UINT64 KEXPORT KERNELAPI KeGetCurrentProcessId();
-UINT64 KEXPORT KERNELAPI KeGetCurrentThreadId();
+UINT64 KEXPORT KERNELAPI KeGetCurrentProcessId(void);
+UINT64 KEXPORT KERNELAPI KeGetCurrentThreadId(void);
 
 BOOL KEXPORT KERNELAPI KeSuspendThread(RFTHREAD Thread);
 BOOL KEXPORT KERNELAPI KeResumeThread(RFTHREAD Thread);
 
 extern PROCESSMGRTABLE Pmgrt;
-extern void ScheduleTask();
-extern void SkipTaskSchedule();
+extern void ScheduleTask(void);
+extern void SkipTaskSchedule(void);
 
 
 double KERNELAPI GetThreadCpuTime(RFTHREAD Thread);
-double KERNELAPI GetIdleCpuTime();
-double KERNELAPI GetTotalCpuTime();
+double KERNELAPI GetIdleCpuTime(void);
+double KERNELAPI GetTotalCpuTime(void);
 double KERNELAPI GetProcessorIdleTime(UINT64 ProcessorId);
 double KERNELAPI GetProcessorTotalTime(UINT64 ProcessorId);
 
 BOOL SetThreadProcessor(RFTHREAD Thread, UINT ProcessorId);
 
 
-void KERNELAPI TaskSchedulerEnable();
-void KERNELAPI TaskSchedulerDisable();
+void KERNELAPI TaskSchedulerEnable(void);
+void KERNELAPI TaskSchedulerDisable(void);
 
-BOOL KEXPORT KERNELAPI IoWait();
+BOOL KEXPORT KERNELAPI IoWait(void);
 BOOL KEXPORT KERNELAPI IoFinish(RFTHREAD Thread);
 
 BOOL isValidProcess(RFPROCESS Process);

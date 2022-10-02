@@ -42,7 +42,7 @@ int MSABI FsDirNext(DIRECTORY_FILE_LIST* list, DIR_LIST_FILE_ENTRY** out){
     }
 
     for(uint8_t z = 0;z<255;z++){
-        for(uint16_t i = list->in_index;i<MAX_FILES_PER_DIRLS_LIST;i++){
+        for(UINT32 i = list->in_index;i<MAX_FILES_PER_DIRLS_LIST;i++){
             if(list->current->Files[i].Set){
                 *out = &list->current->Files[i];
                 list->in_index = i+1;

@@ -109,6 +109,6 @@ BOOL KERNELAPI isDriver(RFDRIVER_OBJECT DriverObject);
 // Driver id is the index in the Driver Identification Table
 RFDRIVER_OBJECT KERNELAPI QueryDriverById(UINT64 DriverId);
 
-void RunEssentialExtensionDrivers();
-void LoadExtensionDrivers();
-void RunDeviceDrivers();
+void RunEssentialExtensionDrivers(void);
+void LoadExtensionDrivers(void);
+void RunDeviceDrivers(void);

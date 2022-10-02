@@ -63,7 +63,7 @@ LPVOID KEXPORT KERNELAPI AllocateIoMemory(_IN LPVOID PhysicalAddress, _IN UINT64
                                     f = &StartBmp->IoBitmap[v];
                                     Value = *f;
                                     for(;x < 64;x++) {
-                                        Value |= (1 << x);
+                                        Value |= ((UINT64)1 << x);
                                         Pages--;
                                         if(!Pages) goto Ret;
                                     }

@@ -74,9 +74,9 @@ LPVOID DeviceConfigurationPtr // Used in PCI Configuration Space (if PCI Source 
 			if(DeviceSource == DEVICE_SOURCE_PCI){
 				if((UINT64)DeviceConfigurationPtr & DEVICE_LEGACY_IO_FLAG) {
 					// Get Bus, Device, and function (DEVICE_LEGACY_IO_FLAG Automatically truncated)
-					Device->Bus = (UINT64)DeviceConfigurationPtr >> 16;
-					Device->DeviceNumber = (UINT64)DeviceConfigurationPtr >> 8;
-					Device->Function = (UINT64)DeviceConfigurationPtr;
+					Device->Bus = (UINT8)((UINT64)DeviceConfigurationPtr >> 16);
+					Device->DeviceNumber = (UINT8)((UINT64)DeviceConfigurationPtr >> 8);
+					Device->Function = (UINT8)((UINT64)DeviceConfigurationPtr);
 
 					Device->DeviceClass = IoPciRead8(Device->Bus, Device->DeviceNumber, Device->Function, PCI_CLASS);
 					Device->DeviceSubclass = IoPciRead8(Device->Bus, Device->DeviceNumber, Device->Function, PCI_SUBCLASS);
@@ -90,9 +90,9 @@ LPVOID DeviceConfigurationPtr // Used in PCI Configuration Space (if PCI Source 
 				}else{
 					PCI_CONFIGURATION_HEADER* PciConfig = Device->DeviceConfiguration;
 					UINT64 _RawConfig = (UINT64)Device->DeviceConfiguration >> 12;
-					Device->Function = _RawConfig & 0b111;
-					Device->DeviceNumber = (_RawConfig >> 3) & 0b11111;
-					Device->Bus = _RawConfig >> 8;
+					Device->Function = (UINT8)(_RawConfig & 0b111);
+					Device->DeviceNumber = (UINT8)((_RawConfig >> 3) & 0b11111);
+					Device->Bus = (UINT8)(_RawConfig >> 8);
 
 					Device->DeviceClass = PciConfig->DeviceClass;
 					Device->DeviceSubclass = PciConfig->DeviceSubclass;

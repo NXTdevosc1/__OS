@@ -23,7 +23,7 @@ typedef union _INTERRUPT_STACK_FRAME {
 
 typedef void(__cdecl* INTERRUPT_SERVICE_ROUTINE)(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptStackFrame);
 
-extern void __InterruptCheckHalt();
+extern void __InterruptCheckHalt(void);
 
 extern void InterruptUnsupported(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFrame);
 

@@ -24,7 +24,6 @@ void InitSysEntry(void* CpuBuffer) {
     uint32_t eax = 0, edx = 0;
 
     // Setup Syscall
-
     __ReadMsr(0xC0000080, &eax, &edx);
     __WriteMsr(0xC0000080, eax | 1, edx); // Enable Syscall Extensions
     eax = 0; // not set in 64 bit, Syscall EIP
@@ -32,8 +31,8 @@ void InitSysEntry(void* CpuBuffer) {
     __WriteMsr(0xC0000081, eax, edx); // set STAR msr
 
     // set syscall RIP
-    eax = (uint64_t)_SyscallEntry;
-    edx = (uint64_t)_SyscallEntry >> 32;
+    eax = (UINT32)((uint64_t)_SyscallEntry);
+    edx = (UINT32)((uint64_t)_SyscallEntry >> 32);
 
     __WriteMsr(0xC0000082, eax, edx);
 
@@ -51,14 +50,14 @@ void InitSysEntry(void* CpuBuffer) {
     UINT64 SyscallStack = (UINT64)CpuBuffer + SYSENTRY_STACK_BASE + 0xC000;
     
 
-    eax = SyscallStack;
-    edx = SyscallStack >> 32;
+    eax = (UINT32)SyscallStack;
+    edx = (UINT32)(SyscallStack >> 32);
 
     __WriteMsr(0x175, eax, edx);
 
     // Write IA32_SYSENTER_RIP
-    eax = (UINT64)__FastSysEntry;
-    edx = (UINT64)__FastSysEntry >> 32;
+    eax = (UINT32)((UINT64)__FastSysEntry);
+    edx = (UINT32)((UINT64)__FastSysEntry >> 32);
 
 }
 
@@ -70,7 +69,7 @@ void GlobalSysEntryTableInitialize(){
 
 }
 
-UINT64 __dbg_y = 0;
+UINT __dbg_y = 0;
 
 void MSABI SyscallDebugPrint(const char* data){
     data = KeResolvePhysicalAddress(KeGetCurrentProcess(), data);

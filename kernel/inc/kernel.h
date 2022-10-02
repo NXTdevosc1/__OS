@@ -20,7 +20,7 @@ extern RFPROCESS SystemInterruptsProcess;
 extern volatile INITDATA InitData;
 extern volatile UINT64 _krnlbase, _krnlend;
 
-void KERNELAPI IdleThread();
+void KERNELAPI IdleThread(void);
 RFSERVER KernelServer;
 
 UINT ExtensionLevel;
