@@ -106,7 +106,6 @@ UINT XOff = 200;
 UINT YOff = 300;
 void TripleFaultingFunction() {
 	UINT64 X0 = GetBezierPoint(XCords, betabuffer, 4, 0.1f), X1 = GetBezierPoint(XCords, betabuffer, 4, 0.2f), Y0 = GetBezierPoint(YCords, betabuffer, 4, 0.1f), Y1 = GetBezierPoint(YCords, betabuffer, 4, 0.2f);
-	for(;;);
 	float Distance = (float)__sqrt(pow((double)(X1 - X0), 2) + pow((double)(Y1-Y0), 2));
 	if(Distance > 2) {
 		IncValue /= (Distance - 1);
@@ -145,7 +144,6 @@ void __declspec(noreturn) _start() {
 		GP_draw_sf_text("Extension level : SSE", 0xFFFFFF, 20, 20);
 	}
 	TripleFaultingFunction();
-	for(;;);
 	
 	// while(1) __hlt();
 	SetupPageAttributeTable();

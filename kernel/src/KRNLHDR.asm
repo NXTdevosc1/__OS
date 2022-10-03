@@ -59,50 +59,7 @@ section .text
 
 
 		.NoNX:
-
-	; A failed attempt to fix the Global Optimizations problem
-		xor rax, rax
-		xor rbx, rbx
-		xor rcx, rcx
-		xor rdx, rdx
-		xor rsi, rsi
-		xor rdi, rdi
-		xor r8, r8
-		xor r9, r9
-		xor r10, r10
-		xor r11, r11
-		xor r12, r12
-		xor r13, r13
-		xor r14, r14
-		xor r15, r15
-
-		pxor xmm0, xmm0
-		pxor xmm1, xmm1
-		pxor xmm2, xmm2
-		pxor xmm3, xmm3
-		pxor xmm4, xmm4
-		pxor xmm5, xmm5
-		pxor xmm6, xmm6
-		pxor xmm7, xmm7
-		pxor xmm8, xmm8
-		pxor xmm9, xmm9
-		pxor xmm10, xmm10
-		pxor xmm11, xmm11
-		pxor xmm12, xmm12
-		pxor xmm13, xmm13
-		pxor xmm14, xmm14
-		pxor xmm15, xmm15
-		
-		pxor mm0, mm0
-		pxor mm1, mm1
-		pxor mm2, mm2
-		pxor mm3, mm3
-		pxor mm4, mm4
-		pxor mm5, mm5
-		pxor mm6, mm6
-		pxor mm7, mm7
-
-
+		add rsp, 8 ; Compiler expects the unaligned stack setup : RCX, RDX, R8, R9, RIP (Return Address)
 		jmp _start
 
 
@@ -146,6 +103,7 @@ KernelRelocate:
 	mov rbp, rbx ; Base Pointer = Stack Top
 
 	mov rbx, __JumpToRelocatedKernel
+
 	jmp rbx
 
 global __JumpToRelocatedKernel

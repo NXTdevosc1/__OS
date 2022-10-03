@@ -11,7 +11,6 @@ global memcmp
 
 ; RCX = Dest, DL = Value, R8 = Count
 memset:
-    cld
     push rdi
     mov al, dl
     mov rdi, rcx
@@ -21,7 +20,6 @@ memset:
     ret
 ; RCX = Dest, RDX = Src, R8 = Count
 memcpy:
-    cld
     push rsi
     push rdi
     mov rsi, rdx
@@ -33,6 +31,8 @@ memcpy:
     ret
 ; RCX = buffer1, RDX = buffer2, R8 = Count
 memcmp:
+    mov rax, 0xdaddad
+    jmp $
     cld
     push rsi
     push rdi
