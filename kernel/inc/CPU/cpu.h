@@ -290,8 +290,7 @@ extern void __lidt(void* idtr);
 extern void __lgdt(void* gdtr);
 void __cpuidex(CPUID_INFO* CpuInfo, int FunctionId, int SubfunctionId);
 
-extern void __ReadMsr(unsigned int msr, unsigned int* eax, unsigned int* edx);
-extern void __WriteMsr(unsigned int msr, unsigned int eax, unsigned int edx);
+
 
 extern unsigned int GetCurrentProcessorId(void);
 extern unsigned long long __getCR2(void);

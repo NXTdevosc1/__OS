@@ -113,18 +113,16 @@ void GP_sf_put_char(const char ch, unsigned int color, unsigned int x, unsigned 
 // in eather SSE, AVX or AVX512
 // the performance increase by the extension level
 */
-extern UINT64 __declspec(noinline) __fastcall _SSE_ComputeBezier(float* beta, UINT NumCordinates, float percent);
-extern UINT64 __declspec(noinline) __fastcall _AVX_ComputeBezier(float* beta, UINT NumCordinates, float percent);
+extern UINT64 __fastcall _SSE_ComputeBezier(float* beta, UINT NumCordinates, float percent);
+extern UINT64 __fastcall _AVX_ComputeBezier(float* beta, UINT NumCordinates, float percent);
 
 UINT64 KERNELAPI GetBezierPoint(float* cordinates, float* beta, UINT8 NumCordinates, float percent){
-	for(;;);
-
-	// memcpy(beta, cordinates, ((UINT64)NumCordinates) << 2);
-	// if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
-	// 	return _SSE_ComputeBezier(beta, NumCordinates, percent);
-	// } else if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
-	// 	return _AVX_ComputeBezier(beta, NumCordinates, percent);
-	// }
+	memcpy(beta, cordinates, ((UINT64)NumCordinates) << 2);
+	if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
+		return _SSE_ComputeBezier(beta, NumCordinates, percent);
+	} else if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
+		return _AVX_ComputeBezier(beta, NumCordinates, percent);
+	}
 	return 0;
 }
 

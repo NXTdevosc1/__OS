@@ -183,6 +183,8 @@ section .PRTVRFY
 	times 0x1000 db 0xC7
 
 section .KSTACK
+
+align 0x1000
 	times 0x1000 resb 0 ; Protective Padding
 	_KernelStackBottom:
 	times 0x8000 resq 0

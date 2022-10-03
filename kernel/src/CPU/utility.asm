@@ -19,8 +19,8 @@ global GetCurrentProcessorId
 global __getCR2
 global __getCR3
 
-global __ReadMsr
-global __WriteMsr
+; global __ReadMsr
+; global __WriteMsr
 
 global __SpinLockSyncBitTestAndSet
 global __BitRelease
@@ -155,31 +155,39 @@ __InvalidatePage:
 	ret
 
 __repstos:
+	push rdi
 	mov rdi, rcx ; Address
 	mov al, dl ; Value
 	mov rcx, r8 ; count
 	rep stosb
+	pop rdi
 	ret
 
 __repstos16:
+	push rdi
 	mov rdi, rcx ; Address
 	mov ax, dx ; Value
 	mov rcx, r8 ; count
 	rep stosw
+	pop rdi
 	ret
 
 __repstos32:
+	push rdi
 	mov rdi, rcx ; Address
 	mov eax, edx ; Value
 	mov rcx, r8 ; count
 	rep stosd
+	pop rdi
 	ret
 
 __repstos64:
+	push rdi
 	mov rdi, rcx ; Address
 	mov rax, rdx ; Value
 	mov rcx, r8 ; count
 	rep stosq
+	pop rdi
 	ret
 
 ; BOOL __SyncBitTestAndSet(void* Address, UINT16 BitOffset)
@@ -245,31 +253,7 @@ __BitRelease:
 	btr qword [rcx], rdx
 	ret
 
-; ReadMsr(ecx MsrNumber, eax*, edx*)
-__ReadMsr:
-	push rdx
-	push r8
-	; ecx is already set
-	rdmsr
-	mov rbx, [rsp]
-	cmp rbx, 0
-	je .skip0
-	mov [rbx], edx
-	.skip0:
-	add rsp, 8
-	mov rbx, [rsp]
-	cmp rbx, 0
-	je .skip1
-	mov [rbx], eax
-	.skip1:
-	add rsp, 8
-	ret
-__WriteMsr:
-	; ecx is already set
-	mov eax, edx
-	mov edx, r8d
-	wrmsr
-	ret
+
 __setCR3:
 	mov cr3, rcx
 	ret

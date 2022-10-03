@@ -11,28 +11,43 @@ global memcmp
 
 ; RCX = Dest, DL = Value, R8 = Count
 memset:
+    cld
+    push rdi
     mov al, dl
     mov rdi, rcx
     mov rcx, r8
     rep stosb
+    pop rdi
     ret
 ; RCX = Dest, RDX = Src, R8 = Count
 memcpy:
+    cld
+    push rsi
+    push rdi
     mov rsi, rdx
     mov rdi, rcx
     mov rcx, r8
     rep movsb
+    pop rdi
+    pop rsi
     ret
 ; RCX = buffer1, RDX = buffer2, R8 = Count
 memcmp:
+    cld
+    push rsi
+    push rdi
     mov rsi, rcx
     mov rdi, rdx
     mov rcx, r8
     repe cmpsb
     jne .failed
     mov rax, 1
+    pop rdi
+    pop rsi
     ret
 .failed:
+    pop rdi
+    pop rsi
     xor rax, rax
     ret
 

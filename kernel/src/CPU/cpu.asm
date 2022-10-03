@@ -38,10 +38,6 @@ LoadGDT:
     retfq
 
 
-_TimeSliceCounter:
-    times 0x500 nop
-    ret
-
 ; null off = 0, kernelc = 0x08, kerneld = 0x10, userc = 0x18, userd = 0x20, tss = 0x28
 
 FlushTSS:
@@ -119,7 +115,7 @@ _basicX64Init:
     or rax, (3 << 9) ; OFXSR | OSXMMEXCPT
     mov cr4, rax
 
-    fninit
+    ; fninit
 
     ret
 

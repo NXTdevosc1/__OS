@@ -13,13 +13,13 @@ global _SSE_AllocatePhysicalPage
 
 %macro _APP0 0
     mov rax, 1
-    movq rdi, xmm0
-    bsf rsi, rdi
+    movq r9, xmm0
+    bsf r10, r9
     jz %%.EXIT
-    lock btr qword [rcx], rsi
+    lock btr qword [rcx], r10
     jnc %%.EXIT
-    shl rsi, 3
-    add r8, rsi
+    shl r10, 3
+    add r8, r10
     or qword [r8], 1
     mov rax, [r8]
     and rax, ~0xFFF
@@ -49,60 +49,3 @@ _SSE_AllocatePhysicalPage:
     xor rax, rax
     ret
 
-
-global _SSE_AllocateContiguousPages
-
-%macro _SSE_ACP_LOOP1 1 ; C Offset
-    test rdi, rax
-    jz %%.ON
-    ; Release chain of pages
-    xor r10, r10
-    jmp %%.EXIT
-%%.ON:
-    test r10, r10
-    jnz %%.A
-    ; Set RBX, RSI, R10
-    mov rbx, rdx
-    mov sil, %1
-%%.A:
-    inc r10
-    cmp r10, rcx
-    je .ExitSuccess
-%%.EXIT:
-%endmacro
-
-; RCX = NUM_PAGES, RDX = Page Bitmap, R8 = Page Bitmap Size in Bytes
-; 128 Times LOOP on XMM0 [128-BIT]
-; RBX = Start Address
-; RSI = Bit Offset
-; R10 = Allocated pages
-_SSE_AllocateContiguousPages:
-.loop0:
-    movdqa xmm0, [rdx]
-    xor r10, r10 ; Current Pages
-    .loop1:
-        %rep 2
-            %assign i 0
-            mov rax, 1
-            movq rdi, xmm0
-            %rep 64
-            _SSE_ACP_LOOP1 i
-            %assign i i + 1
-            shl rax, 1
-            %endrep
-            psrldq xmm0, 8
-            add rdx, 0x8
-        %endrep
-    .loop1_exit:
-    
-    dec r8
-    jmp .loop0
-
-.ExitSuccess:
-    mov rax, rbx ; Start Address
-    mov rbx, 0xccc
-    jmp $
-    ; Fill the chain of bits
-.Exit: ; Failure
-    xor rax, rax
-    ret

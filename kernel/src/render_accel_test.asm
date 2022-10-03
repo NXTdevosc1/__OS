@@ -12,6 +12,8 @@ global _SSE_ComputeBezierW
 ; XMM1 = 1 - percent
 ; XMM2 = Percent
 _SSE_ComputeBezier:
+    mov rax, 0xbbb
+    jmp $
 ; for(register UINT k = 1;k < NumCordinates;k++)
     mov r8, 1
     mov r9, rdx

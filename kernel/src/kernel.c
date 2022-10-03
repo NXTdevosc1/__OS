@@ -98,16 +98,15 @@ LPWSTR KernelProcessName = L"System Kernel.";
 
 char* ExtensionLevelStr[2] = {"SSE", "AVX"};
 
+float XCords[0x100] = {0, 50, 100, 150};
+float YCords[0x100] = {0, 50, -50, 0};
+float betabuffer[0x100] = {0};
+float IncValue = 0.1f;
+UINT XOff = 200;
+UINT YOff = 300;
 void TripleFaultingFunction() {
-	float XCords[0x100] = {0, 50, 100, 150};
-	float YCords[0x100] = {0, 50, -50, 0};
-	float betabuffer[0x100] = {0};
-	float IncValue = 0.1f;
-	UINT XOff = 200;
-	UINT YOff = 300;
-	GetBezierPoint(XCords, betabuffer, 4, 0.1f);
-	while(1);
 	UINT64 X0 = GetBezierPoint(XCords, betabuffer, 4, 0.1f), X1 = GetBezierPoint(XCords, betabuffer, 4, 0.2f), Y0 = GetBezierPoint(YCords, betabuffer, 4, 0.1f), Y1 = GetBezierPoint(YCords, betabuffer, 4, 0.2f);
+	for(;;);
 	float Distance = (float)__sqrt(pow((double)(X1 - X0), 2) + pow((double)(Y1-Y0), 2));
 	if(Distance > 2) {
 		IncValue /= (Distance - 1);
@@ -133,6 +132,7 @@ void TripleFaultingFunction() {
 		LastY = Y;
 	}
 	}
+
 }
 
 void __declspec(noreturn) _start() {
@@ -144,6 +144,8 @@ void __declspec(noreturn) _start() {
 	} else {
 		GP_draw_sf_text("Extension level : SSE", 0xFFFFFF, 20, 20);
 	}
+	TripleFaultingFunction();
+	for(;;);
 	
 	// while(1) __hlt();
 	SetupPageAttributeTable();
@@ -183,7 +185,6 @@ void __declspec(noreturn) _start() {
 	GP_clear_screen(0);
 
 	// SystemDebugPrint(L"Starting...");
-	TripleFaultingFunction();
 	SystemDebugPrint(L"All done");
 	
 	// SystemDebugPrint(L"Allocate Pool : %x", AllocatePool(0x100));

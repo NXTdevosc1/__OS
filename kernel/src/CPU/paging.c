@@ -208,8 +208,5 @@ void SetupPageAttributeTable() {
     }
 
     // Set Page Attribute Table
-    UINT64 Val = *(UINT64*)PageAttributeTable;
-    UINT32 EAX = (UINT32)Val;
-    UINT32 EDX = (UINT32)(Val >> 32);
-    __WriteMsr(PAT_MSR, EAX, EDX);
+    __writemsr(PAT_MSR, *(UINT64*)PageAttributeTable);
 }

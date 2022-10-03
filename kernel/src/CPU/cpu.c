@@ -265,7 +265,7 @@ void LapicTimerSetupTSCDeadlineMode() {
 	GP_draw_sf_text(to_hstring64(__rdtsc()), 0xffffff, 20, 40);
 	*(UINT32*)(LAPIC_ADDRESS + CPU_LAPIC_END_OF_INTERRUPT) = 0;
 
-	__WriteMsr(IA32_TSC_DEADLINE_MSR, (unsigned int)ApicTimerBaseQuantum, 0);
+	__writemsr(IA32_TSC_DEADLINE_MSR, (unsigned long long)ApicTimerBaseQuantum);
 
 	GP_draw_sf_text(to_hstring64(__rdtsc()), 0xffffff, 20, 60);
 
@@ -363,7 +363,5 @@ void EnableApic() {
 
 }
 void SetLocalApicBase(void* _Lapic) {
-	UINT32 eax = (UINT32)((UINT64)_Lapic | IA32_APIC_BASE_MSR_ENABLE);
-	UINT32 edx = (UINT32)((UINT64)_Lapic >> 32);
-	__WriteMsr(IA32_APIC_BASE_MSR, eax, edx);
+	__writemsr(IA32_APIC_BASE_MSR, ((UINT64)_Lapic | IA32_APIC_BASE_MSR_ENABLE));
 }
