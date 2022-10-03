@@ -174,9 +174,11 @@ void LineTo(INT64 x0, INT64 y0, INT64 x1, INT64 y1, UINT32 Color) {
 	double sy = y0 < y1 ? 1 : -1;
 	double error = dx + dy;
 
+	// UINT32 mX = max()
+
 	for(;;) {
 		((UINT32*)InitData.fb->FrameBufferBase)[(x0 + y0 * InitData.fb->Pitch)] = Color;
-		if(x0 == x1 && y0 == y1) break;
+		if(x0 <= x1 && y0 <= y1) break;
 		double e2 = 2 * error;
 		if(e2 >= dy) {
 			if(x0 == x1) break;
@@ -338,5 +340,6 @@ void FillVertex(UINT X, UINT Y, UINT NumCordinates, float* XCordinates, float* Y
 				LastX = *xl;
 			}
 		}
+	for(;;);
 	}
 }

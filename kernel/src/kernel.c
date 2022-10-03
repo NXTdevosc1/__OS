@@ -152,7 +152,7 @@ void __declspec(noreturn) _start() {
 	if(!kproc) SET_SOD_INITIALIZATION;
 
 	InitMemoryManagementSubsystem();
-	// GP_clear_screen(0);
+	GP_clear_screen(0);
 	// UINT64 Bitmap = 0x180;
 	// __SyncBitmapAllocate(&Bitmap);
 	// SystemDebugPrint(L"INDX : %x, BMP : %x, EXT : %x", __SyncBitmapAllocate(&Bitmap), Bitmap, ExtensionLevel);
@@ -168,15 +168,19 @@ void __declspec(noreturn) _start() {
 	SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 1, 0));
 	SystemDebugPrint(L"Single : %x", _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray));
 	SystemDebugPrint(L"Single : %x", _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray));
+	float testX[] = {0, 50, 100, 100, 0,   0};
+	float testY[] = {0, 50, 0,   100, 100, 0};
+	FillVertex(400, 400, 6, testX, testY, 0xFF);
 
+	for(;;);
 
 	ConfigureSystemSpace();
 	// Initialize Kernel Page tables
 	KernelPagingInitialize();
+	InitProcessorDescriptors(&CpuBuffer, &CpuBufferSize);
 	while(1);
 
 
-	InitProcessorDescriptors(&CpuBuffer, &CpuBufferSize);
 
 	// IncValue /= 10;
 
@@ -200,10 +204,8 @@ void __declspec(noreturn) _start() {
 	// LineTo(600, 280, 500, 280, 0xFF0000);
 	// LineTo(500, 280, 500, 200, 0xFF0000);
 	while(1);
-	float testX[] = {0, 50, 100, 100, 0,   0};
-	float testY[] = {0, 50, 0,   100, 100, 0};
+	
 	LineTo(10, 10, 150, 150, 0xFF0000);
-	// FillVertex(400, 400, 6, testX, testY, 0xFF);
 
 	// TestFill(450, 150, 300, 300, 0xFF0000);
 	
@@ -258,9 +260,9 @@ void __declspec(noreturn) _start() {
 	void* __KeReloc = (void*)KernelRelocate;
 	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 1, PM_MAP);
 	KernelRelocate(); // CR3 Will be automatically set with the new kernel one
-	KeInitOptimizedComputing();
 	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 1, 0);
 	
+	KeInitOptimizedComputing();
 	kproc->ProcessName = KernelProcessName;
 	SIMD_InitOptimizedMemoryManagement();
 
