@@ -3,13 +3,13 @@ mkdir x86_64\
 mkdir x86_64\Assembly
 mkdir x86_64\fs\fat32
 FOR /R "src" %%S IN (*.asm) DO (
-	nasm "%%S" -f win64 -o "x86_64/Assembly/%%~nS.s.obj"
+	nasm "%%S" -Ox -f win64 -o "x86_64/Assembly/%%~nS.s.obj"
 
 )
 
 set srcfiles=src/fs/*.c src/*.c "src/Memory Management/*.c" src/smbios/*.c src/acpi/*.c src/acpi/aml/*.c src/CPU/*.c src/dsk/*.c src/input/*.c src/interrupt_manager/*.c src/IO/*.c src/ipc/*.c src/lib/*.c src/loaders/*.c src/Management/*.c src/sys/*.c src/sysentry/*.c src/typography/*.c src/utils/*.c src/timedate/*.c
 set COMPILE=cl /DEFAULTLIB:no
-set CFLAGS= /KERNEL /O2 /Gr /GS- /wd4711 /wd4710 /wd4213 /Wall /wd4820 /wd4200 /wd4152 /wd4100 /wd5045 /wd4189 /wd4702 /wd4255 /Ilib /I../libc/drv/inc /I../UEFI/gnu-efi/inc /I../UEFI/gnu-efi/inc/x86_64 /Iinc /Ilib
+set CFLAGS= /O2 /Gr /GS- /wd4711 /wd4710 /wd4213 /Wall /wd4820 /wd4200 /wd4152 /wd4100 /wd5045 /wd4189 /wd4702 /wd4255 /Ilib /I../libc/drv/inc /I../UEFI/gnu-efi/inc /I../UEFI/gnu-efi/inc/x86_64 /Iinc /Ilib
 @REM Remove /wd4710 (function not inlined)
 set OUT=/Fo:x86_64
 

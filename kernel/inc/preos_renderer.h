@@ -47,3 +47,7 @@ UINT64 KERNELAPI GetBezierPoint(float* cordinates, float* beta, UINT8 NumCordina
 void TestFill(UINT16 RectX, UINT16 RectY, UINT16 RectWidth, UINT16 RectHeight, UINT32 Color);
 
 void FillVertex(UINT X, UINT Y, UINT NumCordinates, float* XCordinates, float* YCordinates, UINT32 Color);
+
+
+extern UINT64 __fastcall _SSE_ComputeBezier(float* beta, UINT NumCordinates, float percent);
+extern UINT64 __fastcall _AVX_ComputeBezier(float* beta, UINT NumCordinates, float percent);

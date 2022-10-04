@@ -113,8 +113,7 @@ void GP_sf_put_char(const char ch, unsigned int color, unsigned int x, unsigned 
 // in eather SSE, AVX or AVX512
 // the performance increase by the extension level
 */
-extern UINT64 __fastcall _SSE_ComputeBezier(float* beta, UINT NumCordinates, float percent);
-extern UINT64 __fastcall _AVX_ComputeBezier(float* beta, UINT NumCordinates, float percent);
+
 
 UINT64 KERNELAPI GetBezierPoint(float* cordinates, float* beta, UINT8 NumCordinates, float percent){
 	memcpy(beta, cordinates, ((UINT64)NumCordinates) << 2);
@@ -174,11 +173,10 @@ void LineTo(INT64 x0, INT64 y0, INT64 x1, INT64 y1, UINT32 Color) {
 	double sy = y0 < y1 ? 1 : -1;
 	double error = dx + dy;
 
-	// UINT32 mX = max()
-
 	for(;;) {
-		((UINT32*)InitData.fb->FrameBufferBase)[(x0 + y0 * InitData.fb->Pitch)] = Color;
-		if(x0 <= x1 && y0 <= y1) break;
+
+		((UINT32*)InitData.fb->FrameBufferBase)[x0 + y0 * InitData.fb->HorizontalResolution] = Color;
+		if(x0 == x1 && y0 == y1) break;
 		double e2 = 2 * error;
 		if(e2 >= dy) {
 			if(x0 == x1) break;
@@ -340,6 +338,5 @@ void FillVertex(UINT X, UINT Y, UINT NumCordinates, float* XCordinates, float* Y
 				LastX = *xl;
 			}
 		}
-	for(;;);
 	}
 }

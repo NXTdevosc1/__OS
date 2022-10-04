@@ -1,0 +1,129 @@
+
+x86_64/Assembly/render_accel_test.s.obj:     file format pe-x86-64
+
+
+Disassembly of section .text:
+
+0000000000000000 <_SSE_ComputeBezier>:
+   0:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+   6:	49 89 d1             	mov    %rdx,%r9
+   9:	f3 49 0f 2a c8       	cvtsi2ss %r8,%xmm1
+   e:	f3 0f 5c ca          	subss  %xmm2,%xmm1
+  12:	66 0f 7e c8          	movd   %xmm1,%eax
+  16:	49 89 c3             	mov    %rax,%r11
+  19:	49 c1 e3 20          	shl    $0x20,%r11
+  1d:	4c 09 d8             	or     %r11,%rax
+  20:	66 48 0f 6e c8       	movq   %rax,%xmm1
+  25:	0f 16 c9             	movlhps %xmm1,%xmm1
+  28:	66 0f 7e d0          	movd   %xmm2,%eax
+  2c:	49 89 c3             	mov    %rax,%r11
+  2f:	49 c1 e3 20          	shl    $0x20,%r11
+  33:	4c 09 d8             	or     %r11,%rax
+  36:	66 48 0f 6e d0       	movq   %rax,%xmm2
+  3b:	0f 16 d2             	movlhps %xmm2,%xmm2
+
+000000000000003e <_SSE_ComputeBezier.loop0>:
+  3e:	49 39 d0             	cmp    %rdx,%r8
+  41:	74 37                	je     7a <_SSE_ComputeBezier.Exit>
+  43:	49 ff c0             	inc    %r8
+  46:	49 ff c9             	dec    %r9
+  49:	4d 31 db             	xor    %r11,%r11
+  4c:	49 89 ca             	mov    %rcx,%r10
+
+000000000000004f <_SSE_ComputeBezier.loop1>:
+  4f:	4d 39 cb             	cmp    %r9,%r11
+  52:	73 ea                	jae    3e <_SSE_ComputeBezier.loop0>
+  54:	0f 28 c1             	movaps %xmm1,%xmm0
+  57:	41 0f 10 1a          	movups (%r10),%xmm3
+  5b:	0f 59 c3             	mulps  %xmm3,%xmm0
+  5e:	0f 28 da             	movaps %xmm2,%xmm3
+  61:	41 0f 10 62 04       	movups 0x4(%r10),%xmm4
+  66:	0f 59 dc             	mulps  %xmm4,%xmm3
+  69:	0f 58 c3             	addps  %xmm3,%xmm0
+  6c:	41 0f 11 02          	movups %xmm0,(%r10)
+  70:	49 83 c2 10          	add    $0x10,%r10
+  74:	49 83 c3 04          	add    $0x4,%r11
+  78:	eb d5                	jmp    4f <_SSE_ComputeBezier.loop1>
+
+000000000000007a <_SSE_ComputeBezier.Exit>:
+  7a:	0f 10 01             	movups (%rcx),%xmm0
+  7d:	f3 48 0f 2d c0       	cvtss2si %xmm0,%rax
+  82:	c3                   	retq   
+
+0000000000000083 <_SSE_ComputeBezierW>:
+  83:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  89:	49 89 d1             	mov    %rdx,%r9
+  8c:	f2 49 0f 2a c8       	cvtsi2sd %r8,%xmm1
+  91:	f2 0f 5c ca          	subsd  %xmm2,%xmm1
+  95:	0f 16 c9             	movlhps %xmm1,%xmm1
+  98:	0f 16 d2             	movlhps %xmm2,%xmm2
+  9b:	eb fe                	jmp    9b <_SSE_ComputeBezierW+0x18>
+
+000000000000009d <_SSE_ComputeBezierW.loop0>:
+  9d:	49 39 d0             	cmp    %rdx,%r8
+  a0:	74 3f                	je     e1 <_SSE_ComputeBezierW.Exit>
+  a2:	49 ff c0             	inc    %r8
+  a5:	49 ff c9             	dec    %r9
+  a8:	4d 31 db             	xor    %r11,%r11
+  ab:	49 89 ca             	mov    %rcx,%r10
+
+00000000000000ae <_SSE_ComputeBezierW.loop1>:
+  ae:	4d 39 cb             	cmp    %r9,%r11
+  b1:	73 ea                	jae    9d <_SSE_ComputeBezierW.loop0>
+  b3:	66 0f 28 c1          	movapd %xmm1,%xmm0
+  b7:	66 41 0f 10 1a       	movupd (%r10),%xmm3
+  bc:	66 0f 59 c3          	mulpd  %xmm3,%xmm0
+  c0:	66 0f 28 da          	movapd %xmm2,%xmm3
+  c4:	66 41 0f 10 62 08    	movupd 0x8(%r10),%xmm4
+  ca:	66 0f 59 dc          	mulpd  %xmm4,%xmm3
+  ce:	66 0f 58 c3          	addpd  %xmm3,%xmm0
+  d2:	66 41 0f 11 02       	movupd %xmm0,(%r10)
+  d7:	49 83 c2 10          	add    $0x10,%r10
+  db:	49 83 c3 02          	add    $0x2,%r11
+  df:	eb cd                	jmp    ae <_SSE_ComputeBezierW.loop1>
+
+00000000000000e1 <_SSE_ComputeBezierW.Exit>:
+  e1:	0f 28 01             	movaps (%rcx),%xmm0
+  e4:	f2 48 0f 2d c0       	cvtsd2si %xmm0,%rax
+  e9:	c3                   	retq   
+
+00000000000000ea <_AVX_ComputeBezier>:
+  ea:	41 b8 01 00 00 00    	mov    $0x1,%r8d
+  f0:	49 89 d1             	mov    %rdx,%r9
+  f3:	f3 49 0f 2a c8       	cvtsi2ss %r8,%xmm1
+  f8:	f3 0f 5c ca          	subss  %xmm2,%xmm1
+  fc:	48 83 ec 08          	sub    $0x8,%rsp
+ 100:	66 0f d6 0c 24       	movq   %xmm1,(%rsp)
+ 105:	c4 e2 7d 18 0c 24    	vbroadcastss (%rsp),%ymm1
+ 10b:	48 83 ec 08          	sub    $0x8,%rsp
+ 10f:	0f 11 14 24          	movups %xmm2,(%rsp)
+ 113:	c4 e2 7d 18 14 24    	vbroadcastss (%rsp),%ymm2
+ 119:	48 83 c4 10          	add    $0x10,%rsp
+
+000000000000011d <_AVX_ComputeBezier.loop0>:
+ 11d:	49 39 d0             	cmp    %rdx,%r8
+ 120:	74 3f                	je     161 <_AVX_ComputeBezier.Exit>
+ 122:	49 ff c0             	inc    %r8
+ 125:	49 ff c9             	dec    %r9
+ 128:	4d 31 db             	xor    %r11,%r11
+ 12b:	49 89 ca             	mov    %rcx,%r10
+
+000000000000012e <_AVX_ComputeBezier.loop1>:
+ 12e:	4d 39 cb             	cmp    %r9,%r11
+ 131:	73 ea                	jae    11d <_AVX_ComputeBezier.loop0>
+ 133:	c5 fc 28 c1          	vmovaps %ymm1,%ymm0
+ 137:	c4 c1 7c 10 1a       	vmovups (%r10),%ymm3
+ 13c:	c5 fc 59 c3          	vmulps %ymm3,%ymm0,%ymm0
+ 140:	c5 fc 28 da          	vmovaps %ymm2,%ymm3
+ 144:	c4 c1 7c 10 62 04    	vmovups 0x4(%r10),%ymm4
+ 14a:	c5 e4 59 dc          	vmulps %ymm4,%ymm3,%ymm3
+ 14e:	c5 fc 58 c3          	vaddps %ymm3,%ymm0,%ymm0
+ 152:	c4 c1 7c 11 02       	vmovups %ymm0,(%r10)
+ 157:	49 83 c2 20          	add    $0x20,%r10
+ 15b:	49 83 c3 08          	add    $0x8,%r11
+ 15f:	eb cd                	jmp    12e <_AVX_ComputeBezier.loop1>
+
+0000000000000161 <_AVX_ComputeBezier.Exit>:
+ 161:	0f 10 01             	movups (%rcx),%xmm0
+ 164:	f3 48 0f 2d c0       	cvtss2si %xmm0,%rax
+ 169:	c3                   	retq   

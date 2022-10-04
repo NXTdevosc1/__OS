@@ -104,6 +104,8 @@ float betabuffer[0x100] = {0};
 float IncValue = 0.1f;
 UINT XOff = 200;
 UINT YOff = 300;
+
+
 void TripleFaultingFunction() {
 	UINT64 X0 = GetBezierPoint(XCords, betabuffer, 4, 0.1f), X1 = GetBezierPoint(XCords, betabuffer, 4, 0.2f), Y0 = GetBezierPoint(YCords, betabuffer, 4, 0.1f), Y1 = GetBezierPoint(YCords, betabuffer, 4, 0.2f);
 	float Distance = (float)__sqrt(pow((double)(X1 - X0), 2) + pow((double)(Y1-Y0), 2));
@@ -111,17 +113,20 @@ void TripleFaultingFunction() {
 		IncValue /= (Distance - 1);
 	}
 
-	for(UINT c = 0;c<0x100;c++) { 
+	SystemDebugPrint(L"Starting.");
+	for(UINT c = 0;c<0x10000;c++) { 
 	register UINT64 LastX = XOff;
 	register UINT64 LastY = YOff;
 
 	register UINT64 X = 0;
 	register UINT64 Y = 0;
 	
-
 	for(register float t = 0;t<=1;t+=IncValue) {
-		X = XOff + GetBezierPoint(XCords, betabuffer, 4, t);
-		Y = YOff + GetBezierPoint(YCords, betabuffer, 4, t);
+		*(__m128i*)betabuffer = _mm_load_si128((__m128i*)XCords);
+		X = XOff + _SSE_ComputeBezier(betabuffer, 4, t);
+
+		*(__m128i*)betabuffer = _mm_load_si128((__m128i*)YCords);
+		Y = YOff + _SSE_ComputeBezier(betabuffer, 4, t);
 		// if(X > LastX + 1 || X < LastX - 1 || Y > LastY + 1 || Y < LastY - 1) {
 		// 	LineTo(LastX, LastY, X, Y, 0xFF0000);
 		// } else {
@@ -131,7 +136,7 @@ void TripleFaultingFunction() {
 		LastY = Y;
 	}
 	}
-
+	SystemDebugPrint(L"Ended.");
 }
 
 void __declspec(noreturn) _start() {
@@ -143,7 +148,6 @@ void __declspec(noreturn) _start() {
 	} else {
 		GP_draw_sf_text("Extension level : SSE", 0xFFFFFF, 20, 20);
 	}
-	TripleFaultingFunction();
 	
 	// while(1) __hlt();
 	SetupPageAttributeTable();
@@ -153,6 +157,7 @@ void __declspec(noreturn) _start() {
 
 	InitMemoryManagementSubsystem();
 	GP_clear_screen(0);
+	TripleFaultingFunction();
 	// UINT64 Bitmap = 0x180;
 	// __SyncBitmapAllocate(&Bitmap);
 	// SystemDebugPrint(L"INDX : %x, BMP : %x, EXT : %x", __SyncBitmapAllocate(&Bitmap), Bitmap, ExtensionLevel);
@@ -170,11 +175,12 @@ void __declspec(noreturn) _start() {
 	SystemDebugPrint(L"Single : %x", _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray));
 	float testX[] = {0, 50, 100, 100, 0,   0};
 	float testY[] = {0, 50, 0,   100, 100, 0};
+
 	FillVertex(400, 400, 6, testX, testY, 0xFF);
 
-	for(;;);
 
 	ConfigureSystemSpace();
+	for(;;);
 	// Initialize Kernel Page tables
 	KernelPagingInitialize();
 	InitProcessorDescriptors(&CpuBuffer, &CpuBufferSize);
@@ -198,7 +204,6 @@ void __declspec(noreturn) _start() {
 
 	
 
-	// LineTo(500, 200, 600, 200, 0xFF0000);
 	// LineTo(600, 200, 540, 240, 0xFF0000);
 	// LineTo(540, 240, 600, 280, 0xFF0000);
 	// LineTo(600, 280, 500, 280, 0xFF0000);
