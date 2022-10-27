@@ -30,6 +30,8 @@
         "chrono": "c",
         "iterator": "c",
         "cpu.h": "c",
-        "intrin.h": "c"
+        "intrin.h": "c",
+        "process_defs.h": "c",
+        "stdlib.h": "c"
     }
 }

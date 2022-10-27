@@ -70,6 +70,8 @@ extern KeGlobalCR3
 
 global KernelRelocate
 extern __KernelRelocate
+
+align 0x1000
 KernelRelocate:
 
 	mov rax, InitData
@@ -83,12 +85,15 @@ KernelRelocate:
 	push r8
 	push r9
 	push r10
+	sub rsp, 0x20 ; Callee stack
 	call __KernelRelocate
+	add rsp, 0x20
 	pop r10
 	pop r9
 	pop r8
 	pop rax
 	wbinvd
+
 
 
 	; Calculate new rsp
@@ -132,13 +137,12 @@ section .GLBDSIG
 
 ; RESERVE 4K For Bootloader INITDATA
 section INITDATA
-	InitData:
-	times 0x1000 db 0xE5
+	InitData resb 0x1000
 
 
 ; RESERVED 4K For Bootloader Payload 
 section .PRTVRFY
-	times 0x1000 db 0xC7
+	resb 0x1000
 
 section .KSTACK
 

@@ -44,3 +44,7 @@ void* AllocatePool(UINT64 NumBytes) {
 void* FreePool(void* HeapAddress) {
     return RemoteFreePool(KeGetCurrentProcess(), HeapAddress);
 }
+
+RFMEMORY_SEGMENT MemMgr_CreateInitialHeap(void* HeapAddress, UINT64 HeapLength) {
+    return NULL;
+}

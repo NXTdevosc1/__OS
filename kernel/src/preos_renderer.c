@@ -333,7 +333,11 @@ void FillVertex(UINT X, UINT Y, UINT NumCordinates, float* XCordinates, float* Y
 		
 		for(UINT i = 0;i<NumLinks;i++, xl++) {
 			if(i & 1) {
-				LineTo(X + LastX, Y + _Y, X + (*xl), Y + _Y, Color);
+				UINT d = X + (*xl);
+				for(UINT c = X + LastX;c<=d;c++) {
+					((UINT32*)InitData.fb->FrameBufferBase)[c + (Y + _Y) * InitData.fb->HorizontalResolution] = Color;
+				}
+				// LineTo(X + LastX, Y + _Y, X + (*xl), Y + _Y, Color);
 			} else {
 				LastX = *xl;
 			}

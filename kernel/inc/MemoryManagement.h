@@ -17,12 +17,15 @@ each process has the page allocation table start and end pointer, then the conti
 
 */
 
+#define PAGE_SIZE 0x1000
+
 #pragma once
 #include <krnltypes.h>
 #include <mem.h>
 
 #define ZeroMemory(Memory, Size) memset(Memory, 0, Size)
 #define SZeroMemory(Memory) memset(Memory, 0, sizeof(*Memory))
+
 
 #pragma pack(push, 1)
 
@@ -39,25 +42,37 @@ typedef volatile union _PAGE {
     UINT64 PhysicalAddress;
 } PAGE;
 
-typedef struct _PAGE_ALLOCATION_TABLE PAGE_ALLOCATION_TABLE;
-typedef struct _MEMORY_SEGMENT MEMORY_SEGMENT, *RFMEMORY_SEGMENT;
+typedef volatile struct _PAGE_ALLOCATION_TABLE PAGE_ALLOCATION_TABLE;
+typedef volatile struct _MEMORY_SEGMENT MEMORY_SEGMENT, *RFMEMORY_SEGMENT;
 
-#define PAGE_ALLOCATION_TABLE_ENTRY_COUNT 0x40
+#define PAGE_ALLOCATION_TABLE_ENTRY_COUNT 0x80
 
-typedef struct _VIRTUAL_MEMORY_PAGE {
+typedef volatile struct _VIRTUAL_MEMORY_PAGE {
     UINT64 DiskPagingAllowed : 1;
     UINT64 CompressionAllowed : 1;
     UINT64 PagePtr : 62; // Reference to the 8-Byte aligned PAGE Structure
     MEMORY_SEGMENT* FirstHeap;
     MEMORY_SEGMENT* LastHeap;
+
 } VIRTUAL_MEMORY_PAGE;
 
-typedef struct _PAGE_ALLOCATION_TABLE {
-    UINT64 Bitmap;
-    VIRTUAL_MEMORY_PAGE VirtualMemoryPages[PAGE_ALLOCATION_TABLE_ENTRY_COUNT];
+// All structures must fit inside a page
+typedef volatile struct _PAGE_ALLOCATION_TABLE {
+    UINT64* Bitmap;
+    UINT64 Offset;
+    UINT64 AllocatedPages;
+    
+    VIRTUAL_MEMORY_PAGE VirtualMemoryPages[0x40];
     PAGE_ALLOCATION_TABLE* Next;
 } PAGE_ALLOCATION_TABLE;
 
+typedef volatile struct _PAGE_ALLOCATION_BITMAP PAGE_ALLOCATION_BITMAP;
+
+// each bit specifies if there is a free page in an allocation table
+typedef volatile struct _PAGE_ALLOCATION_BITMAP {
+    UINT64 Bitmap[0x1FF];
+    PAGE_ALLOCATION_BITMAP* Next;
+} PAGE_ALLOCATION_BITMAP;
 
 #define MEMORY_BLOCK_CACHE_COUNT 4
 #define MEMORY_BLOCK_CACHE_SIZE 0x40
@@ -81,14 +96,14 @@ typedef enum _IO_MEMORY_FLAGS {
     IO_MEMORY_WRITE_COMBINE = 8
 } IO_MEMORY_FLAGS;
 
-typedef struct _MEMORY_SEGMENT {
+typedef volatile struct _MEMORY_SEGMENT {
     UINT32 Present : 1;
     UINT32 Reserved : 19;
     UINT32 Offset : 12;
     UINT64 HeapLength;
 } MEMORY_SEGMENT;
 
-typedef struct _FREE_MEMORY_SEGMENT {
+typedef volatile struct _FREE_MEMORY_SEGMENT {
     UINT8 Present : 1;
     UINT8 Reserved : 7;
     void* Address;
@@ -96,18 +111,18 @@ typedef struct _FREE_MEMORY_SEGMENT {
 } FREE_MEMORY_SEGMENT;
 
 
-typedef struct _MEMORY_SEGMENT_LIST_HEAD MEMORY_SEGMENT_LIST_HEAD, *RFMEMORY_SEGMENT_LIST_HEAD;
+typedef volatile struct _MEMORY_SEGMENT_LIST_HEAD MEMORY_SEGMENT_LIST_HEAD, *RFMEMORY_SEGMENT_LIST_HEAD;
 
 
 
-typedef struct _MEMORY_SEGMENT_LIST_HEAD {
+typedef volatile struct _MEMORY_SEGMENT_LIST_HEAD {
     MEMORY_SEGMENT MemorySegments[MEMORY_LIST_HEAD_SIZE];
     RFMEMORY_SEGMENT_LIST_HEAD NextListHead;
     UINT64 Bitmask;
     RFMEMORY_SEGMENT_LIST_HEAD* RefCacheLineSegment; // set if there is 
 } MEMORY_SEGMENT_LIST_HEAD;
 
-typedef struct _FREE_MEMORY_SEGMENT_LIST_HEAD {
+typedef volatile struct _FREE_MEMORY_SEGMENT_LIST_HEAD {
     FREE_MEMORY_SEGMENT MemorySegments[MEMORY_LIST_HEAD_SIZE];
     RFMEMORY_SEGMENT_LIST_HEAD NextListHead;
     UINT64 Bitmask;
@@ -125,7 +140,7 @@ typedef enum _FREE_MEMORY_LEVELS {
 } FREE_MEMORY_LEVELS;
 
 // Used to cache and optimize memory functions
-typedef struct _MEMORY_REGION_TABLE {
+typedef volatile struct _MEMORY_REGION_TABLE {
     // Variables are ordered this way to keep 0x10 Bytes alignment and therefore win cpu clocks
     MEMORY_SEGMENT_LIST_HEAD SegmentListHead;
     UINT64 AllocatedEntries;
@@ -138,34 +153,32 @@ typedef struct _MEMORY_REGION_TABLE {
 
 
 // Global Memory Management Table for kernel processes and allocation source for user processes
-typedef struct _MEMORY_MANAGEMENT_TABLE {
-    volatile UINT64 TotalMemory;
-    volatile UINT64 PhysicalMemory;
-    volatile UINT64 TotalDiskMemory;
-    volatile UINT64 TotalCompressedMemory; // Compressed physical memory
-    volatile UINT64 UsedPhysicalMemory;
-    volatile UINT64 UsedDiskMemory;
-    volatile UINT64 IoMemorySize;
+typedef volatile struct _MEMORY_MANAGEMENT_TABLE {
+    UINT64 TotalMemory;
+    UINT64 PhysicalMemory;
+    UINT64 TotalDiskMemory;
+    UINT64 TotalCompressedMemory; // Compressed physical memory
+    UINT64 UsedPhysicalMemory;
+    UINT64 UsedDiskMemory;
+    UINT64 IoMemorySize;
     UINT64 PageArraySize; // In Number of entries
     
     PAGE* PageArray;
     UINT64 NumBytesPageBitmap;
-    volatile char* PageBitmap;
+    char* PageBitmap;
 } MEMORY_MANAGEMENT_TABLE;
 
 extern MEMORY_MANAGEMENT_TABLE MemoryManagementTable;
 
 
 // Only for user processes
-typedef struct _PROCESS_MEMORY_TABLE {
-    volatile UINT64 AllocatedPages;
-    volatile UINT64 ReservedPages;
-    volatile UINT64 CompressedPages;
-    volatile UINT64 DiskPages;
-
-    volatile UINT64 UsedMemory; // Used memory from these reserved pages
-    PAGE_ALLOCATION_TABLE PageAllocationTable;
-
+typedef volatile struct _PROCESS_MEMORY_TABLE {
+    void* VirtualBase;
+    UINT64 AllocatedPages;
+    UINT64 ReservedPages;
+    UINT64 CompressedPages;
+    UINT64 DiskPages;
+    UINT64 UsedMemory; // Used memory from these reserved pages
     MEMORY_SEGMENT_LIST_HEAD AllocatedMemory;
     FREE_MEMORY_SEGMENT_LIST_HEAD FreeMemory[NUM_FREE_MEMORY_LEVELS];
 } PROCESS_MEMORY_TABLE;
@@ -198,6 +211,8 @@ void* RemoteFreePool(RFPROCESS Process, void* HeapAddress);
 // Process = NULL will return true physical pages, only allowed before system startup
 void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags);
 
+// KERNELSTATUS KERNELAPI AllocateVirtualMemory(RFPROCESS Process, VIRTUAL_MEMORY_PAGE* )
+
 #define PAGE_FILE_LOCATION "//OS/$SwapFile"
 
 void InitPagingFile(void); // System PARTITION_INSTANCE Located in C:/ By default
@@ -208,6 +223,7 @@ LPVOID KEXPORT KERNELAPI AllocateIoMemory(_IN LPVOID PhysicalAddress, _IN UINT64
 BOOL KEXPORT KERNELAPI FreeIoMemory(_IN LPVOID IoMemory);
 
 
+void KEXPORT *KERNELAPI KeAllocateVirtualMemory(RFPROCESS Process, UINT64 NumBytes);
 
 // The free memory segment has the semaphore bit set until the pool is actually given
 // the host routine must reset the MEMORY_SEGMENT_SEMAPHORE Bit in the returned Segment

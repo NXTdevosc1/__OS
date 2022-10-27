@@ -36,6 +36,97 @@ LPVOID KEXPORT KERNELAPI KeResolvePhysicalAddress(RFPROCESS Process, const void*
     return (void*)((_pt->PhysicalAddr << 12) + ((UINT64)VirtualAddress & 0xFFF));
 }
 
+#define __ToVirtAddress48(Pml4, Pdp, Pd, Pt) ((Pml4 << 39) | (Pdp << 30) | (Pd << 21) | (Pt << 12))
+
+LPVOID KEXPORT KERNELAPI VirtualFindAvailableMemory(RFPAGEMAP PageTable, LPVOID VirtualStart, LPVOID VirtualEnd, UINT64 NumPages) {
+    
+
+    // if((VirtualStart) > (VirtualEnd) || !NumPages) return NULL;
+    if(((UINT64)VirtualStart & 0xFFFF800000000000) == 0xFFFF800000000000) {
+        ((UINT64)VirtualStart) &= ~ 0xFFFF000000000000;
+        ((UINT64)VirtualStart) |= (UINT64)1 << 48;
+    }
+    if(((UINT64)VirtualEnd & 0xFFFF800000000000) == 0xFFFF800000000000) {
+        ((UINT64)VirtualEnd) &= ~ 0xFFFF000000000000;
+        ((UINT64)VirtualEnd) |= (UINT64)1 << 48;
+    }
+    UINT64 FoundPages = 0;
+
+    LPVOID VirtualAddress = NULL;
+
+    (UINT64)VirtualStart >>= 12;
+    (UINT64)VirtualEnd >>= 12;
+
+    UINT64 Pml4Index = ((UINT64)VirtualStart >> 27) & 0x1FF;
+    UINT64 PdpIndex = ((UINT64)VirtualStart >> 18) & 0x1FF;
+    UINT64 PdIndex = ((UINT64)VirtualStart >> 9) & 0x1FF;
+    UINT64 PtIndex = (UINT64)VirtualStart & 0x1FF;
+
+    UINT64 Pml4End = ((UINT64)VirtualEnd >> 27) & 0x1FF;
+    UINT64 PdpEnd = 511, PdEnd = 511, PtEnd = 511;
+    RFPAGEMAP Pdp = NULL, Pd = NULL, Pt = NULL;
+
+// TODO : Lower level checks at higher levels
+    for(; Pml4Index <= Pml4End;Pml4Index++) {
+        if(!PageTable[Pml4Index].Present) {
+            FoundPages += 0x8000000 - PtIndex - (PdIndex << 9) - (PdpIndex << 18);
+            if(!VirtualAddress) VirtualAddress = (LPVOID)__ToVirtAddress48(Pml4Index, PdpIndex, PdIndex, PtIndex);
+            if(FoundPages >= NumPages) return VirtualAddress;
+            PdpIndex = 0;
+            PdIndex = 0;
+            PtIndex = 0;
+            continue;
+        }
+        Pdp = (RFPAGEMAP)(PageTable[Pml4Index].PhysicalAddr << 12);
+
+        if(Pml4Index == Pml4End) {
+            PdpEnd = ((UINT64)VirtualEnd >> 18) & 0x1FF;
+        }
+        for(; PdpIndex <= PdpEnd; PdpIndex++) {
+            if(!Pdp[PdpIndex].Present) {
+                FoundPages+=0x40000 - PtIndex - (PdIndex << 9);
+                if(!VirtualAddress) VirtualAddress = (LPVOID)__ToVirtAddress48(Pml4Index, PdpIndex, PdIndex, PtIndex);
+                if(FoundPages >= NumPages) return VirtualAddress;
+                PdIndex = 0;
+                PtIndex = 0;
+                continue;
+            }
+            Pd = (RFPAGEMAP)(Pdp[PdpIndex].PhysicalAddr << 12);
+            if(Pml4Index == Pml4End && PdpIndex == PdpEnd) PdEnd = ((UINT64)VirtualEnd >> 9) & 0x1FF;
+            for(; PdIndex <= PdEnd; PdIndex++) {
+                if(!Pd[PdIndex].Present) {
+                    FoundPages += 0x200 - PtIndex;
+                    if(!VirtualAddress) VirtualAddress = (LPVOID)__ToVirtAddress48(Pml4Index, PdpIndex, PdIndex, PtIndex);
+                    if(FoundPages >= NumPages) return VirtualAddress;
+                    continue;
+                    PtIndex = 0;
+                } else if(Pd[PdIndex].SizePAT) {
+                    FoundPages = 0;
+                    VirtualAddress = NULL;
+                    PtIndex = 0;
+                    continue;
+                }
+                Pt = (RFPAGEMAP)(Pd[PdIndex].PhysicalAddr << 12);
+                if(Pml4Index == Pml4End && PdpIndex == PdpEnd && PdIndex == PdEnd) PtEnd = (UINT64)VirtualEnd & 0x1FF;
+                for(; PtIndex <= PtEnd; PtIndex++) {
+                    if(Pt[PtIndex].Present) {
+                        FoundPages = 0;
+                        VirtualAddress = NULL;
+                    } else {
+                        FoundPages++;
+                        if(!VirtualAddress) VirtualAddress = (LPVOID)__ToVirtAddress48(Pml4Index, PdpIndex, PdIndex, PtIndex);
+                        if(FoundPages >= NumPages) return VirtualAddress;
+                    }
+                }
+                PtIndex = 0;
+            }
+            PdIndex = 0;
+        }
+        PdpIndex = 0;
+    }
+    return NULL;
+}
+
 BOOL NX = FALSE;
 
 int MapPhysicalPages(

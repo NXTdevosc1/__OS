@@ -1,9 +1,7 @@
 #pragma once
-
 #define MSABI __cdecl
-
-#define KERNELAPI __cdecl
-#define __KERNELAPI __cdecl // Applies to types
+#define KERNELAPI __fastcall
+#define __KERNELAPI __fastcall // Applies to types
 
 #define KEXPORT __declspec(dllexport)
 

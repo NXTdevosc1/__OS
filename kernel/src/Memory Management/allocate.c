@@ -60,9 +60,15 @@ void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags) 
                     // Clear bits from StartIndex to Index
 
                     // Lowerhalf
-                    UINT64 Num = (*Bmp) & ((UINT64)-1 >> (63 - (PagesStartIndex + 1)));
-                    Num |= (*Bmp) & ((UINT64)-1 << (Index + 1));
+                    UINT64 Num = 0;
+                    if(PagesStartIndex) {
+                        // Prevent undefined behaviour on bitshift overflow
+                        Num = (*Bmp) & ((UINT64)-1 >> (64 - PagesStartIndex));
+                    }
                     // Uperhalf
+                    if(Index != 63) {
+                        Num |= (*Bmp) & ((UINT64)-1 << (Index + 1));
+                    }
                     *Bmp = Num;
                     
                 } else {

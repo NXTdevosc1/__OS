@@ -102,7 +102,7 @@ LPVOID (__fastcall *_SIMD_AllocatePhysicalPage) (volatile char* PageBitmap, UINT
 void SIMD_InitOptimizedMemoryManagement() {
     // Relocate variables
     MemoryManagementTable.PageArray = (PAGE*)AllocateIoMemory((LPVOID)MemoryManagementTable.PageArray, ALIGN_VALUE(MemoryManagementTable.PageArraySize, 0x1000) >> 12, 0);
-    MemoryManagementTable.PageBitmap = (volatile char*)AllocateIoMemory((LPVOID)MemoryManagementTable.PageBitmap, ALIGN_VALUE(MemoryManagementTable.NumBytesPageBitmap, 0x1000) >> 12, 0);
+    MemoryManagementTable.PageBitmap = (char*)AllocateIoMemory((LPVOID)MemoryManagementTable.PageBitmap, ALIGN_VALUE(MemoryManagementTable.NumBytesPageBitmap, 0x1000) >> 12, 0);
 
     // if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
 
@@ -112,10 +112,6 @@ void SIMD_InitOptimizedMemoryManagement() {
     // } else if((ExtensionLevel & EXTENSION_LEVEL_AVX512)) {
     //     _SIMD_FetchMemoryCacheLine = _AVX512_FetchMemoryCacheLine;
     // }
-}
-
-RFMEMORY_SEGMENT MemMgr_CreateInitialHeap(void* HeapAddress, UINT64 HeapLength) {
-    return NULL;
 }
 
 RFMEMORY_SEGMENT MemMgr_FreePool(RFMEMORY_REGION_TABLE MemoryRegion, RFMEMORY_SEGMENT_LIST_HEAD ListHead, RFMEMORY_SEGMENT MemorySegment) {
