@@ -46,59 +46,59 @@ FlushTSS:
 
 
 
-_Xmemset128:
-    movq xmm0, rdx
-    movlhps xmm0, xmm0
-    .loop:
-        test r8, r8
-        jz .exit
-        movdqu [rcx], xmm0
-        add rcx, 16
-        dec r8
-        jmp .loop
-    .exit:
-        ret
-_Xmemset256:
-    movq xmm0, rsi
-    movlhps xmm0, xmm0
-    .loop:
-        cmp rdx, 0
-        je .exit
-        vmovdqa [rdi], ymm0
-        add rdi, 32
-        dec rdx
-        jmp .loop
-    .exit:
-    ret
-_Xmemset512:
-    push rsi
-    push rsi
-    push rsi
-    push rsi
-    push rsi
-    push rsi
-    push rsi
-    push rsi
-    vmovaps zmm0, [rsp]
-    pop rsi
-    pop rsi
-    pop rsi
-    pop rsi
-    pop rsi
-    pop rsi
-    pop rsi
-    pop rsi
-    cli
-    hlt
-    .loop:
-        cmp rdx, 0
-        je .exit
-        vmovaps [rdi], zmm0
-        add rdi, 64
-        dec rdx
-        jmp .loop
-    .exit:
-    ret
+; _Xmemset128:
+;     movq xmm0, rdx
+;     movlhps xmm0, xmm0
+;     .loop:
+;         test r8, r8
+;         jz .exit
+;         movdqu [rcx], xmm0
+;         add rcx, 16
+;         dec r8
+;         jmp .loop
+;     .exit:
+;         ret
+; _Xmemset256:
+;     movq xmm0, rsi
+;     movlhps xmm0, xmm0
+;     .loop:
+;         cmp rdx, 0
+;         je .exit
+;         vmovdqa [rdi], ymm0
+;         add rdi, 32
+;         dec rdx
+;         jmp .loop
+;     .exit:
+;     ret
+; _Xmemset512:
+;     push rsi
+;     push rsi
+;     push rsi
+;     push rsi
+;     push rsi
+;     push rsi
+;     push rsi
+;     push rsi
+;     vmovaps zmm0, [rsp]
+;     pop rsi
+;     pop rsi
+;     pop rsi
+;     pop rsi
+;     pop rsi
+;     pop rsi
+;     pop rsi
+;     pop rsi
+;     cli
+;     hlt
+;     .loop:
+;         cmp rdx, 0
+;         je .exit
+;         vmovaps [rdi], zmm0
+;         add rdi, 64
+;         dec rdx
+;         jmp .loop
+;     .exit:
+;     ret
 
 _basicX64Init:
      ; enable write protect
@@ -115,7 +115,7 @@ _basicX64Init:
     or rax, (3 << 9) ; OFXSR | OSXMMEXCPT
     mov cr4, rax
 
-    ; fninit
+    fninit
 
     ret
 

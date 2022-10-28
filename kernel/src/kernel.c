@@ -157,7 +157,7 @@ void __declspec(noreturn) _start() {
 
 	InitMemoryManagementSubsystem();
 	GP_clear_screen(0);
-	TripleFaultingFunction();
+	// TripleFaultingFunction();
 	// UINT64 Bitmap = 0x180;
 	// __SyncBitmapAllocate(&Bitmap);
 	// SystemDebugPrint(L"INDX : %x, BMP : %x, EXT : %x", __SyncBitmapAllocate(&Bitmap), Bitmap, ExtensionLevel);
@@ -206,13 +206,19 @@ void __declspec(noreturn) _start() {
 	kproc->ProcessName = KernelProcessName;
 	SIMD_InitOptimizedMemoryManagement();
 
-
 	QemuWriteSerialMessage("OSKRNLX64.exe : Allocating I/O Memory for Frame Buffer");
 	// AllocateIoMemory(0x1000, 10, 0);
 	InitData.fb->FrameBufferBase = AllocateIoMemory(InitData.fb->FrameBufferBase, (InitData.fb->FrameBufferSize >> 12) + 1, IO_MEMORY_WRITE_COMBINE);
 	QemuWriteSerialMessage("Allocated I/O Memory :");
 	QemuWriteSerialMessage(to_hstring64((UINT64)InitData.fb->FrameBufferBase));
 	
+
+	SystemDebugPrint(L"IB : %x, IS : %x", InitData.ImageBase, InitData.ImageSize);
+
+	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(kproc, 0x1000));
+	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(kproc, 0x2000));
+	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(kproc, 0x10000));
+	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(kproc, 0x1000));
 
 	GP_draw_sf_text("EXT_LEVEL :", 0xFFFFFF, 20, 220);
 	if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
@@ -234,11 +240,8 @@ void __declspec(noreturn) _start() {
 		GP_draw_sf_text("AVX512", 0xFFFFFF, 20, 300);
 	}
 	
+	// SystemDebugPrint(L"SZ : %x", InitData.ImageSize);
 
-	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(kproc, 0x1000));
-	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(kproc, 0x2000));
-	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(kproc, 0x10000));
-	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(kproc, 0x1000));
 
 
 

@@ -104,12 +104,12 @@ KernelRelocate:
 	
 
 	mov cr3, r9
-	mov rbx, _KernelStackTop
-	mov rbp, rbx ; Base Pointer = Stack Top
+	mov rdx, _KernelStackTop
+	mov rbp, rdx ; Base Pointer = Stack Top
 
-	mov rbx, __JumpToRelocatedKernel
+	mov rdx, __JumpToRelocatedKernel
 
-	jmp rbx
+	jmp rdx
 
 global __JumpToRelocatedKernel
 
@@ -137,19 +137,19 @@ section .GLBDSIG
 
 ; RESERVE 4K For Bootloader INITDATA
 section INITDATA
-	InitData resb 0x1000
+	InitData times 0x1000 db 0
 
 
 ; RESERVED 4K For Bootloader Payload 
 section .PRTVRFY
-	resb 0x1000
+	times 0x1000 db 0
 
 section .KSTACK
 
 align 0x1000
-	times 0x1000 resb 0 ; Protective Padding
+	times 0x1000 db 0 ; Protective Padding
 	_KernelStackBottom:
-	times 0x8000 resq 0
+	times 0x8000 dq 0
 	_KernelStackTop:
-	times 0x1000 resb 0 ; Protective Padding
+	times 0x1000 db 0 ; Protective Padding
 

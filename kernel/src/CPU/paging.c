@@ -6,7 +6,7 @@
 #include <CPU/cpu.h>
 #include <preos_renderer.h>
 #include <CPU/process.h>
-#define ResetPageMap(x) memset((LPVOID)(x), 0, 0x1000)
+#define ResetPageMap(x) _SIMD_Memset((LPVOID)(x), 0, 0x1000)
 
 LPVOID KEXPORT KERNELAPI KeResolvePhysicalAddress(RFPROCESS Process, const void* VirtualAddress)
 {
@@ -38,10 +38,10 @@ LPVOID KEXPORT KERNELAPI KeResolvePhysicalAddress(RFPROCESS Process, const void*
 
 #define __ToVirtAddress48(Pml4, Pdp, Pd, Pt) ((Pml4 << 39) | (Pdp << 30) | (Pd << 21) | (Pt << 12))
 
-LPVOID KEXPORT KERNELAPI VirtualFindAvailableMemory(RFPAGEMAP PageTable, LPVOID VirtualStart, LPVOID VirtualEnd, UINT64 NumPages) {
+LPVOID KEXPORT __declspec(align(64)) KERNELAPI VirtualFindAvailableMemory(RFPAGEMAP PageTable, LPVOID VirtualStart, LPVOID VirtualEnd, UINT64 NumPages) {
     
 
-    // if((VirtualStart) > (VirtualEnd) || !NumPages) return NULL;
+    if((VirtualStart) > (VirtualEnd) || !NumPages) return NULL;
     if(((UINT64)VirtualStart & 0xFFFF800000000000) == 0xFFFF800000000000) {
         ((UINT64)VirtualStart) &= ~ 0xFFFF000000000000;
         ((UINT64)VirtualStart) |= (UINT64)1 << 48;
@@ -65,7 +65,7 @@ LPVOID KEXPORT KERNELAPI VirtualFindAvailableMemory(RFPAGEMAP PageTable, LPVOID 
     UINT64 Pml4End = ((UINT64)VirtualEnd >> 27) & 0x1FF;
     UINT64 PdpEnd = 511, PdEnd = 511, PtEnd = 511;
     RFPAGEMAP Pdp = NULL, Pd = NULL, Pt = NULL;
-
+    
 // TODO : Lower level checks at higher levels
     for(; Pml4Index <= Pml4End;Pml4Index++) {
         if(!PageTable[Pml4Index].Present) {
@@ -98,8 +98,8 @@ LPVOID KEXPORT KERNELAPI VirtualFindAvailableMemory(RFPAGEMAP PageTable, LPVOID 
                     FoundPages += 0x200 - PtIndex;
                     if(!VirtualAddress) VirtualAddress = (LPVOID)__ToVirtAddress48(Pml4Index, PdpIndex, PdIndex, PtIndex);
                     if(FoundPages >= NumPages) return VirtualAddress;
-                    continue;
                     PtIndex = 0;
+                    continue;
                 } else if(Pd[PdIndex].SizePAT) {
                     FoundPages = 0;
                     VirtualAddress = NULL;
@@ -235,7 +235,7 @@ int MapPhysicalPages(
 
             *&PtEntry[PtIndex] = ModelEntry;
 
-            PtEntry[PtIndex].PhysicalAddr = TmpPhysicalAddr | ModelEntry.PhysicalAddr;
+            PtEntry[PtIndex].PhysicalAddr = TmpPhysicalAddr/* | ModelEntry.PhysicalAddr */;
         }
         // Check if paging modification is not very big
         if(Count <= 0x2000 || !(Flags & PM_NO_TLB_INVALIDATION)){

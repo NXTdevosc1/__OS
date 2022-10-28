@@ -25,7 +25,7 @@ enum PAGEMAP_FLAGS {
     PM_WRITE_COMBINE     = 0x400
 };
 
-typedef struct _PAGE_TABLE_ENTRY {
+typedef volatile struct _PAGE_TABLE_ENTRY {
     UINT64 Present : 1;
     UINT64 ReadWrite : 1;
     UINT64 UserSupervisor : 1;

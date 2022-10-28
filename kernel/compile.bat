@@ -19,7 +19,7 @@ set OBJFILES=x86_64/Assembly/*.obj
 @REM %COMPILE% /c %OUT%/fs/ %CFLAGS%
 @REM %COMPILE% /c src/fs/fat32/*.c %OUT%/fs/fat32/ %CFLAGS%
 
-%COMPILE% %srcfiles% %OBJFILES% /Fo:x86_64/ %CFLAGS% /Fe:oskrnlx64.exe /LD /link /OPT:LBR,REF /DLL /MACHINE:x64 /NODEFAULTLIB /SUBSYSTEM:native /ENTRY:KrnlEntry /FIXED:no /DYNAMICBASE /LARGEADDRESSAWARE
+%COMPILE% %srcfiles% %OBJFILES% /Fo:x86_64/ %CFLAGS% /DEBUG:no /Fe:oskrnlx64.exe /LD /link /OPT:LBR,REF /DLL /MACHINE:x64 /NODEFAULTLIB /SUBSYSTEM:native /ENTRY:KrnlEntry /FIXED:no /DYNAMICBASE /LARGEADDRESSAWARE
 
 @REM wsl cd ../UEFI/gnu-efi; make bootloader
 

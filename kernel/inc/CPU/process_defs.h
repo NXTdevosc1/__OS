@@ -172,11 +172,11 @@ typedef enum _PROCESS_CONTROL_MUTEX0_BITS {
     // kernel must reset thread priority for all threads
     // and creating new threads may miss that
     PROCESS_MUTEX0_CREATE_THREAD = 0,
-    PROCESS_MUTEX0_ALLOCATE_FREE_HEAP_DESCRIPTOR = 1
-
+    PROCESS_MUTEX0_ALLOCATE_FREE_HEAP_DESCRIPTOR = 1,
+    PROCESS_MUTEX0_ALLOCATE_VIRTUAL_MEMORY = 2
 } PROCESS_CONTROL_MUTEX0_BITS;
 
-typedef struct _PROCESS_CONTROL_BLOCK{
+typedef volatile struct _PROCESS_CONTROL_BLOCK{
     BOOL Set;
     UINT64 ProcessId;
     LPWSTR ProcessName;

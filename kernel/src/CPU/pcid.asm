@@ -7,6 +7,7 @@ global	CheckInvPcidSupport
 section .text
 
 CheckProcessContextIdEnable:
+	mov rax, 0xca0
 	; Check pcid Support in IA32_EFER
 	xor rcx, rcx
 	mov eax, 1
@@ -33,6 +34,8 @@ CheckProcessContextIdEnable:
 	ret
 
 CheckInvPcidSupport:
+	mov rax, 0xca0
+	jmp $
 	xor rcx, rcx
 	mov eax, 7
 	cpuid
