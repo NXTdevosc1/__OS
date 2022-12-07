@@ -56,8 +56,8 @@ KERNELSTATUS KERNELAPI SystemDebugPrint(LPWSTR Format, ...){
     UINT   StackOff = 0;
     UINT8   FormatIndex = 0;
 
-    // Calculate Result Length
-    ZeroMemory(_DEBUGPRINT_FORMATTED, 0x100);
+   
+
     for(UINT8 i = 0;i< Len;){
         if(Format[i] == L'%'){
             LPWSTR Next = &Format[i + 1];
@@ -134,7 +134,7 @@ KERNELSTATUS KERNELAPI SystemDebugPrint(LPWSTR Format, ...){
     }
 
 
-
+            _DEBUGPRINT_FORMATTED[FormatIndex] = 0;
     // Format string
 
     LPWSTR ProcessName = L"Unnamed Process.";

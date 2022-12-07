@@ -21,8 +21,8 @@ void _enable(void);
 #include <sys/sys.h>
 #include <kernel.h>
 
-#define MutexWait64(Mutex, BitOffset) while(_interlockedbittestandset64(&Mutex, BitOffset)) _mm_pause()
-#define MutexRelease64(Mutex, BitOffset) _bittestandreset64(&Mutex, BitOffset)
+#define MutexWait64(Mutex, BitOffset) while(_interlockedbittestandset64(((volatile __int64*)&Mutex), BitOffset)) _mm_pause()
+#define MutexRelease64(Mutex, BitOffset) _bittestandreset64(((__int64*)&Mutex), BitOffset)
 // Intrinsic used in MSVC CL (directly inserted in code without function call)
 
 
@@ -219,7 +219,7 @@ BOOL __CPU_MGMT_TBL_SETUP__;
 
 #define NUM_IRQS_PER_PROCESSOR 0xE0 // IRQs 0-24 (IOAPIC), 24-0xE0 MSI/MSI-X/System Interrupts/User mode interrupts
 
-typedef struct _THREAD_CONTROL_BLOCK THREAD, *RFTHREAD;
+typedef volatile struct _THREAD_CONTROL_BLOCK THREAD, *RFTHREAD;
 
 #define NUM_PRIORITY_CLASSES 7
 
@@ -300,10 +300,14 @@ extern void __setRFLAGS(unsigned long long RFLAGS);
 extern unsigned long long __getRFLAGS(void);
 
 
-extern void __SpinLockSyncBitTestAndSet(void* Address, UINT16 BitOffset);
-extern BOOL __SyncBitTestAndSet(void* Address, UINT16 BitOffset); // return 1 if success, 0 if fail
+// extern void __SpinLockSyncBitTestAndSet(void* Address, UINT16 BitOffset);
+// extern BOOL __SyncBitTestAndSet(void* Address, UINT16 BitOffset); // return 1 if success, 0 if fail
 // Previous bit content is storred in carry flag (__getRFLAGS(void)) to test content of CF
-extern void __BitRelease(void* Address, UINT16 BitOffset); // Does not need synchronization
+
+#define __BitRelease(Addr, Off) _bittestandreset64((long long*)Addr, Off)
+#define __SpinLockSyncBitTestAndSet(Addr, Off) while(_interlockedbittestandset64((volatile long long*)Addr, Off)) _mm_pause()
+#define __SyncBitTestAndSet(Addr, Off) (!_interlockedbittestandset64((volatile long long*)Addr, Off))
+// extern void __BitRelease(void* Address, UINT16 BitOffset); // Does not need synchronization
 
 extern void __SyncIncrement64(UINT64* Address);
 extern void __SyncIncrement32(UINT32* Address);

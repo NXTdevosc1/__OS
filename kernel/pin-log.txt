@@ -1,0 +1,5 @@
+Pin: pin-3.23-98579-b15ab7903
+Copyright 2002-2022 Intel Corporation.
+E:  [tid:1672] SYSCALL_INSPECTOR: NTDLL module is rebased
+A:  C:\tmp_proj\sde_admin\emx\external\pin\Source\pin\base_w\ipc_server_windows.cpp: LEVEL_BASE::StartServer: 1283: assertion failed: res == TRUE
+

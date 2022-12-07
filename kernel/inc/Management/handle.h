@@ -1,6 +1,8 @@
 #pragma once
 #include <krnltypes.h>
 
+typedef volatile struct _THREAD_CONTROL_BLOCK *RFTHREAD;
+typedef volatile struct _PROCESS_CONTROL_BLOCK *RFPROCESS;
 #define HANDLE_COUNT_PER_LIST 120
 
 enum HANDLE_DATA_TYPES {
@@ -28,8 +30,8 @@ typedef struct {
 	UINT64 HandleId;
 	UINT64 Flags;
 	UINT64 DataType;
-	LPVOID Process;
-	LPVOID Thread;
+	RFPROCESS Process;
+	RFTHREAD Thread;
 	HANDLE_RELEASE_PROCEDURE ReleaseProcedure;
 	LPVOID Data;
 	LPVOID Data1;
@@ -61,7 +63,7 @@ typedef struct _HANDLE_ITERATION_STRUCTURE{
 } HANDLE_ITERATION_STRUCTURE, * PHANDLE_ITERATION_STRUCTURE;
 
 HANDLE_TABLE* CreateHandleTable(void);
-HANDLE OpenHandle(HANDLE_TABLE* HandleTable, LPVOID Thread, UINT64 Flags, UINT64 DataType, void* Data, HANDLE_RELEASE_PROCEDURE ReleaseProcedure);
+HANDLE OpenHandle(HANDLE_TABLE* HandleTable, RFTHREAD Thread, UINT64 Flags, UINT64 DataType, void* Data, HANDLE_RELEASE_PROCEDURE ReleaseProcedure);
 HRESULT CloseHandle(HANDLE Handle);
 BOOL AcquireHandle(HANDLE Handle);
 HANDLE GetHandle(HANDLE_TABLE* HandleTable, const void* Data);

@@ -70,6 +70,7 @@ extern KeGlobalCR3
 
 global KernelRelocate
 extern __KernelRelocate
+extern _kmain
 
 align 0x1000
 KernelRelocate:
@@ -78,17 +79,14 @@ KernelRelocate:
 
 	; Preserve address of InitData, _KernelStackTop
 	mov r8, rax
-	mov r10, __JumpToRelocatedKernel
 	mov r9, [rel KeGlobalCR3]
 	mov rax, [rax + 0x3C]
 	push rax
 	push r8
 	push r9
-	push r10
 	sub rsp, 0x20 ; Callee stack
 	call __KernelRelocate
 	add rsp, 0x20
-	pop r10
 	pop r9
 	pop r8
 	pop rax
@@ -106,22 +104,19 @@ KernelRelocate:
 	mov cr3, r9
 	mov rdx, _KernelStackTop
 	mov rbp, rdx ; Base Pointer = Stack Top
+	
+	push 0
+	popf
 
-	mov rdx, __JumpToRelocatedKernel
-
-	jmp rdx
+	mov rax, _kmain
+	jmp rax
 
 global __JumpToRelocatedKernel
 
 
-__JumpToRelocatedKernel:
-	; Relocate Return Address
+
 	
-	pop rdx
-	sub rdx, rax
-	add rdx, rcx
-	push rdx
-	ret
+	
 
 
 section .GLBDSIG

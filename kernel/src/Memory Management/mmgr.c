@@ -9,8 +9,8 @@ BOOL _PageFilePresent = 0;
 
 __declspec(align(0x1000)) MEMORY_MANAGEMENT_TABLE MemoryManagementTable = {0};
 
-#define DECLARE_USED_MEMORY(NumBytes) MemoryManagementTable.UsedPhysicalMemory += NumBytes;
-#define DECLARE_FREE_MEMORY(NumBytes) MemoryManagementTable.UsedPhysicalMemory -= NumBytes;
+#define DECLARE_USED_MEMORY(NumPages) MemoryManagementTable.AllocatedPages += NumPages;
+#define DECLARE_FREE_MEMORY(NumPages) MemoryManagementTable.AllocatedPages -= NumPages;
 
 // Maps BIOS Map to EFI Memory Map Types
 char LegacyBiosMemoryMapToEfiMapping[8] = {
@@ -50,10 +50,9 @@ void InitMemoryManagementSubsystem() {
                 Memory->PageCount--;
             }
             MemoryManagementTable.PageArraySize+=Memory->PageCount;
-            MemoryManagementTable.PhysicalMemory += (Memory->PageCount << 12);
+            MemoryManagementTable.PhysicalPages += Memory->PageCount;
         }
     }
-    if(MemoryManagementTable.PhysicalMemory < 0x40000000) SOD(0, "Unsufficient Memory"); // Memory Must be >= 1GB
     UINT64 NumPages = ((sizeof(PAGE) * MemoryManagementTable.PageArraySize) >> 12) + 1;
     UINT64 BitmapOffset = NumPages << 12;
     NumPages += (((MemoryManagementTable.PageArraySize + 1) >> 3) >> 12) + 10; // Bitmap
@@ -69,7 +68,7 @@ void InitMemoryManagementSubsystem() {
             MemoryManagementTable.PageBitmap = (char*)Memory->PhysicalStart + BitmapOffset;
             (UINT64)Memory->PhysicalStart+=(NumPages << 12);
             Memory->PageCount -= NumPages;
-            DECLARE_USED_MEMORY(NumPages << 12);
+            DECLARE_USED_MEMORY(NumPages);
             break;
         }
     }
@@ -86,7 +85,7 @@ void InitMemoryManagementSubsystem() {
     }
     // Zero Page Bitmap
     MemoryManagementTable.NumBytesPageBitmap = ((((MemoryManagementTable.PageArraySize + 1) >> 12) >> 3) << 12) + 0x80; // Padding 0x80
-    memset((void*)MemoryManagementTable.PageBitmap, 0xFF, MemoryManagementTable.NumBytesPageBitmap);
+    memset((void*)MemoryManagementTable.PageBitmap, 0, MemoryManagementTable.NumBytesPageBitmap);
     // // Declare all the free segments in the cache
     // for(int i = 0;i<NUM_FREE_MEMORY_LEVELS;i++) {
     //     MemoryManagementTable.FreeMemoryLevels[i].UnallocatedSegmentCache.CachedMemorySegments[i] = 

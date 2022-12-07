@@ -12,12 +12,12 @@ global _SSE_AllocatePhysicalPage
 
 
 %macro _APP0 0
-    mov rax, 1
     movq r9, xmm0
+    not r9
     bsf r10, r9
     jz %%.EXIT
-    lock btr qword [rcx], r10
-    jnc %%.EXIT
+    lock bts qword [rcx], r10
+    jc %%.EXIT
     shl r10, 3
     add r8, r10
     or qword [r8], 1
@@ -40,6 +40,7 @@ _SSE_AllocatePhysicalPage:
     ; jb .ExitFailure
 .loop0:
     movdqa xmm0, [rcx] ; Page Bitmap
+
     %rep 2
     _APP0
     %endrep

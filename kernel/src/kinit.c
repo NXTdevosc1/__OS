@@ -75,14 +75,14 @@ void KernelPagingInitialize(){
 			if(MemoryType == EfiUnusableMemory) continue;
 			// Check if its a conventionnal memory, if not then the page writing
 			//  should not be cached (page must be writting in memory not only in cache)
-			if (MemoryType != EfiLoaderData && MemoryType != EfiLoaderCode &&
-				MemoryType != EfiConventionalMemory) Flags |= PM_WRITE_THROUGH;
+			// if (MemoryType != EfiLoaderData && MemoryType != EfiLoaderCode &&
+			// 	MemoryType != EfiConventionalMemory) Flags |= PM_WRITE_THROUGH;
 			
 			MapPhysicalPages(kproc->PageMap, (LPVOID)InitData.MemoryMap->MemoryDescriptors[i].PhysicalStart, (LPVOID)InitData.MemoryMap->MemoryDescriptors[i].PhysicalStart, InitData.MemoryMap->MemoryDescriptors[i].PageCount, Flags);
 			Flags = PM_MAP | PM_NO_CR3_RELOAD | PM_NO_TLB_INVALIDATION;
 		}
 		// Map Kernel (BIOS Bootloader memory map is very simple and kernel memory region is not mapped)
-		MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_KERNEL, (char*)InitData.ImageBase, (InitData.ImageSize >> 12), PM_MAP);
+		MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_KERNEL, (char*)InitData.ImageBase, (InitData.ImageSize >> 12) + 0x200, PM_MAP);
 		// MapPhysicalPages(kproc->PageMap, (char*)InitData.ImageBase, (char*)InitData.ImageBase, (InitData.ImageSize >> 12) + 1, PM_MAP);
 
 		// Map Low Memory & 1MB Of high memory (Not declared by LEGACY BIOS Bootloader)
@@ -90,9 +90,9 @@ void KernelPagingInitialize(){
 
 		// Map Allocated Memory by bootloader
 		UINT64 DependencyOffset = 0;
-		MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset, InitData.start_font, 10, PM_MAP);
+		MapPhysicalPages(kproc->PageMap, (char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset, InitData.start_font, 0x10, PM_MAP);
 		InitData.start_font = (void*)((char*)SystemSpaceBase + SYSTEM_SPACE48_DEPENDENCIES + DependencyOffset + ((UINT64)InitData.start_font & 0xFFF));
-		DependencyOffset += 0xA000;
+		DependencyOffset += 0x10000;
 
 		volatile FILE_IMPORT_ENTRY* Entry = FileImportTable;
 		while(Entry->Type != FILE_IMPORT_ENDOFTABLE) {
@@ -153,6 +153,8 @@ void __KernelRelocate() {
 void InitFeatures(){
 	IpcInit();
 }
+
+
 
 void KeInitOptimizedComputing() {
 	if(ExtensionLevel == EXTENSION_LEVEL_SSE) {

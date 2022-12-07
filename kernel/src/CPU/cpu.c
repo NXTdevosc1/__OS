@@ -32,17 +32,22 @@ UINT64 ProcessorTablesOffset = 0;
 void InitProcessorDescriptors(void** CpuBuffer, UINT64* CpuBufferSize){
 	UINT64 _CpuBufferNumPages = 20 + TSS_IST1_NUMPAGES + TSS_IST2_NUMPAGES + TSS_IST3_NUMPAGES + SYSENTRY_STACK_NUMPAGES;
 	void* _CpuBuffer = (char*)SystemSpaceBase + SYSTEM_SPACE48_PROCESSOR_TABLES + ProcessorTablesOffset;
-	void* __Allocated = AllocateContiguousPages(kproc, _CpuBufferNumPages, ALLOCATE_POOL_PHYSICAL);
+	void* __Allocated = (void*)AllocateContiguousPages(kproc, _CpuBufferNumPages, ALLOCATE_POOL_PHYSICAL);
 	if(!__Allocated) SOD(SOD_PROCESSOR_INITIALIZATION, "Failed to allocate Processor Tables, Please Upgrade your RAM");
-	MapPhysicalPages(kproc->PageMap, _CpuBuffer, __Allocated, _CpuBufferNumPages, PM_MAP);
-	ZeroMemory(_CpuBuffer, _CpuBufferNumPages << 12);
-	ProcessorTablesOffset += _CpuBufferNumPages << 12;
+	// MapPhysicalPages(kproc->PageMap, _CpuBuffer, __Allocated, _CpuBufferNumPages, PM_MAP);
+	
+	_CpuBuffer = __Allocated; // TODO : Remove
 	GlobalCpuDescriptorsInitialize(_CpuBuffer);
 	GlobalInterruptDescriptorLoad();
-	InitSysEntry(_CpuBuffer);
 
 	*CpuBuffer = _CpuBuffer;
 	*CpuBufferSize = _CpuBufferNumPages << 12;
+	return;
+	// ZeroMemory(_CpuBuffer, (_CpuBufferNumPages << 12));
+	while(1);
+	ProcessorTablesOffset += _CpuBufferNumPages << 12;
+	InitSysEntry(_CpuBuffer);
+
 
 	// Checking & Enabling PCID
 	#ifdef ___KERNEL_DEBUG___

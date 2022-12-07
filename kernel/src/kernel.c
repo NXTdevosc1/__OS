@@ -105,6 +105,7 @@ float IncValue = 0.1f;
 UINT XOff = 200;
 UINT YOff = 300;
 
+#include <utils/bmp.h>
 
 void TripleFaultingFunction() {
 	UINT64 X0 = GetBezierPoint(XCords, betabuffer, 4, 0.1f), X1 = GetBezierPoint(XCords, betabuffer, 4, 0.2f), Y0 = GetBezierPoint(YCords, betabuffer, 4, 0.1f), Y1 = GetBezierPoint(YCords, betabuffer, 4, 0.2f);
@@ -141,54 +142,27 @@ void TripleFaultingFunction() {
 
 void __declspec(noreturn) _start() {
 	__cli();
-	GP_clear_screen(0xFF);
-	EnableCpuFeatures();
+		EnableCpuFeatures();
+		SetupPageAttributeTable();
 	if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
 		GP_draw_sf_text("Extension level : AVX", 0xFFFFFF, 20, 20);
 	} else {
 		GP_draw_sf_text("Extension level : SSE", 0xFFFFFF, 20, 20);
 	}
-	
-	// while(1) __hlt();
-	SetupPageAttributeTable();
+	// Setup kernel process
 	Pmgrt.NumProcessors = 1;
 	kproc = KeCreateProcess(NULL, NULL, SUBSYSTEM_NATIVE, KERNELMODE_PROCESS);
 	if(!kproc) SET_SOD_INITIALIZATION;
 
+	// Initialize Kernel Memory Management
+	// Start by initializing the subsystem, configuring system space address then initialize paging
 	InitMemoryManagementSubsystem();
-	GP_clear_screen(0);
-	// TripleFaultingFunction();
-	// UINT64 Bitmap = 0x180;
-	// __SyncBitmapAllocate(&Bitmap);
-	// SystemDebugPrint(L"INDX : %x, BMP : %x, EXT : %x", __SyncBitmapAllocate(&Bitmap), Bitmap, ExtensionLevel);
+	GP_clear_screen(0xFF);
 
-	void* CpuBuffer = NULL;
-	UINT64 CpuBufferSize = 0;
-
-	GlobalInterruptDescriptorInitialize();
-	GlobalSysEntryTableInitialize();
-
-	// SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 0x100, 0));
-	// SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 1, 0));
-	// SystemDebugPrint(L"Contiguous : %x", AllocateContiguousPages(kproc, 1, 0));
-	// SystemDebugPrint(L"Single : %x", _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray));
-	// SystemDebugPrint(L"Single : %x", _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray));
-	
-	
-	// SystemDebugPrint(L"Allocate Page : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
-	// SystemDebugPrint(L"Allocate Page : %x, PAGE_BITMAP : %x, PAGE_ARRAY : %x", _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray), MemoryManagementTable.PageBitmap, MemoryManagementTable.PageArray);
-	
-	
-	float testX[] = {0, 50, 100, 100, 0,   0};
-	float testY[] = {0, 50, 0,   100, 100, 0};
-
-	FillVertex(400, 400, 6, testX, testY, 0xFF00);
-	
 
 	ConfigureSystemSpace();
-	// Initialize Kernel Page tables
+	// Initialize Kernel Page tables (Remaps memory and kernel, imported files at boot...)
 	KernelPagingInitialize();
-
 
 
 
@@ -198,27 +172,46 @@ void __declspec(noreturn) _start() {
 	
 
 	void* __KeReloc = (void*)KernelRelocate;
-	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 1, PM_MAP);
+	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 2, PM_MAP);
 	KernelRelocate(); // CR3 Will be automatically set with the new kernel one
-	MapPhysicalPages(kproc->PageMap, __KeReloc, __KeReloc, 1, 0);
 	
-	KeInitOptimizedComputing();
+}
+
+void __declspec(noreturn) __declspec(noinline) _kmain() {
+	
+
 	kproc->ProcessName = KernelProcessName;
 	SIMD_InitOptimizedMemoryManagement();
-
-	QemuWriteSerialMessage("OSKRNLX64.exe : Allocating I/O Memory for Frame Buffer");
-	// AllocateIoMemory(0x1000, 10, 0);
+	KeInitOptimizedComputing();
 	InitData.fb->FrameBufferBase = AllocateIoMemory(InitData.fb->FrameBufferBase, (InitData.fb->FrameBufferSize >> 12) + 1, IO_MEMORY_WRITE_COMBINE);
-	QemuWriteSerialMessage("Allocated I/O Memory :");
-	QemuWriteSerialMessage(to_hstring64((UINT64)InitData.fb->FrameBufferBase));
+	void* CpuBuffer = NULL;
+	UINT64 CpuBufferSize = 0;
+	// GP_clear_screen(0xFFFFFF);
+	GP_draw_sf_text("Scratch Project : Mn Jumia", 0xDC840C, 20, 20);
+	GP_draw_sf_text("Mr. Producer : Loukmane Khaled", 0, 20, 40);
+	GP_draw_sf_text("Kernel-Version : Pre-release (In developement)", 0xFF, 20, 60);
+
 	
+	BmpImgDraw(FileImportTable[0].LoadedFileBuffer, 200, 200);
+	struct BMP_HDR* Bmp = FileImportTable[0].LoadedFileBuffer;
+	// int ps2 kbd
+	// __outbyte(PIC1_DATA,0b11111000);
+	// __outbyte(PIC2_DATA,0b11101111);
+	SystemDebugPrint(L"Hello world");
+	// SystemDebugPrint(L"IB : %x, IS : %x", InitData.ImageBase, InitData.ImageSize);
+	// __sti();
 
-	SystemDebugPrint(L"IB : %x, IS : %x", InitData.ImageBase, InitData.ImageSize);
 
-	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(kproc, 0x1000));
-	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(kproc, 0x2000));
-	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(kproc, 0x10000));
-	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(kproc, 0x1000));
+	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(0x10000));
+	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(0x2000));
+	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(0x10000));
+	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(0x1000));
+	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(0x100000));
+	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(0x4000));
+	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(0x4000));
+
+
+	while(1) __hlt();
 
 	GP_draw_sf_text("EXT_LEVEL :", 0xFFFFFF, 20, 220);
 	if(ExtensionLevel == EXTENSION_LEVEL_SSE) {

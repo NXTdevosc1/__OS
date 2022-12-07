@@ -53,6 +53,6 @@ int memcmp(
    size_t count
 );
 
-// int memcmp(LPVOID x, LPVOID y, size_t size);
-#define ZeroMemory(ptr, len) memset(ptr, 0, len)
-#define SZeroMemory(ptr) memset(ptr, 0, sizeof(*ptr))
+// // int memcmp(LPVOID x, LPVOID y, size_t size);
+// #define ZeroMemory(ptr, len) memset(ptr, 0, len)
+// #define SZeroMemory(ptr) memset(ptr, 0, sizeof(*ptr))

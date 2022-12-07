@@ -23,13 +23,13 @@ each process has the page allocation table start and end pointer, then the conti
 #include <krnltypes.h>
 #include <mem.h>
 
-#define ZeroMemory(Memory, Size) memset(Memory, 0, Size)
-#define SZeroMemory(Memory) memset(Memory, 0, sizeof(*Memory))
+#define ZeroMemory(Memory, Size) memset((void*)Memory, 0, Size)
+#define SZeroMemory(Memory) memset((void*)Memory, 0, sizeof(*Memory))
 
 
 #pragma pack(push, 1)
 
-typedef struct _PROCESS_CONTROL_BLOCK *RFPROCESS;
+typedef volatile struct _PROCESS_CONTROL_BLOCK *RFPROCESS;
 
 typedef volatile union _PAGE {
     struct {
@@ -154,12 +154,12 @@ typedef volatile struct _MEMORY_REGION_TABLE {
 
 // Global Memory Management Table for kernel processes and allocation source for user processes
 typedef volatile struct _MEMORY_MANAGEMENT_TABLE {
-    UINT64 TotalMemory;
-    UINT64 PhysicalMemory;
-    UINT64 TotalDiskMemory;
-    UINT64 TotalCompressedMemory; // Compressed physical memory
-    UINT64 UsedPhysicalMemory;
-    UINT64 UsedDiskMemory;
+    UINT64 TotalPages;
+    UINT64 PhysicalPages;
+    UINT64 DiskPages;
+    UINT64 CompressedPages; // Compressed physical memory
+    UINT64 AllocatedPages;
+    UINT64 AllocatedDiskPages;
     UINT64 IoMemorySize;
     UINT64 PageArraySize; // In Number of entries
     
@@ -223,7 +223,9 @@ LPVOID KEXPORT KERNELAPI AllocateIoMemory(_IN LPVOID PhysicalAddress, _IN UINT64
 BOOL KEXPORT KERNELAPI FreeIoMemory(_IN LPVOID IoMemory);
 
 
-void KEXPORT *KERNELAPI KeAllocateVirtualMemory(RFPROCESS Process, UINT64 NumBytes);
+void KEXPORT *KERNELAPI KeAllocateVirtualMemory(UINT64 NumBytes);
+
+BOOL KeAllocateFragmentedPages(RFPROCESS Process, void* VirtualMemory, UINT64 NumPages);
 
 // The free memory segment has the semaphore bit set until the pool is actually given
 // the host routine must reset the MEMORY_SEGMENT_SEMAPHORE Bit in the returned Segment

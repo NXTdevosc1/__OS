@@ -32,6 +32,7 @@
         "cpu.h": "c",
         "intrin.h": "c",
         "process_defs.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "idt.h": "c"
     }
 }

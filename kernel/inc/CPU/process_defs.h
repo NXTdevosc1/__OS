@@ -151,7 +151,7 @@ enum PROCESS_TOKEN_PRIVILEGES{
     TPPR_REGISTER_DRIVER = 0x40000
 };
 
-typedef struct _THREAD_CONTROL_BLOCK THREAD, * RFTHREAD;
+typedef volatile struct _THREAD_CONTROL_BLOCK THREAD, * RFTHREAD;
 
 
 
@@ -159,9 +159,9 @@ typedef struct _THREAD_WAITING_QUEUE THREAD_WAITING_QUEUE, *RFTHREAD_WAITING_QUE
 
 #define THREADS_PER_PROCESS_THREAD_LIST 20
 
-typedef struct _PROCESS_THREAD_LIST PROCESS_THREAD_LIST;
+typedef volatile struct _PROCESS_THREAD_LIST PROCESS_THREAD_LIST;
 
-typedef struct _PROCESS_THREAD_LIST {
+typedef volatile struct _PROCESS_THREAD_LIST {
     RFTHREAD Threads[THREADS_PER_PROCESS_THREAD_LIST];
     PROCESS_THREAD_LIST* Next;
 } PROCESS_THREAD_LIST;
@@ -181,7 +181,7 @@ typedef volatile struct _PROCESS_CONTROL_BLOCK{
     UINT64 ProcessId;
     LPWSTR ProcessName;
     RFPAGEMAP PageMap;
-    struct _PROCESS_CONTROL_BLOCK* ParentProcess;
+    volatile struct _PROCESS_CONTROL_BLOCK* ParentProcess;
     UINT16 OperatingMode;
     UINT32 PriorityClass;
     UINT8 Subsystem;
@@ -206,7 +206,7 @@ typedef enum _THREAD_CONTROL_MUTEX_BITS {
     THREAD_MUTEX_CHANGE_PRIORITY = 1
 } THREAD_CONTROL_MUTEX_BITS;
 
-typedef struct _THREAD_CONTROL_BLOCK{
+typedef volatile struct _THREAD_CONTROL_BLOCK{
     UINT64       State;
     UINT64      ThreadId;
     RFPROCESS    Process;
@@ -230,12 +230,12 @@ typedef struct _THREAD_CONTROL_BLOCK{
     UINT64      SleepUntil[2];
     UINT64      LastCalculationTime[2]; // Second on which the scheduler have set cpu time
 } THREAD, *RFTHREAD;
-typedef struct _THREAD_LIST{
+typedef volatile struct _THREAD_LIST{
     THREAD threads[PENTRIES_PER_LIST];
     struct _THREAD_LIST* Next;
 } THREADLIST, *RFTHREADLIST;
 
-typedef struct _PROCESS_LIST{
+typedef volatile struct _PROCESS_LIST{
     INT16 LastUnset;
     PROCESS processes[PENTRIES_PER_LIST];
     struct _PROCESS_LIST* Next;

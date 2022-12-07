@@ -36,12 +36,18 @@ LPVOID KEXPORT KERNELAPI KeResolvePhysicalAddress(RFPROCESS Process, const void*
     return (void*)((_pt->PhysicalAddr << 12) + ((UINT64)VirtualAddress & 0xFFF));
 }
 
-#define __ToVirtAddress48(Pml4, Pdp, Pd, Pt) ((Pml4 << 39) | (Pdp << 30) | (Pd << 21) | (Pt << 12))
+static inline void* __ToVirtAddress48(UINT64 Pml4, UINT64 Pdp, UINT64 Pd, UINT64 Pt) {
+    UINT64 v = ((Pml4 << 39) | (Pdp << 30) | (Pd << 21) | (Pt << 12));
+    if(v > 0x7FFFFFFFFFFF) {
+        v |= 0xFFFF800000000000;
+    }
+    return (void*)v;
+}
 
-LPVOID KEXPORT __declspec(align(64)) KERNELAPI VirtualFindAvailableMemory(RFPAGEMAP PageTable, LPVOID VirtualStart, LPVOID VirtualEnd, UINT64 NumPages) {
+LPVOID KEXPORT __declspec(align(64)) KERNELAPI VirtualFindAvailableMemory(RFPROCESS Process, LPVOID VirtualStart, LPVOID VirtualEnd, UINT64 NumPages) {
     
-
-    if((VirtualStart) > (VirtualEnd) || !NumPages) return NULL;
+    if((UINT64)VirtualStart > (UINT64)VirtualEnd || !NumPages) return NULL;
+    RFPAGEMAP PageTable = Process->PageMap;
     if(((UINT64)VirtualStart & 0xFFFF800000000000) == 0xFFFF800000000000) {
         ((UINT64)VirtualStart) &= ~ 0xFFFF000000000000;
         ((UINT64)VirtualStart) |= (UINT64)1 << 48;

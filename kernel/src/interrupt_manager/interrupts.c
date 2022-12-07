@@ -219,7 +219,10 @@ void INTH_DBL_FAULT(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFram
 
 
 void INTH_keyboard(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFrame){	
-	// handle_keyboard(InPortB(0x60));
+	while(1);
+	GP_clear_screen(0xFF);
+	handle_keyboard(__inbyte(0x60));
+	pic_end_master();
 }
 void INTH_mouse(UINT64 InterruptNumber, PINTERRUPT_STACK_FRAME InterruptFrame){
 	// handle_mouse_input(InPortB(0x60));

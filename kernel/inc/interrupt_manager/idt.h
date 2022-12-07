@@ -92,6 +92,7 @@ typedef struct _INTERRUPT_INFORMATION {
 
 typedef void (__cdecl* KEIRQ_ROUTINE)(RFDRIVER_OBJECT DriverObject, RFINTERRUPT_INFORMATION InterruptInformation);
 
+typedef volatile struct _PROCESS_CONTROL_BLOCK *RFPROCESS;
 
 typedef struct _IRQ_CONTROL_DESCRIPTOR {
     UINT8 Present;
@@ -99,7 +100,7 @@ typedef struct _IRQ_CONTROL_DESCRIPTOR {
     UINT8 PhysicalIrqNumber;
     UINT8 IoApicIrqNumber; // index to IRQ Redirection Table
     UINT Flags;
-    void* Process;
+    volatile RFPROCESS Process;
     KEIRQ_ROUTINE Handler;
     UINT8 InterruptVector; // Set to 0x20 + IrqIndex
     UINT32 LapicId;

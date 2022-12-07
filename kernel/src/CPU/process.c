@@ -234,7 +234,7 @@ KERNELSTATUS KERNELAPI SetPriorityClass(RFPROCESS Process, int PriorityClass) {
     UINT64 RemainingThreads = Process->NumThreads;
     PROCESS_THREAD_LIST* ThreadList = &Process->Threads;
     while(RemainingThreads) {
-        RFTHREAD* _th = ThreadList->Threads;
+        volatile RFTHREAD* _th = ThreadList->Threads;
         for(UINT i = 0;i<THREADS_PER_PROCESS_THREAD_LIST;i++, _th++) {
             if(*_th) {
                 if(KERNEL_ERROR(SetThreadPriority(*_th, (*_th)->ThreadPriority + THREAD_PRIORITY_MIN))) SET_SOD_PROCESS_MANAGEMENT;
@@ -371,7 +371,7 @@ RFTHREAD KEXPORT KERNELAPI KeCreateThread(RFPROCESS Process, UINT64 StackSize, T
     // Linking the thread to the process
     PROCESS_THREAD_LIST* ThreadList = &Process->Threads;
     for(;;) {
-        RFTHREAD* _th = ThreadList->Threads;
+        volatile RFTHREAD* _th = ThreadList->Threads;
         for(UINT i = 0;i<THREADS_PER_PROCESS_THREAD_LIST;i++, _th++) {
             if(!(*_th)) {
                 *_th = Thread;

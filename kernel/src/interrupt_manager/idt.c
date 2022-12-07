@@ -94,7 +94,7 @@ void GlobalInterruptDescriptorInitialize()
 	
 	
 	// IRQ
-
+	RegisterInterruptServiceRoutine(INTH_keyboard, 0x21);
 	// Determine which function to use depending on extension support :
 	// (SSE, AVX, AVX512)
 	CPUID_INFO CpuInfo = {0};
@@ -104,18 +104,18 @@ void GlobalInterruptDescriptorInitialize()
 	// 	while(1);
 	// 	SetInterruptGate(SchedulerEntryAVX,INT_APIC_TIMER,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
 	// } else {
-		SetInterruptGate(SchedulerEntrySSE,INT_APIC_TIMER,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
-	// }
+	// 	SetInterruptGate(SchedulerEntrySSE,INT_APIC_TIMER,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
+	// // }
 	
-	// SetInterruptGate(SkipTaskSchedule,INT_SCHEDULE,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
+	// // SetInterruptGate(SkipTaskSchedule,INT_SCHEDULE,0, 2, IDT_INTERRUPT_GATE, CS_KERNEL);
 
-	SetInterruptGate(ApicSpuriousInt, INT_APIC_SPURIOUS, 0, 3, IDT_INTERRUPT_GATE, 0x08);
-	RegisterInterruptServiceRoutine(ApicThermalSensorInt, INT_TSR);
-	RegisterInterruptServiceRoutine(ApicPerformanceMonitorCountersInt, INT_PMCR);
-	RegisterInterruptServiceRoutine(ApicLint0Int, INT_LINT0);
-	RegisterInterruptServiceRoutine(ApicLint1Int, INT_LINT1);
-	RegisterInterruptServiceRoutine(ApicLvtErrorInt, INT_LVT_ERROR);
-	RegisterInterruptServiceRoutine(ApicCmciInt, INT_CMCI);
+	// SetInterruptGate(ApicSpuriousInt, INT_APIC_SPURIOUS, 0, 3, IDT_INTERRUPT_GATE, 0x08);
+	// RegisterInterruptServiceRoutine(ApicThermalSensorInt, INT_TSR);
+	// RegisterInterruptServiceRoutine(ApicPerformanceMonitorCountersInt, INT_PMCR);
+	// RegisterInterruptServiceRoutine(ApicLint0Int, INT_LINT0);
+	// RegisterInterruptServiceRoutine(ApicLint1Int, INT_LINT1);
+	// RegisterInterruptServiceRoutine(ApicLvtErrorInt, INT_LVT_ERROR);
+	// RegisterInterruptServiceRoutine(ApicCmciInt, INT_CMCI);
 
 
 	
@@ -128,7 +128,7 @@ void GlobalInterruptDescriptorInitialize()
 
 	// Remap PIC
 	remap_pic();
-	// Mask All PIC Interrupts
+	// // Mask All PIC Interrupts
 	OutPortB(0xA1, 0xFF);
 	OutPortB(0x21, 0xFF);
 
@@ -136,7 +136,7 @@ void GlobalInterruptDescriptorInitialize()
 }
 
 void GlobalInterruptDescriptorLoad() {
-	SystemDebugPrint(L"IDTR : %x, IDT : %x", &idtr, &KERNEL_IDT);
+	// SystemDebugPrint(L"IDTR : %x, IDT : %x", &idtr, &KERNEL_IDT);
 	__lidt(&idtr);
 }
 

@@ -41,7 +41,7 @@ HANDLE GetHandle(HANDLE_TABLE* HandleTable, const void* Data) {
 	return NULL;
 }
 
-HANDLE OpenHandle(HANDLE_TABLE* HandleTable, LPVOID Thread, UINT64 Flags, UINT64 DataType, void* Data, HANDLE_RELEASE_PROCEDURE ReleaseProcedure) {
+HANDLE OpenHandle(HANDLE_TABLE* HandleTable, RFTHREAD Thread, UINT64 Flags, UINT64 DataType, void* Data, HANDLE_RELEASE_PROCEDURE ReleaseProcedure) {
 	if (!Data) return NULL;
 	PHANDLE_ITERATOR Iterator = &HandleTable->HandleIterator;
 	UINT64 IteratorId = 0;

@@ -15,7 +15,6 @@ section .text
 
 InterruptServiceWrapper%1:
 	cli
-
 	push rdx
 	lea rdx, [rsp + 8] ; Interrupt Stack Frame
 	push rax
@@ -32,6 +31,7 @@ InterruptServiceWrapper%1:
 	push r14
 	push r15
 	mov rcx, %1
+
 
 	mov rax, GlobalIsrPointer
 	shl rcx, 3 ; Multiply by 8
@@ -54,8 +54,8 @@ InterruptServiceWrapper%1:
 	pop rdi
 	pop rcx
 	pop rbx
-	mov rax, [rel SystemSpaceBase]
-	mov dword [rax + 0xB0], 0 ; Signal EOI
+	; mov rax, [rel SystemSpaceBase]
+	; mov dword [rax + 0xB0], 0 ; Signal EOI
 	pop rax
 	pop rdx
 	iretq

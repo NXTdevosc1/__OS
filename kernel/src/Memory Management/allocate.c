@@ -45,8 +45,8 @@ void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags) 
     for(UINT64 i = 0;i<Max;i++, Bmp++, Page+=64) {
         NextIndex = 0;
         __int64 BitMap = *Bmp;
-        while(_BitScanForward64(&Index, (UINT64)BitMap)) {
-            _bittestandreset64(&BitMap, Index);
+        while(_BitScanForward64(&Index, ~(UINT64)BitMap)) {
+            _bittestandset64(&BitMap, Index);
             if(Index != NextIndex) Arrival = 0;
 
             if(!Arrival) {
@@ -61,21 +61,15 @@ void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags) 
 
                     // Lowerhalf
                     UINT64 Num = 0;
-                    if(PagesStartIndex) {
-                        // Prevent undefined behaviour on bitshift overflow
-                        Num = (*Bmp) & ((UINT64)-1 >> (64 - PagesStartIndex));
-                    }
-                    // Uperhalf
-                    if(Index != 63) {
-                        Num |= (*Bmp) & ((UINT64)-1 << (Index + 1));
-                    }
-                    *Bmp = Num;
+                    Num = ((UINT64)-1 >> (64 - NumPages));
+                    Num <<= PagesStartIndex;
+                    *Bmp |= Num;
                     
                 } else {
                     // Fill bitmap
                     if(PagesStartBmp < Bmp) {
                         // Clear bits from StartIndex to 63
-                        *PagesStartBmp &= ((UINT64)-1 >> (63 - PagesStartIndex));
+                        *PagesStartBmp |= ((UINT64)-1 >> (63 - PagesStartIndex));
                         if((64 - PagesStartIndex) <= NumPages) {
                             NumPages -= (64 - PagesStartIndex);
                         } else NumPages = 0;
@@ -84,17 +78,17 @@ void* AllocateContiguousPages(RFPROCESS Process, UINT64 NumPages, UINT64 Flags) 
                         PagesStartBmp++;
                     }
                     while(PagesStartBmp < Bmp) {
-                        *PagesStartBmp = 0;
+                        *PagesStartBmp = (UINT64)-1;
                         PagesStartBmp++;
                         NumPages -= 64;
                     }
                     if(NumPages) {
                         // Clear bits from 0 to Index
-                        *(PagesStartBmp) &= ((UINT64)-1 << (Index + 1));
-                        SystemDebugPrint(L"C(%x, %x)", ((UINT64)-1 << (Index + 1)), *PagesStartBmp);
+                        *(PagesStartBmp) |= ((UINT64)-1 << (Index + 1));
+                        // SystemDebugPrint(L"C(%x, %x)", ((UINT64)-1 << (Index + 1)), *PagesStartBmp);
                     }
                 }
-                SystemDebugPrint(L"PI : %d, I : %d, PBMP : %x", PagesStartIndex, Index, *PagesStartBmp);
+                // SystemDebugPrint(L"PI : %d, I : %d, PBMP : %x", PagesStartIndex, Index, *PagesStartBmp);
                 // for(UINT c = PagesStartIndex;c<=Index;c++) {
                 //     _bittestandreset64(PagesStartBmp, c);
                 // }
@@ -142,4 +136,71 @@ void* ProcessAllocateVirtualMemory(RFPROCESS Process, UINT64 NumPages) {
     //     }
     // }
     return NULL;
+}
+
+BOOL KeAllocateFragmentedPages(RFPROCESS Process, void* VirtualMemory, UINT64 NumPages) {
+    if(!Process || !NumPages) return FALSE;
+    char* Off = VirtualMemory;
+    PAGE* Page = MemoryManagementTable.PageArray;
+    UINT64* Bitmap = (UINT64*)MemoryManagementTable.PageBitmap;
+    register const UINT64 Max = MemoryManagementTable.NumBytesPageBitmap >> 3;
+    unsigned long Index;
+    for(UINT64 i = 0;i<Max;i++, Page+=64, Bitmap++) {
+        UINT64 b = *Bitmap;
+        if(b == (UINT64)-1) continue;
+        if(b == 0) {
+            *Bitmap = -1 << (64 - min(64, NumPages));
+            for(UINT c = 0;c<min(64, NumPages);c++) {
+                Page[c].PageStruct.Allocated = 1;
+                MapPhysicalPages(Process->PageMap, Off, (LPVOID)(Page[c].PhysicalAddress & ~0xFFF), 1, PM_MAP);
+                Off += 0x1000;
+            }
+            NumPages -= min(64, NumPages);
+            if(!NumPages) goto Success;
+            continue;
+        }
+        // // Scan for the first bit
+        _BitScanForward64(&Index, b);
+        if(Index) {
+            b |= ((UINT64)-1 >> (64 - Index));
+            for(UINT c = 0;c<min(Index, NumPages);c++) {
+                Page[c].PageStruct.Allocated = 1;
+                MapPhysicalPages(Process->PageMap, Off, (LPVOID)(Page[c].PhysicalAddress & ~0xFFF), 1, PM_MAP);
+                Off += 0x1000;
+            }
+            NumPages -= min(Index, NumPages);
+            if(!NumPages) goto Success;
+        }
+        // // Scan for the last bit
+        _BitScanReverse64(&Index, b);
+        if(Index != 63) {
+            b |= ((UINT64)-1 << (Index + 1));
+            for(UINT c = 0;c<min(64 - (Index + 1), NumPages);c++) {
+                Page[c].PageStruct.Allocated = 1;
+                MapPhysicalPages(Process->PageMap, Off, (LPVOID)(Page[c].PhysicalAddress & ~0xFFF), 1, PM_MAP);
+                Off += 0x1000;
+            }
+            NumPages -= min(64 - Index - 1, NumPages);
+            if(!NumPages) goto Success;
+        }
+        // Fill remaining bits
+        while(_BitScanForward64(&Index, ~b)) {
+            _bittestandset64((__int64*)&b, Index);
+            NumPages--;
+            Page[Index].PageStruct.Allocated = 1;
+            MapPhysicalPages(Process->PageMap, Off, (LPVOID)(Page[Index].PhysicalAddress & ~0xFFF), 1, PM_MAP);
+            Off += 0x1000;
+            if(!NumPages) {
+                *Bitmap = b;
+                goto Success;
+            }
+        }
+        *Bitmap = b;
+    }
+    // The allocation did not finish meaning that there is a bug in the system
+    SET_SOD_MEMORY_MANAGEMENT;
+    // ---------------
+    Success:
+        MemoryManagementTable.AllocatedPages+=NumPages;
+        return TRUE;
 }
