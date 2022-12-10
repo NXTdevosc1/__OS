@@ -526,8 +526,12 @@ EFI_STATUS EFIAPI UefiEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *Sys
 		}
 
 		ImportFileTable->LoadedFileSize = FileInfo->FileSize;
+		if(ImportFileTable->LoadedFileSize & 0xFFF) {
+			ImportFileTable->LoadedFileSize += 0x1000;
+			ImportFileTable->LoadedFileSize &= ~0xFFF;
+		}
 		
-		if(EFI_ERROR(SystemTable->BootServices->AllocatePool(EfiLoaderData, FileInfo->FileSize, (void**)&ImportFileTable->LoadedFileBuffer)))
+		if(EFI_ERROR(SystemTable->BootServices->AllocatePages(AllocateAnyPages, EfiLoaderData, ImportFileTable->LoadedFileSize >> 12, &ImportFileTable->LoadedFileBuffer)))
 		{
 			ALLOCATION_PROBLEM;
 			while(1);
@@ -544,8 +548,7 @@ EFI_STATUS EFIAPI UefiEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *Sys
 
 	InitData->ImageBase = (void*)ImageBase;
 	InitData->ImageSize = SizeVBuffer;
-
-	SystemTable->BootServices->FreePool(KernelBuffer);
+	InitData->PEDataDirectories = (RFOPTIONNAL_HEADER_DATA_DIRECTORIES)&PeHdr->OptionnalDataDirectories;
 	kernel->Close(kernel);
 
 
@@ -568,9 +571,9 @@ EFI_STATUS EFIAPI UefiEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *Sys
 	}
 	map_size+=2*descriptor_size; // this padding must be added for map size
 
-	SystemTable->BootServices->AllocatePool(EfiLoaderData,0x10000 + (map_size / descriptor_size) * sizeof(struct MEMORY_MAP),(void**)&InitData->memory_map);
+	SystemTable->BootServices->AllocatePool(EfiLoaderData,0x10000 + (map_size / descriptor_size) * sizeof(MEMORY_MAP),(void**)&InitData->MemoryMap);
 
-	Xmemset(InitData->memory_map, 0, (map_size / descriptor_size) * sizeof(struct MEMORY_MAP));
+	Xmemset(InitData->MemoryMap, 0, (map_size / descriptor_size) * sizeof(MEMORY_MAP));
 	s = SystemTable->BootServices->AllocatePool(EfiLoaderData,map_size + 0x10000,(void**)&memory_map);
 	if(s != EFI_SUCCESS){
         ALLOCATION_PROBLEM;
@@ -587,15 +590,16 @@ EFI_STATUS EFIAPI UefiEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *Sys
 		InitData->RuntimeServices = SystemTable->RuntimeServices;
 		InitData->SystemConfigurationTables = SystemTable->ConfigurationTable;
 		InitData->EfiSystemTable = SystemTable;
-	InitData->memory_map->count = 0;
+	
 	EFI_MEMORY_DESCRIPTOR* mp_entry = NULL;
-	for(UINTN i = 0;i<(map_size/descriptor_size) - 2;i++){
+	MEMORY_DESCRIPTOR* MemoryDescriptor = InitData->MemoryMap->MemoryDescriptors;
+	for(UINTN i = 0;i<(map_size/descriptor_size) - 2;i++, MemoryDescriptor++){
 		mp_entry = (EFI_MEMORY_DESCRIPTOR*) ((UINTN)memory_map+(i*descriptor_size));
 			
-			InitData->memory_map->mem_desc[InitData->memory_map->count].type = mp_entry->Type;
-			InitData->memory_map->mem_desc[InitData->memory_map->count].pages_count = mp_entry->NumberOfPages;
-			InitData->memory_map->mem_desc[InitData->memory_map->count].physical_start = (unsigned long long)mp_entry->PhysicalStart;
-			InitData->memory_map->count++;	
+			MemoryDescriptor->Type = mp_entry->Type;
+			MemoryDescriptor->PageCount = mp_entry->NumberOfPages;
+			MemoryDescriptor->PhysicalStart = (unsigned long long)mp_entry->PhysicalStart;
+			InitData->MemoryMap->Count++;
 	}
 
 	s = SystemTable->BootServices->ExitBootServices(ImageHandle,map_key);
