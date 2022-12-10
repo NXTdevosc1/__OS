@@ -10,7 +10,7 @@ uint8_t BmpImgDraw(void* _file, uint32_t x, uint32_t y){
     struct BMP_HDR* hdr = _file;
 
     if(hdr->bits_per_pixels == 32){
-        GP_draw_sf_text("BPP : 32", 0xFF, 20, 80);
+        GP_draw_sf_text("BPP : 32", 0xFFFF, 400, 380);
 
         uint32_t* buffer = (uint32_t*)((uint64_t)hdr + hdr->img_offset);
 
@@ -22,7 +22,7 @@ uint8_t BmpImgDraw(void* _file, uint32_t x, uint32_t y){
     }else if(hdr->bits_per_pixels == 24){
 
         
-	    GP_draw_sf_text("BPP : 24", 0xFF, 20, 80);
+	    GP_draw_sf_text("BPP : 24", 0xFFFF, 400, 380);
         
         unsigned char*  buffer = (unsigned char*)((UINT64)_file + hdr->img_offset);
         unsigned char* bf_row = buffer;
@@ -43,7 +43,11 @@ uint8_t BmpImgDraw(void* _file, uint32_t x, uint32_t y){
         }
 
     
-    }else return 0;
+    }else {
+	    GP_draw_sf_text("Invalid BMP", 0xFFFF, 400, 380);
+
+        return 0;
+    }
  
     return 1;
 }

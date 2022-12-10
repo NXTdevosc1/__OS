@@ -115,6 +115,7 @@ typedef volatile struct _MEMORY_SEGMENT_LIST_HEAD MEMORY_SEGMENT_LIST_HEAD, *RFM
 
 
 
+
 typedef volatile struct _MEMORY_SEGMENT_LIST_HEAD {
     MEMORY_SEGMENT MemorySegments[MEMORY_LIST_HEAD_SIZE];
     RFMEMORY_SEGMENT_LIST_HEAD NextListHead;
@@ -128,6 +129,17 @@ typedef volatile struct _FREE_MEMORY_SEGMENT_LIST_HEAD {
     UINT64 Bitmask;
     RFMEMORY_SEGMENT_LIST_HEAD* RefCacheLineSegment; // set if there is 
 } FREE_MEMORY_SEGMENT_LIST_HEAD;
+
+typedef struct _FREE_MEMORY_TREE {
+    UINT64 FreeSlots; // Bitmap leading to entries with free slots
+    struct {
+        void* Child; // FREE_MEMORY_TREE or HEAP_LIST
+        UINT8 FreeSlotsCount;
+        UINT64 LargestHeap; // if > 0 then Child also is > 0
+    } Childs[64];
+    FREE_MEMORY_TREE* Next; // only in level1 tree
+} FREE_MEMORY_TREE;
+
 
 
 #define NUM_FREE_MEMORY_LEVELS 4

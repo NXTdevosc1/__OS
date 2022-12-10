@@ -1,5 +1,6 @@
 #include <MemoryManagement.h>
 #include <CPU/process.h>
+#include <interrupt_manager/SOD.h>
 
 void* AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flags) {
     if(!NumBytes || !Process) return NULL;
@@ -46,5 +47,24 @@ void* FreePool(void* HeapAddress) {
 }
 
 RFMEMORY_SEGMENT MemMgr_CreateInitialHeap(void* HeapAddress, UINT64 HeapLength) {
+    return NULL;
+}
+
+FREE_MEMORY_SEGMENT* SearchFreeMemory(FREE_MEMORY_TREE* Tree, UINT64 NumBytes) {
+    for(;;) {
+        for(UINT64 i = 0;i<64;i++) {
+            if(Tree->Childs[i].LargestHeap >= NumBytes) {
+                FREE_MEMORY_TREE* Level2 = Tree->Childs[i].Child;
+                for(UINT64 x = 0;x<64;x++) {
+                    if(Level2->Childs[x].LargestHeap >= NumBytes) {
+                        FREE_MEMORY_TREE* Level3 = Tree->Childs[i].Child;
+                    }
+                }
+                SET_SOD_MEMORY_MANAGEMENT;
+            }
+        }
+        if(!Tree) break;
+        Tree = Tree->Next;
+    }
     return NULL;
 }

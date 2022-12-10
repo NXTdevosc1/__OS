@@ -16,7 +16,7 @@ void KEXPORT *KERNELAPI KeAllocateVirtualMemory(UINT64 NumBytes) {
         MutexRelease64(kproc->ControlMutex0, PROCESS_MUTEX0_ALLOCATE_VIRTUAL_MEMORY);
     }
     
-    if(!KeAllocateFragmentedPages(kproc, Vmem, NumPages)) {       
+    if(!KeAllocateFragmentedPages(kproc, Vmem, NumPages)) {
         MutexRelease64(kproc->ControlMutex0, PROCESS_MUTEX0_ALLOCATE_VIRTUAL_MEMORY);
         SET_SOD_MEMORY_MANAGEMENT;
     }

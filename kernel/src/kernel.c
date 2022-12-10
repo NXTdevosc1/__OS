@@ -142,8 +142,8 @@ void TripleFaultingFunction() {
 
 void __declspec(noreturn) _start() {
 	__cli();
-		EnableCpuFeatures();
-		SetupPageAttributeTable();
+	EnableCpuFeatures();
+	SetupPageAttributeTable();
 	if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
 		GP_draw_sf_text("Extension level : AVX", 0xFFFFFF, 20, 20);
 	} else {
@@ -210,8 +210,11 @@ void __declspec(noreturn) __declspec(noinline) _kmain() {
 	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(0x4000));
 	SystemDebugPrint(L"VMEM : %x", KeAllocateVirtualMemory(0x4000));
 
-
-	while(1) __hlt();
+	__m256 t = {2, 3, 4, 5, 6, 7, 8, 9};
+	__m256 c = {2, 3, 4, 5, 6, 7, 8, 9};
+	__m256 x = _mm256_add_ps(t, c);
+	SystemDebugPrint(L"T : %x %x %x %x , C : %x %x %x %x", t.m256_f32[0], t.m256_f32[1], t.m256_f32[2], t.m256_f32[3], c.m256_f32[0], c.m256_f32[1], c.m256_f32[2], c.m256_f32[3]);
+	SystemDebugPrint(L"Result : %x %x %x %x", x.m256_f32[0], x.m256_f32[1], x.m256_f32[2], x.m256_f32[3]);
 
 	GP_draw_sf_text("EXT_LEVEL :", 0xFFFFFF, 20, 220);
 	if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
@@ -239,25 +242,25 @@ void __declspec(noreturn) __declspec(noinline) _kmain() {
 
 
 
-	// for(UINT64 i = 0;i<0xFFFFF00;i++);
-	// for(;;) {
-	// 	for(UINT64 x = 0;x<4;x++) {
-	// 		UINT64 f = 0;
-	// 		if(x) f = 0xff << (x - 1);
-	// 		for(UINT64 i = 0;i<0xff;i++) {
-	// 		GP_clear_screen((i << 0) | f);
-	// 		}
+	for(UINT64 i = 0;i<0xFFFFF00;i++);
+	for(;;) {
+		for(UINT64 x = 0;x<4;x++) {
+			UINT64 f = 0;
+			if(x) f = 0xff << (x - 1);
+			for(UINT64 i = 0;i<0xff;i++) {
+			GP_clear_screen((i << 0) | f);
+			}
 			
-	// 		for(UINT64 i = 0;i<0xff;i++) {
-	// 			GP_clear_screen((i << 8) | f);
-	// 		}
+			for(UINT64 i = 0;i<0xff;i++) {
+				GP_clear_screen((i << 8) | f);
+			}
 			
-	// 		for(UINT64 i = 0;i<0xff;i++) {
-	// 			GP_clear_screen((i << 16) | f);
-	// 		}
-	// 	}
+			for(UINT64 i = 0;i<0xff;i++) {
+				GP_clear_screen((i << 16) | f);
+			}
+		}
 		
-	// }
+	}
 	
 	while(1) __hlt();
 	// Unmap KernelRelocate
