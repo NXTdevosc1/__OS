@@ -23,6 +23,8 @@ void _enable(void);
 
 #define MutexWait64(Mutex, BitOffset) while(_interlockedbittestandset64(((volatile __int64*)&Mutex), BitOffset)) _mm_pause()
 #define MutexRelease64(Mutex, BitOffset) _bittestandreset64(((__int64*)&Mutex), BitOffset)
+
+
 // Intrinsic used in MSVC CL (directly inserted in code without function call)
 
 

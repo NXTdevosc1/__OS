@@ -25,15 +25,15 @@ typedef unsigned int UINT32;
 typedef int INT32;
 typedef unsigned long long UINT64;
 typedef long long INT64;
-typedef UINT64* ULONGPTR;
-typedef INT64* LONGPTR;
+typedef unsigned long* ULONGPTR;
+typedef long* LONGPTR;
 typedef char* LPSTR;
 typedef const char* LPCSTR;
 typedef UINT16* LPWSTR;
 typedef const UINT16* LPCWSTR;
 
-typedef UINT64 ULONG;
-typedef INT64 LONG;
+typedef unsigned long ULONG;
+typedef long LONG;
 typedef UINT32 UINT;
 typedef INT32 INT;
 typedef UINT16 USHORT;
@@ -43,12 +43,11 @@ typedef INT8 CHAR;
 
 typedef UINT DWORD;
 typedef USHORT WORD;
-typedef ULONG QWORD;
+typedef UINT64 QWORD;
 
 typedef int BOOL;
 typedef unsigned char BYTE;
 
-typedef void VOID;
 typedef void* LPVOID;
 typedef UINT64 SIZE;
 
@@ -92,3 +91,6 @@ typedef const void* LPCVOID;
 #define KERNEL_WARNING(x) (x >= 0x250000 && x < 0x500000)
 #define KERNEL_ERROR(x) (x < 0)
 #define KERNEL_SUCCEEDED(x) (x >= 0)
+
+
+#define VOID void

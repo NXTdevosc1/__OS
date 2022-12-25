@@ -5,6 +5,7 @@
 #include <Management/runtimesymbols.h>
 #include <stdlib.h>
 #include <CPU/cpu.h>
+#include <loaders/pe.h>
 void FirmwareControlRelease(){
     // memory map code
 

@@ -104,8 +104,6 @@ typedef volatile struct _MEMORY_SEGMENT {
 } MEMORY_SEGMENT;
 
 typedef volatile struct _FREE_MEMORY_SEGMENT {
-    UINT8 Present : 1;
-    UINT8 Reserved : 7;
     void* Address;
     UINT64 HeapLength;
 } FREE_MEMORY_SEGMENT;
@@ -123,22 +121,34 @@ typedef volatile struct _MEMORY_SEGMENT_LIST_HEAD {
     RFMEMORY_SEGMENT_LIST_HEAD* RefCacheLineSegment; // set if there is 
 } MEMORY_SEGMENT_LIST_HEAD;
 
-typedef volatile struct _FREE_MEMORY_SEGMENT_LIST_HEAD {
-    FREE_MEMORY_SEGMENT MemorySegments[MEMORY_LIST_HEAD_SIZE];
-    RFMEMORY_SEGMENT_LIST_HEAD NextListHead;
-    UINT64 Bitmask;
-    RFMEMORY_SEGMENT_LIST_HEAD* RefCacheLineSegment; // set if there is 
-} FREE_MEMORY_SEGMENT_LIST_HEAD;
+
+// 3 level free memory tree + free memory heap list
+
+typedef struct _FREE_MEMORY_TREE FREE_MEMORY_TREE;
+
+#define MEMTREE_MAX_SLOTS 192
 
 typedef struct _FREE_MEMORY_TREE {
-    UINT64 FreeSlots; // Bitmap leading to entries with free slots
+    UINT64 Present[3];
+    UINT64 FullSlots[3];
+    UINT8 FullSlotCount;
+    UINT8 PresentSlotCount;
+    
     struct {
         void* Child; // FREE_MEMORY_TREE or HEAP_LIST
-        UINT8 FreeSlotsCount;
         UINT64 LargestHeap; // if > 0 then Child also is > 0
-    } Childs[64];
+        volatile UINT32 LockMutex;
+        UINT16 FullSlotsCount; // from 0 to 192
+    } Childs[192];
     FREE_MEMORY_TREE* Next; // only in level1 tree
 } FREE_MEMORY_TREE;
+
+// 4th level of the tree
+typedef volatile struct _FREE_MEMORY_SEGMENT_LIST_HEAD {
+    UINT64 UsedSlots[3];
+    UINT8 NumUsedSlots;
+    FREE_MEMORY_SEGMENT MemorySegments[192];
+} FREE_MEMORY_SEGMENT_LIST_HEAD;
 
 
 
@@ -191,8 +201,7 @@ typedef volatile struct _PROCESS_MEMORY_TABLE {
     UINT64 CompressedPages;
     UINT64 DiskPages;
     UINT64 UsedMemory; // Used memory from these reserved pages
-    MEMORY_SEGMENT_LIST_HEAD AllocatedMemory;
-    FREE_MEMORY_SEGMENT_LIST_HEAD FreeMemory[NUM_FREE_MEMORY_LEVELS];
+    FREE_MEMORY_TREE FreeMemory;
 } PROCESS_MEMORY_TABLE;
 
 #pragma pack(pop)

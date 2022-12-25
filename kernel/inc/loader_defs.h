@@ -1,13 +1,13 @@
 #pragma once
-#include <stdint.h>
-#ifndef ___EDK2___
-#include <efi.h>
-#include <loaders/pe.h>
-#else
-// EDK2 Official UEFI Specification & Implementation
 #include <Uefi.h>
-#endif
-
+#include <krnltypes.h>
+// #ifndef ___EDK2___
+// #include <efi.h>
+// #include <loaders/pe.h>
+// #else
+// // EDK2 Official UEFI Specification & Implementation
+// #include <Uefi.h>
+// #endif
 typedef struct _OPTIONNAL_HEADER_DATA_DIRECTORIES *RFOPTIONNAL_HEADER_DATA_DIRECTORIES;
 
 
@@ -20,9 +20,9 @@ typedef struct _OPTIONNAL_HEADER_DATA_DIRECTORIES *RFOPTIONNAL_HEADER_DATA_DIREC
 
 
 struct PSF1_HEADER{
-	uint8_t magic[2];
-	uint8_t mode;
-	uint8_t character_size;
+	UINT8 magic[2];
+	UINT8 mode;
+	UINT8 character_size;
 };
 
 enum FILE_IMPORT_TYPE{
@@ -52,7 +52,7 @@ struct PSF1_FONT{
 	char  glyph_buffer[];
 };
 typedef struct _FRAME_BUFFER_DESCRIPTOR FRAME_BUFFER_DESCRIPTOR;
-typedef void (EFIAPI *FRAME_BUFFER_UPDATE_VIDEO)
+typedef void (__cdecl *FRAME_BUFFER_UPDATE_VIDEO)
 (FRAME_BUFFER_DESCRIPTOR* FrameBufferDescriptor, unsigned int x, unsigned int y,
 unsigned int Width, unsigned int Height
 );
