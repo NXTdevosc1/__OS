@@ -69,7 +69,6 @@ void KernelPagingInitialize(){
 	kproc->PageMap = (RFPAGEMAP)CreatePageMap(); // To be easily accessible by SMP
 	KeGlobalCR3 = (UINT64)kproc->PageMap;
 	
-
 		UINT64 Flags = PM_MAP | PM_NO_CR3_RELOAD | PM_NO_TLB_INVALIDATION;
 		for (UINT64 i = 0; i < InitData.MemoryMap->Count; i++) {
 			UINT16 MemoryType = InitData.MemoryMap->MemoryDescriptors[i].Type;

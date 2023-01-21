@@ -27,6 +27,60 @@ each process has the page allocation table start and end pointer, then the conti
 #define SZeroMemory(Memory) memset((void*)Memory, 0, sizeof(*Memory))
 
 
+typedef struct _FREE_MEMORY_TREE FREE_MEMORY_TREE;
+
+#define MEMTREE_MAX_SLOTS 128
+#define MEMTREE_NUM_SLOT_GROUPS 2
+
+typedef volatile struct _FREE_MEMORY_SEGMENT FREE_MEMORY_SEGMENT;
+
+typedef volatile struct _FREE_MEMORY_SEGMENT {
+    void* Address;
+    UINT64 HeapLength;
+    UINT64 InitialLength : 63;
+    UINT64 InitialHeap : 1; // This heap can only be deleted if the page is released
+} FREE_MEMORY_SEGMENT;
+
+typedef volatile struct _FREE_MEMORY_SEGMENT_LIST_HEAD FREE_MEMORY_SEGMENT_LIST_HEAD;
+
+typedef struct _MEMORY_TREE_ITEM {
+    void* Child; // FREE_MEMORY_TREE or HEAP_LIST
+    volatile UINT32 LockMutex;
+    FREE_MEMORY_SEGMENT* LargestHeap;
+    FREE_MEMORY_SEGMENT_LIST_HEAD* ListHeadLargestHeap;
+    UINT8 IndexLargestHeap;
+} MEMORY_TREE_ITEM;
+
+typedef struct _FREE_MEMORY_TREE {
+    UINT8 FullSlotCount;
+    UINT64 Present[MEMTREE_NUM_SLOT_GROUPS];
+    UINT64 FullSlots[MEMTREE_NUM_SLOT_GROUPS];
+    UINT8 PresentSlotCount;
+    UINT64 LargestHeapLength;
+    UINT64 SecondLargestHeapLength;
+
+
+
+    MEMORY_TREE_ITEM Childs[MEMTREE_MAX_SLOTS];
+
+    UINT ParentItemIndex;
+    FREE_MEMORY_TREE* Parent;
+
+    FREE_MEMORY_TREE* Next; // only in level1 tree
+    BOOL Root;
+    UINT8 Rsv[322];
+} FREE_MEMORY_TREE;
+
+// 3rd level of the tree
+typedef volatile struct _FREE_MEMORY_SEGMENT_LIST_HEAD {
+    UINT ParentItemIndex;
+    FREE_MEMORY_TREE* Parent;
+    UINT64 UsedSlots[MEMTREE_NUM_SLOT_GROUPS];
+    UINT8 NumUsedSlots;
+    FREE_MEMORY_SEGMENT MemorySegments[MEMTREE_MAX_SLOTS];
+} FREE_MEMORY_SEGMENT_LIST_HEAD;
+
+
 #pragma pack(push, 1)
 
 typedef volatile struct _PROCESS_CONTROL_BLOCK *RFPROCESS;
@@ -103,10 +157,6 @@ typedef volatile struct _MEMORY_SEGMENT {
     UINT64 HeapLength;
 } MEMORY_SEGMENT;
 
-typedef volatile struct _FREE_MEMORY_SEGMENT {
-    void* Address;
-    UINT64 HeapLength;
-} FREE_MEMORY_SEGMENT;
 
 
 typedef volatile struct _MEMORY_SEGMENT_LIST_HEAD MEMORY_SEGMENT_LIST_HEAD, *RFMEMORY_SEGMENT_LIST_HEAD;
@@ -122,57 +172,8 @@ typedef volatile struct _MEMORY_SEGMENT_LIST_HEAD {
 } MEMORY_SEGMENT_LIST_HEAD;
 
 
-// 3 level free memory tree + free memory heap list
 
-typedef struct _FREE_MEMORY_TREE FREE_MEMORY_TREE;
-
-#define MEMTREE_MAX_SLOTS 192
-
-typedef struct _FREE_MEMORY_TREE {
-    UINT64 Present[3];
-    UINT64 FullSlots[3];
-    UINT8 FullSlotCount;
-    UINT8 PresentSlotCount;
-    
-    struct {
-        void* Child; // FREE_MEMORY_TREE or HEAP_LIST
-        UINT64 LargestHeap; // if > 0 then Child also is > 0
-        volatile UINT32 LockMutex;
-        UINT16 FullSlotsCount; // from 0 to 192
-    } Childs[192];
-    FREE_MEMORY_TREE* Next; // only in level1 tree
-} FREE_MEMORY_TREE;
-
-// 4th level of the tree
-typedef volatile struct _FREE_MEMORY_SEGMENT_LIST_HEAD {
-    UINT64 UsedSlots[3];
-    UINT8 NumUsedSlots;
-    FREE_MEMORY_SEGMENT MemorySegments[192];
-} FREE_MEMORY_SEGMENT_LIST_HEAD;
-
-
-
-#define NUM_FREE_MEMORY_LEVELS 4
-
-typedef enum _FREE_MEMORY_LEVELS {
-    FREE_MEMORY_BELOW_1KB = 0,
-    FREE_MEMORY_BELOW_64KB = 1,
-    FREE_MEMORY_BELOW_2MB = 2,
-    FREE_MEMORY_ABOVE_2MB = 3 
-} FREE_MEMORY_LEVELS;
-
-// Used to cache and optimize memory functions
-typedef volatile struct _MEMORY_REGION_TABLE {
-    // Variables are ordered this way to keep 0x10 Bytes alignment and therefore win cpu clocks
-    MEMORY_SEGMENT_LIST_HEAD SegmentListHead;
-    UINT64 AllocatedEntries;
-    UINT64 TotalEntries;
-    RFMEMORY_SEGMENT_LIST_HEAD LastListHead; // To optimize fetching, when :
-                                            // AllocatedEntries = Total Entries
-                                            /// LastListHead->Next = New List Head
-    UINT64 AllocateListControl; // UINT64 To make alignement
-} MEMORY_REGION_TABLE, *RFMEMORY_REGION_TABLE;
-
+#pragma pack(push, 1)
 
 // Global Memory Management Table for kernel processes and allocation source for user processes
 typedef volatile struct _MEMORY_MANAGEMENT_TABLE {
@@ -185,16 +186,21 @@ typedef volatile struct _MEMORY_MANAGEMENT_TABLE {
     UINT64 IoMemorySize;
     UINT64 PageArraySize; // In Number of entries
     
-    PAGE* PageArray;
-    UINT64 NumBytesPageBitmap;
-    char* PageBitmap;
+    PAGE* PageArray; // 0x40
+    UINT64 NumBytesPageBitmap; // 0x48
+    char* PageBitmap; // 0x50
+    char* FreePagesStart; // Offset 0x58
+    PAGE* FreePageArrayStart; // Offset 0x60
+    char* BmpEnd; // Off 0x68
 } MEMORY_MANAGEMENT_TABLE;
+
+#pragma pack(pop)
 
 extern MEMORY_MANAGEMENT_TABLE MemoryManagementTable;
 
 
 // Only for user processes
-typedef volatile struct _PROCESS_MEMORY_TABLE {
+typedef struct _PROCESS_MEMORY_TABLE {
     void* VirtualBase;
     UINT64 AllocatedPages;
     UINT64 ReservedPages;
@@ -209,7 +215,6 @@ typedef volatile struct _PROCESS_MEMORY_TABLE {
 void InitMemoryManagementSubsystem(void);
 RFMEMORY_SEGMENT QueryAllocatedBlockSegment(void* BlockAddress);
 RFMEMORY_SEGMENT QueryFreeBlockSegment(void* BlockAddress);
-RFMEMORY_SEGMENT AllocateMemorySegment(RFMEMORY_REGION_TABLE MemoryRegion);
 
 typedef enum _ALLOCATE_POOL_FLAGS {
 	ALLOCATE_POOL_LOW_4GB = 1,
@@ -251,11 +256,11 @@ BOOL KeAllocateFragmentedPages(RFPROCESS Process, void* VirtualMemory, UINT64 Nu
 // The free memory segment has the semaphore bit set until the pool is actually given
 // the host routine must reset the MEMORY_SEGMENT_SEMAPHORE Bit in the returned Segment
 RFMEMORY_SEGMENT MemMgr_FreePool(RFMEMORY_REGION_TABLE MemoryRegion, RFMEMORY_SEGMENT_LIST_HEAD ListHead, RFMEMORY_SEGMENT MemorySegment);
-RFMEMORY_SEGMENT MemMgr_CreateInitialHeap(void* HeapAddress, UINT64 HeapLength);
+// RFMEMORY_SEGMENT MemMgr_CreateInitialHeap(void* HeapAddress, UINT64 HeapLength);
 
 // Sets present bit in Memory Segment flags when Found
 RFMEMORY_SEGMENT (*_SIMD_FetchUnusedSegmentsUncached)(MEMORY_SEGMENT_LIST_HEAD* ListHead);
-LPVOID (__fastcall *_SIMD_AllocatePhysicalPage) (volatile char* PageBitmap, UINT64 BitmapSize, PAGE* PageArray);
+LPVOID (__fastcall *_SIMD_AllocatePhysicalPage) ();
 // ---------------------------
 
 void SIMD_InitOptimizedMemoryManagement(void);

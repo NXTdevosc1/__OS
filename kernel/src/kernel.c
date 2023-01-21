@@ -98,15 +98,15 @@ LPWSTR KernelProcessName = L"System Kernel.";
 
 char* ExtensionLevelStr[2] = {"SSE", "AVX"};
 
+
+#include <utils/bmp.h>
+
 float XCords[0x100] = {0, 50, 100, 150};
 float YCords[0x100] = {0, 50, -50, 0};
 float betabuffer[0x100] = {0};
 float IncValue = 0.1f;
 UINT XOff = 200;
 UINT YOff = 300;
-
-#include <utils/bmp.h>
-
 void TripleFaultingFunction() {
 	UINT64 X0 = GetBezierPoint(XCords, betabuffer, 4, 0.1f), X1 = GetBezierPoint(XCords, betabuffer, 4, 0.2f), Y0 = GetBezierPoint(YCords, betabuffer, 4, 0.1f), Y1 = GetBezierPoint(YCords, betabuffer, 4, 0.2f);
 	float Distance = (float)__sqrt(pow((double)(X1 - X0), 2) + pow((double)(Y1-Y0), 2));
@@ -115,27 +115,33 @@ void TripleFaultingFunction() {
 	}
 
 	SystemDebugPrint(L"Starting.");
-	for(UINT c = 0;c<0x1000;c++) { 
-	register UINT64 LastX = XOff;
-	register UINT64 LastY = YOff;
+	int b = 0;
+	for(;;b++) {
+		break;
+		GP_draw_rect(20, 400, 220, 20, 0);
+		GP_draw_sf_text(to_hstring64(b), 0xFFFFFF, 20, 400);
+		for(UINT c = 0;c<10000;c++) {
+		register UINT64 LastX = XOff;
+		register UINT64 LastY = YOff;
 
-	register UINT64 X = 0;
-	register UINT64 Y = 0;
-	
-	for(register float t = 0;t<=1;t+=IncValue) {
-		*(__m128i*)betabuffer = _mm_load_si128((__m128i*)XCords);
-		X = XOff + _SSE_ComputeBezier(betabuffer, 4, t);
+		register UINT64 X = 0;
+		register UINT64 Y = 0;
+		
+		for(register float t = 0;t<=1;t+=IncValue) {
+			*(__m128i*)betabuffer = _mm_load_si128((__m128i*)XCords);
+			X = XOff + _SSE_ComputeBezier(betabuffer, 4, t);
 
-		*(__m128i*)betabuffer = _mm_load_si128((__m128i*)YCords);
-		Y = YOff + _SSE_ComputeBezier(betabuffer, 4, t);
-		// if(X > LastX + 1 || X < LastX - 1 || Y > LastY + 1 || Y < LastY - 1) {
-		// 	LineTo(LastX, LastY, X, Y, 0xFF0000);
-		// } else {
-			*(UINT32*)(InitData.fb->FrameBufferBase + ((UINT64)X << 2) + ((UINT64)Y * InitData.fb->Pitch)) = 0xFF0000;
-		// }
-		LastX = X;
-		LastY = Y;
-	}
+			*(__m128i*)betabuffer = _mm_load_si128((__m128i*)YCords);
+			Y = YOff + _SSE_ComputeBezier(betabuffer, 4, t);
+			// if(X > LastX + 1 || X < LastX - 1 || Y > LastY + 1 || Y < LastY - 1) {
+				// LineTo(LastX, LastY, X, Y, 0xFF0000);
+			// } else {
+				*(UINT32*)(InitData.fb->FrameBufferBase + ((UINT64)X << 2) + ((UINT64)Y * InitData.fb->HorizontalResolution * 4)) = 0xFF0000;
+			// }
+			LastX = X;
+			LastY = Y;
+		}
+		}
 	}
 	SystemDebugPrint(L"Ended.");
 }
@@ -157,7 +163,10 @@ void __declspec(noreturn) _start() {
 	// Initialize Kernel Memory Management
 	// Start by initializing the subsystem, configuring system space address then initialize paging
 	InitMemoryManagementSubsystem();
-	GP_clear_screen(0xFF);
+	GP_clear_screen(0);
+
+
+	TripleFaultingFunction();
 
 
 	ConfigureSystemSpace();
@@ -328,7 +337,6 @@ void __declspec(noreturn) __declspec(noinline) _kmain() {
 	UINT8 ControlPortB = InPortB(SYSTEM_CONTROL_PORT_B);
 	ControlPortB |= (3 << 2);
 	OutPortB(SYSTEM_CONTROL_PORT_B, ControlPortB);
-	
 	
 	
 

@@ -93,20 +93,32 @@ void InitMemoryManagementSubsystem() {
 
     //     MemoryManagementTable.FreeMemoryLevels[i].UnallocatedSegmentCache.CacheLineSize++;
     // }
+    MemoryManagementTable.FreePagesStart = MemoryManagementTable.PageBitmap;
+    MemoryManagementTable.FreePageArrayStart = MemoryManagementTable.PageArray;
+    MemoryManagementTable.BmpEnd = MemoryManagementTable.PageBitmap + (((MemoryManagementTable.PageArraySize) >> 3) >> 12);
+
 }
-extern LPVOID __fastcall _SSE_AllocatePhysicalPage(volatile char* PageBitmap, UINT64 BitmapSize, PAGE* PageArray);
-LPVOID (__fastcall *_SIMD_AllocatePhysicalPage) (volatile char* PageBitmap, UINT64 BitmapSize, PAGE* PageArray) = _SSE_AllocatePhysicalPage;
+extern LPVOID __fastcall _SSE_AllocatePhysicalPage();
+LPVOID (__fastcall *_SIMD_AllocatePhysicalPage) () = _SSE_AllocatePhysicalPage;
 
 // Used after relocation
 void SIMD_InitOptimizedMemoryManagement() {
+	
     // Relocate variables
     MemoryManagementTable.PageArray = (PAGE*)AllocateIoMemory((LPVOID)MemoryManagementTable.PageArray, ALIGN_VALUE(MemoryManagementTable.PageArraySize, 0x1000) >> 12, 0);
     MemoryManagementTable.PageBitmap = (char*)AllocateIoMemory((LPVOID)MemoryManagementTable.PageBitmap, ALIGN_VALUE(MemoryManagementTable.NumBytesPageBitmap, 0x1000) >> 12, 0);
+
+    MemoryManagementTable.FreePagesStart = MemoryManagementTable.PageBitmap;
+    MemoryManagementTable.FreePageArrayStart = MemoryManagementTable.PageArray;
+    MemoryManagementTable.BmpEnd = MemoryManagementTable.PageBitmap + ALIGN_VALUE((((MemoryManagementTable.PageArraySize + 1) >> 3) >> 12) + 0x1000, 0x1000);
+
 
     if(ExtensionLevel == EXTENSION_LEVEL_SSE) {
         _SIMD_AllocatePhysicalPage = _SSE_AllocatePhysicalPage;
     }
     else if(ExtensionLevel == EXTENSION_LEVEL_AVX) {
+        _SIMD_AllocatePhysicalPage = _SSE_AllocatePhysicalPage;
+
         // _SIMD_FetchMemoryCacheLine = _AVX_FetchMemoryCacheLine;
     } else if((ExtensionLevel & EXTENSION_LEVEL_AVX512)) {
         // _SIMD_FetchMemoryCacheLine = _AVX512_FetchMemoryCacheLine;

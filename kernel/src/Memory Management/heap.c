@@ -4,7 +4,8 @@
 #include <intrin.h>
 #include <CPU/cpu.h>
 
-FREE_MEMORY_SEGMENT* AllocateFreeMemorySegment(FREE_MEMORY_TREE* Tree);
+FREE_MEMORY_SEGMENT* KERNELAPI CreateHeap(FREE_MEMORY_TREE* Tree, void* HeapAddress, UINT64 HeapLength);
+
 
 void* AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flags) {
     if(!NumBytes || !Process) return NULL;
@@ -12,36 +13,56 @@ void* AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flag
         NumBytes += 0x10;
         NumBytes &= ~0xF;
     }
+    FREE_MEMORY_TREE* Current = &Process->MemoryManagementTable.FreeMemory;
+    ULONG Index;
+    UINT64 Bmp;
+    // Step 1 : Find a free block (TODO After multiprocessing : CPU Sync)
     for(;;) {
-        for(UINT i = 0;i<0x100;i++) _mm_pause();
+        if(Current->FullSlotCount == MEMTREE_MAX_SLOTS) goto continue0;
+        for(UINT x0 = 0;x0<MEMTREE_NUM_SLOT_GROUPS;x0) {
+            Bmp = Current->FullSlots[x0];
+            while(_BitScanForward64(&Index, Bmp)) {
+                _bittestandreset64(&Bmp, Index);
+                Index += (x0 << 7);
+                if(Current->Childs[Index].Child && Current->Childs[Index].LargestHeap->HeapLength >= NumBytes) {
+                    // We found a heap
+                    FREE_MEMORY_SEGMENT* Heap = Current->Childs[Index].LargestHeap;
+                    void* Address = Heap->Address;
+                    (char*)Heap->Address += NumBytes;
+                    Heap->HeapLength -= NumBytes;
+                    
+                    FREE_MEMORY_SEGMENT_LIST_HEAD* LhLargestHeap = Current->Childs[Index].ListHeadLargestHeap;
+                    
+                    if(!Heap->HeapLength && !Heap->InitialHeap) {
+                        UINT ChainId = Current->Childs[Index].IndexLargestHeap >> 7 /* / MEMTREE_MAX_SLOTS*/;
+                        // Free heap slot
+                        _bittestandreset64(&LhLargestHeap->UsedSlots[ChainId], Current->Childs[Index].IndexLargestHeap & (MEMTREE_MAX_SLOTS - 1));
+                        LhLargestHeap->NumUsedSlots--;
+                        
+                        // Clear full slot count
+                        ChainId = LhLargestHeap->ParentItemIndex >> 7;
+                        FREE_MEMORY_TREE* Tree = LhLargestHeap->Parent; // LVL2
+                        if(_bittestandreset64(&Tree->FullSlots[ChainId], LhLargestHeap->ParentItemIndex & (MEMTREE_MAX_SLOTS - 1))) {
+                            Tree->FullSlotCount--;
+                            ChainId = Tree->ParentItemIndex >> 7;
+                            if(_bittestandreset64(&Tree->Parent->FullSlots[ChainId], Tree->ParentItemIndex & (MEMTREE_MAX_SLOTS - 1))) {
+                                Tree->Parent->FullSlotCount--;
+                            }
+                        } 
+                    }
+                    // Now determine the biggest heap
+                    
+                }
+            }
 
-        AllocateFreeMemorySegment(&Process->MemoryManagementTable.FreeMemory);
+        }
+        continue0:
+        if(!Current->Next) break;
+        Current = Current->Next;
     }
     
-    // Check reserved, not allocated memory
-    if(Process->MemoryManagementTable.ReservedPages < NumBytes) {
-        UINT64 Pages = NumBytes >> 12;
-        if(NumBytes & 0xFFF) Pages++;
 
-
-    }
-
-    if(!(NumBytes & ~(0x3FF))) {
-        // Below 1KB (fetch all lists)
-        // SystemDebugPrint(L"Below 1KB");
-        for(UINT i = 0;i<NUM_FREE_MEMORY_LEVELS;i++) {
-            
-        }
-    } else if(!(NumBytes & ~(0xFFFF))) {
-        // Below 64 KB (fetch all lists from 64 kb)
-        // SystemDebugPrint(L"Below 64KB");
-    } else if(!(NumBytes & ~(0x1FFFFF))) {
-        // Below 2MB (fetch below and above 2MB lists)
-        // SystemDebugPrint(L"Below 2MB");
-    } else {
-        // Above (or Equal) 2MB
-        // SystemDebugPrint(L"Above 2MB");
-    }
+    
     return NULL;
 }
 void* RemoteFreePool(RFPROCESS Process, void* HeapAddress) {
@@ -55,63 +76,75 @@ void* FreePool(void* HeapAddress) {
     return RemoteFreePool(KeGetCurrentProcess(), HeapAddress);
 }
 
-RFMEMORY_SEGMENT MemMgr_CreateInitialHeap(void* HeapAddress, UINT64 HeapLength) {
+RFMEMORY_SEGMENT KERNELAPI MemMgr_CreateInitialHeap(RFPROCESS Process, void* HeapAddress, UINT64 HeapLength) {
+    // Search for free memory ending 
     return NULL;
 }
 
-#define _spalloc() _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray)
+#define _spalloc() _SIMD_AllocatePhysicalPage()
 
-static inline BOOL MmAllocateSlot(FREE_MEMORY_TREE* Tree, ULONG* _Indx) {
+#define _mm256_treeclr(_Tree) __stosq((unsigned long long*)_Tree, 0, 512)
+
+
+static inline BOOL KERNELAPI MmAllocateSlot(FREE_MEMORY_TREE* Tree, ULONG* _Indx) {
     ULONG Index;
-    for(ULONG x = 0;x<3;x++) {
+    for(ULONG x = 0;x<MEMTREE_NUM_SLOT_GROUPS;x++) {
         UINT64 p = ~Tree->Present[x];
         while(_BitScanForward64(&Index, p)) {
             _bittestandreset64(&p, Index);
             ULONG BiIndx = Index;
             Index += (x << 6);
-            if(!_interlockedbittestandset(&Tree->Childs[Index].LockMutex, 0)) {
-                Tree->Childs[Index].FullSlotsCount = 0;
-                Tree->Childs[Index].LargestHeap = 0;
-                Tree->Childs[Index].Child = _spalloc();
-                if(!Tree->Childs[Index].Child) SET_SOD_MEMORY_MANAGEMENT;
-                ZeroMemory(Tree->Childs[Index].Child, 0x1000);
-                _bittestandset64((long long*)&Tree->Present[x], BiIndx);
-                Tree->PresentSlotCount++;
-                *_Indx = Index;
+            if(Tree->Root && _interlockedbittestandset(&Tree->Childs[Index].LockMutex, 0)) continue;
 
-                return TRUE;
-            }
+            Tree->Childs[Index].Child = _spalloc();
+            if(!Tree->Childs[Index].Child) SET_SOD_MEMORY_MANAGEMENT;
+            _mm256_treeclr(Tree->Childs[Index].Child);
+            _bittestandset64((long long*)&Tree->Present[x], BiIndx);
+            Tree->PresentSlotCount++;
+            *_Indx = Index;
+
+            return TRUE;
         }
     }
     return FALSE;
 }
 
-static inline ULONG FindNextAvailableChild(FREE_MEMORY_TREE* Parent, BOOL _Root) {
+// Optimization note : SecondLargestHeap is used for : 
+// if HeapLength >= SecondLargestHeap && Tree.NumFullSlots != MAX_SLOTS :
+// Find a slot where to set LargestHeap
+// if not found, then set SecondLargestHeap in the new slot
+
+static inline ULONG KERNELAPI FindNextAvailableChild(FREE_MEMORY_TREE* Parent) {
     // Keep looping on the root tree
 
     ULONG Index;
         
     for(;;) {
-        if(Parent->FullSlotCount == MEMTREE_MAX_SLOTS) return (ULONG)-1;
         if(Parent->PresentSlotCount == Parent->FullSlotCount) goto Allocate;
-        for(UINT b = 0;b<3;b++) {
+        for(UINT b = 0;b<MEMTREE_NUM_SLOT_GROUPS;b++) {
             UINT64 f0 = (~Parent->FullSlots[b]) & Parent->Present[b];
             while(_BitScanForward64(&Index, f0)) {
                 // Found a tree with free slots
                 _bittestandreset64(&f0, Index);
                 ULONG i = Index + (b << 6);
-                if(_Root && _interlockedbittestandset(&Parent->Childs[i].LockMutex, 0)) {
+                if(Parent->Root && _interlockedbittestandset(&Parent->Childs[i].LockMutex, 0)) {
                     continue;
                 }
-                if(Parent->Childs[i].FullSlotsCount == MEMTREE_MAX_SLOTS) {
-                    _interlockedbittestandreset(&Parent->Childs[i].LockMutex, 0);
+                
+                if(*(UINT8*)Parent->Childs[i].Child == MEMTREE_MAX_SLOTS) {
+                    if(Parent->Root)
+                        _interlockedbittestandreset(&Parent->Childs[i].LockMutex, 0);
+                    
                     continue;
                 }
                 return i;
             }
         }
         Allocate:
-        if(!MmAllocateSlot(Parent, &Index)) return (ULONG)-1;
+        if(!MmAllocateSlot(Parent, &Index)) {
+            SystemDebugPrint(L"SF");
+            return (ULONG)-1;
+        }
         else return Index;
     }
 
@@ -120,75 +153,84 @@ static inline ULONG FindNextAvailableChild(FREE_MEMORY_TREE* Parent, BOOL _Root)
     return Index;
 }
 
+// Initial heap is the heap with index 0
+
 // Allocates a segment descriptor for the heap
-FREE_MEMORY_SEGMENT* AllocateFreeMemorySegment(FREE_MEMORY_TREE* Tree) {
+FREE_MEMORY_SEGMENT* KERNELAPI CreateHeap(FREE_MEMORY_TREE* Tree, void* HeapAddress, UINT64 HeapLength) {
     FREE_MEMORY_TREE* Current;
+    // if(Tree->InitialHeap && ((UINT64)Tree->InitialHeap->Address + Tree->InitialHeap->HeapLength) == (UINT64)HeapAddress) {
+    //     Tree->InitialHeap->HeapLength += HeapLength;
+    //     return Tree->InitialHeap;
+    // }
 // Retry:
     Current = Tree;
     for(;;) {
         while(Current->FullSlotCount != MEMTREE_MAX_SLOTS) {
             ULONG idx;
-            idx = FindNextAvailableChild(Current, TRUE);
+            idx = FindNextAvailableChild(Current);
             if(idx == (ULONG)-1) goto NextTree;
             FREE_MEMORY_TREE* Lvl1 = Current->Childs[idx].Child;
-            ULONG idx1 = FindNextAvailableChild(Lvl1, FALSE);
+            ULONG idx1 = FindNextAvailableChild(Lvl1);
             if(idx1 == (ULONG)-1) SET_SOD_MEMORY_MANAGEMENT; // There is a software bug
 
             FREE_MEMORY_TREE* Lvl2 = Lvl1->Childs[idx1].Child;
-            ULONG idx2 = FindNextAvailableChild(Lvl2, FALSE);
+            ULONG idx2 = FindNextAvailableChild(Lvl2);
             if(idx2 == (ULONG)-1) SET_SOD_MEMORY_MANAGEMENT;
-            FREE_MEMORY_TREE* Lvl3 = Lvl2->Childs[idx2].Child;
-            ULONG idx3 = FindNextAvailableChild(Lvl3, FALSE);
-            if(idx3 == (ULONG)-1) SET_SOD_MEMORY_MANAGEMENT;
-            FREE_MEMORY_SEGMENT_LIST_HEAD* ListHead = Lvl3->Childs[idx3].Child;
-            ULONG idx4 = (ULONG)-1;
+            FREE_MEMORY_SEGMENT_LIST_HEAD* ListHead = Lvl2->Childs[idx2].Child;
+            ULONG idxlh = (ULONG)-1;
 
-            for(UINT b = 0;b<3;b++) {
+            // Now allocate a segment for the heap
+
+            for(UINT b = 0;b<MEMTREE_NUM_SLOT_GROUPS;b++) {
                 UINT64 FreeSlots = ~ListHead->UsedSlots[b];
-                if(_BitScanForward64(&idx4, FreeSlots)) {
-                    _bittestandset64((long long*)ListHead->UsedSlots + b, idx4);
-                    idx4 = idx4 + (b << 6);
+                if(_BitScanForward64(&idxlh, FreeSlots)) {
+                    _bittestandset64((long long*)ListHead->UsedSlots + b, idxlh);
+                    idxlh = idxlh + (b << 6);
                     break;
                 }
             }
-            if(idx4 == (ULONG)-1) SET_SOD_MEMORY_MANAGEMENT;
+            if(idxlh == (ULONG)-1) SET_SOD_MEMORY_MANAGEMENT;
             ListHead->NumUsedSlots++;
 
             // Track full tree slots
             if(ListHead->NumUsedSlots == MEMTREE_MAX_SLOTS) {
-                SystemDebugPrint(L"LH_FULL_SLOTS");
-                Lvl3->FullSlotCount++;
-                _bittestandset64(&Lvl3->FullSlots[idx3 >> 6], (idx3 & 0x3F));
-                if(Lvl3->FullSlotCount == MEMTREE_MAX_SLOTS) {
-                    SystemDebugPrint(L"LVL3_FULL_SLOTS");
-
-                    Lvl2->FullSlotCount++;
-                    _bittestandset64(&Lvl2->FullSlots[idx2 >> 6], (idx2 & 0x3F));
-                    if(Lvl2->FullSlotCount == MEMTREE_MAX_SLOTS) {
-                    SystemDebugPrint(L"LVL2_FULL_SLOTS");
-
-                        Lvl1->FullSlotCount++;
-                        _bittestandset64(&Lvl1->FullSlots[idx1 >> 6], (idx1 & 0x3F));
-                        if(Lvl1->FullSlotCount == MEMTREE_MAX_SLOTS) {
-                SystemDebugPrint(L"LVL1_FULL_SLOTS");
-
-                            Current->FullSlotCount++;
-                            _bittestandset64(&Current->FullSlots[idx >> 6], (idx & 0x3F));
-                        }
+                Lvl2->FullSlotCount++;
+                _bittestandset64(&Lvl2->FullSlots[idx2 >> 6], (idx2 & 0x3F));
+                if(Lvl2->FullSlotCount == MEMTREE_MAX_SLOTS) {
+                    Lvl1->FullSlotCount++;
+                    _bittestandset64(&Lvl1->FullSlots[idx1 >> 6], (idx1 & 0x3F));
+                    if(Lvl1->FullSlotCount == MEMTREE_MAX_SLOTS) {
+                        Current->FullSlotCount++;
+                        _bittestandset64(&Current->FullSlots[idx1 >> 6], (idx1 & 0x3F));
                     }
                 }
             }
             // Release Tree
             _interlockedbittestandreset(&Current->Childs[idx].LockMutex, 0);
             
-            return &ListHead->MemorySegments[idx4];
+            ListHead->MemorySegments[idxlh].Address = HeapAddress;
+            ListHead->MemorySegments[idxlh].HeapLength = HeapLength;
+
+            // Check largest heap tree
+            if(!Lvl2->Childs[idx2].LargestHeap || Lvl2->Childs[idx2].LargestHeap->HeapLength < HeapLength) {
+                Lvl2->Childs[idx2].LargestHeap = &ListHead->MemorySegments[idxlh];
+                if(!Lvl2->Childs[idx2].LargestHeap || Lvl1->Childs[idx1].LargestHeap->HeapLength < HeapLength) {
+                    Lvl1->Childs[idx1].LargestHeap = &ListHead->MemorySegments[idxlh];
+                    if(!Current->Childs[idx].LargestHeap || Current->Childs[idx].LargestHeap->HeapLength < HeapLength) {
+                        Current->Childs[idx].LargestHeap = &ListHead->MemorySegments[idxlh];
+                    }
+                }
+            }
+
+            return &ListHead->MemorySegments[idxlh];
         }
 NextTree:
         if(!Current->Next) {
             SystemDebugPrint(L"NEW_TREE");
+            while(1);
             Current->Next =  _spalloc();
             if(!Current->Next) SET_SOD_LESS_MEMORY;
-            ZeroMemory(Current->Next, sizeof(FREE_MEMORY_TREE));
+            _mm256_treeclr(Current->Next);
         }
         Current = Current->Next;
     }

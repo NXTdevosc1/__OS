@@ -39,7 +39,7 @@ static inline int KERNELAPI SetProcess(
     Process->OperatingMode = OperatingMode;
     Process->ProcessId = ProcessId;
     Process->Subsystem = (UINT8)Subsystem;
-   
+    Process->MemoryManagementTable.FreeMemory.Root = TRUE;
     // CreateMemoryTable(Process, &Process->MemoryManagementTable);
 
     if (kproc) {

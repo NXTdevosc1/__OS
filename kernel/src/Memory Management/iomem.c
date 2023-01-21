@@ -97,7 +97,7 @@ LPVOID KEXPORT KERNELAPI AllocateIoMemory(_IN LPVOID PhysicalAddress, _IN UINT64
             }
         }
         if(!Bmp) {
-            Bmp->Next = _SIMD_AllocatePhysicalPage(MemoryManagementTable.PageBitmap, MemoryManagementTable.NumBytesPageBitmap, MemoryManagementTable.PageArray);
+            Bmp->Next = _SIMD_AllocatePhysicalPage();
             if(!Bmp->Next) SET_SOD_MEMORY_MANAGEMENT;
             ZeroMemory(Bmp->Next, sizeof(IO_BITMAP));
         }
