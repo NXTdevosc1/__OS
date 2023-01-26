@@ -178,6 +178,7 @@ void __declspec(noreturn) _start() {
 // Relocate the kernel
 	// Map KernelRelocate (To change CR3 With no Page-Fault)
 
+
 	
 
 	void* __KeReloc = (void*)KernelRelocate;
@@ -239,6 +240,8 @@ void __declspec(noreturn) __declspec(noinline) _kmain() {
 	if(CpuId.ebx & (1 << CPUID7_0_EBX_AVX512F)) {
 		GP_draw_sf_text("AVX512", 0xFFFFFF, 20, 300);
 	}
+
+	SystemDebugPrint(L"start.. ()");
 	
 	// TODO : malloc, free
 	SystemDebugPrint(L"malloc : %x", AllocatePool(0x100));
@@ -248,7 +251,20 @@ void __declspec(noreturn) __declspec(noinline) _kmain() {
 	SystemDebugPrint(L"malloc : %x", AllocatePool(0x100));
 	SystemDebugPrint(L"malloc : %x", AllocatePool(0x100));
 
-	
+
+	for(;;) {
+	SystemDebugPrint(L"start");
+	for(UINT i = 0;i<4000000;i++) {
+		if(!AllocatePool(0x100)) {
+			SystemDebugPrint(L"fail");
+			while(1);
+		}
+		// SystemDebugPrint(L"malloc : %x", AllocatePool(0x100));
+	}
+	SystemDebugPrint(L"end");
+	SystemDebugPrint(L"malloc : %x", AllocatePool(0x100));
+
+	}
 	while(1) __hlt();
 	// Unmap KernelRelocate
 	// Setup I/O Memory process & thread

@@ -34,6 +34,8 @@ typedef struct _FREE_MEMORY_TREE FREE_MEMORY_TREE;
 
 typedef volatile struct _FREE_MEMORY_SEGMENT FREE_MEMORY_SEGMENT;
 
+
+
 typedef volatile struct _FREE_MEMORY_SEGMENT {
     void* Address;
     UINT64 HeapLength;
@@ -53,18 +55,14 @@ typedef struct _MEMORY_TREE_ITEM {
 
 typedef struct _FREE_MEMORY_TREE {
     UINT8 FullSlotCount;
+    UINT ParentItemIndex;
+    FREE_MEMORY_TREE* Parent;
     UINT64 Present[MEMTREE_NUM_SLOT_GROUPS];
     UINT64 FullSlots[MEMTREE_NUM_SLOT_GROUPS];
     UINT8 PresentSlotCount;
-    UINT64 LargestHeapLength;
-    UINT64 SecondLargestHeapLength;
-
-
 
     MEMORY_TREE_ITEM Childs[MEMTREE_MAX_SLOTS];
 
-    UINT ParentItemIndex;
-    FREE_MEMORY_TREE* Parent;
 
     FREE_MEMORY_TREE* Next; // only in level1 tree
     BOOL Root;
@@ -73,15 +71,14 @@ typedef struct _FREE_MEMORY_TREE {
 
 // 3rd level of the tree
 typedef volatile struct _FREE_MEMORY_SEGMENT_LIST_HEAD {
+    UINT8 NumUsedSlots;
     UINT ParentItemIndex;
     FREE_MEMORY_TREE* Parent;
     UINT64 UsedSlots[MEMTREE_NUM_SLOT_GROUPS];
-    UINT8 NumUsedSlots;
     FREE_MEMORY_SEGMENT MemorySegments[MEMTREE_MAX_SLOTS];
 } FREE_MEMORY_SEGMENT_LIST_HEAD;
 
 
-#pragma pack(push, 1)
 
 typedef volatile struct _PROCESS_CONTROL_BLOCK *RFPROCESS;
 
@@ -210,7 +207,6 @@ typedef struct _PROCESS_MEMORY_TABLE {
     FREE_MEMORY_TREE FreeMemory;
 } PROCESS_MEMORY_TABLE;
 
-#pragma pack(pop)
 
 void InitMemoryManagementSubsystem(void);
 RFMEMORY_SEGMENT QueryAllocatedBlockSegment(void* BlockAddress);
@@ -255,8 +251,6 @@ BOOL KeAllocateFragmentedPages(RFPROCESS Process, void* VirtualMemory, UINT64 Nu
 
 // The free memory segment has the semaphore bit set until the pool is actually given
 // the host routine must reset the MEMORY_SEGMENT_SEMAPHORE Bit in the returned Segment
-RFMEMORY_SEGMENT MemMgr_FreePool(RFMEMORY_REGION_TABLE MemoryRegion, RFMEMORY_SEGMENT_LIST_HEAD ListHead, RFMEMORY_SEGMENT MemorySegment);
-// RFMEMORY_SEGMENT MemMgr_CreateInitialHeap(void* HeapAddress, UINT64 HeapLength);
 
 // Sets present bit in Memory Segment flags when Found
 RFMEMORY_SEGMENT (*_SIMD_FetchUnusedSegmentsUncached)(MEMORY_SEGMENT_LIST_HEAD* ListHead);

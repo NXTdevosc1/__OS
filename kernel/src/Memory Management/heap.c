@@ -6,7 +6,8 @@
 
 FREE_MEMORY_SEGMENT* KERNELAPI CreateHeap(FREE_MEMORY_TREE* Tree, void* HeapAddress, UINT64 HeapLength);
 
-
+static inline void SetLargestHeap(FREE_MEMORY_SEGMENT_LIST_HEAD* SegmentList);
+BOOL b = 0;
 void* AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flags) {
     if(!NumBytes || !Process) return NULL;
     if(NumBytes & 0xF) {
@@ -16,15 +17,23 @@ void* AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flag
     FREE_MEMORY_TREE* Current = &Process->MemoryManagementTable.FreeMemory;
     ULONG Index;
     UINT64 Bmp;
+    if(!b) {
+        b = 1;
+	SystemDebugPrint(L"ch.. ()");
+
+    if(!CreateHeap(Current, 0x1000, 0x100000000000)) SET_SOD_MEDIA_MANAGEMENT;
+    }
+	SystemDebugPrint(L"al.. ()");
+
     // Step 1 : Find a free block (TODO After multiprocessing : CPU Sync)
     for(;;) {
-        if(Current->FullSlotCount == MEMTREE_MAX_SLOTS) goto continue0;
-        for(UINT x0 = 0;x0<MEMTREE_NUM_SLOT_GROUPS;x0) {
-            Bmp = Current->FullSlots[x0];
+        for(UINT x0 = 0;x0<MEMTREE_NUM_SLOT_GROUPS;x0++) {
+            Bmp = Current->Present[x0];
             while(_BitScanForward64(&Index, Bmp)) {
                 _bittestandreset64(&Bmp, Index);
+
                 Index += (x0 << 7);
-                if(Current->Childs[Index].Child && Current->Childs[Index].LargestHeap->HeapLength >= NumBytes) {
+                if(Current->Childs[Index].LargestHeap && Current->Childs[Index].LargestHeap->HeapLength >= NumBytes) {
                     // We found a heap
                     FREE_MEMORY_SEGMENT* Heap = Current->Childs[Index].LargestHeap;
                     void* Address = Heap->Address;
@@ -50,13 +59,13 @@ void* AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flag
                             }
                         } 
                     }
-                    // Now determine the biggest heap
-                    
+                    // Now set the largests heap
+                    SetLargestHeap(LhLargestHeap);
+                    return Address;
                 }
             }
 
         }
-        continue0:
         if(!Current->Next) break;
         Current = Current->Next;
     }
@@ -65,6 +74,53 @@ void* AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flag
     
     return NULL;
 }
+
+static inline void SetLargestHeap(FREE_MEMORY_SEGMENT_LIST_HEAD* SegmentList) {
+    FREE_MEMORY_SEGMENT* LargestHeap = NULL;
+    FREE_MEMORY_SEGMENT_LIST_HEAD* LhLargestHeap = NULL;
+    FREE_MEMORY_TREE* Parent = SegmentList->Parent;
+    UINT64 LargestHeapLength = 0;
+    UINT8 Indx;
+    // Scan LVL3
+    for(UINT8 x = 0;x<MEMTREE_NUM_SLOT_GROUPS;x++) {
+        UINT64 Bmp = SegmentList->UsedSlots[x];
+        ULONG Index;
+        while(_BitScanForward64(&Index, Bmp)) {
+            _bittestandreset64(&Bmp, Index);
+            Index += (x << 7);
+            if(SegmentList->MemorySegments[Index].HeapLength > LargestHeapLength) {
+                LargestHeap = &SegmentList->MemorySegments[Index];
+                LargestHeapLength = LargestHeap->HeapLength;
+                Indx = (UINT8)Index;
+            }
+        }
+    }
+
+	SystemDebugPrint(L"bl.. (%x) ", Parent);
+    Parent->Childs[SegmentList->ParentItemIndex].LargestHeap = LargestHeap;
+    Parent->Childs[SegmentList->ParentItemIndex].IndexLargestHeap = Indx;
+    // Scan LVL2
+    LhLargestHeap = SegmentList; // No need to reset LargestHeap
+    for(UINT8 x = 0;x<MEMTREE_NUM_SLOT_GROUPS;x++) {
+        UINT64 Bmp = Parent->Present[x];
+        ULONG Index;
+        while(_BitScanForward64(&Index, Bmp)) {
+            _bittestandreset64(&Bmp, Index);
+            Index += (x << 7);
+            if(Parent->Childs[Index].LargestHeap && Parent->Childs[Index].LargestHeap->HeapLength > LargestHeapLength) {
+                LhLargestHeap = Parent->Childs[Index].ListHeadLargestHeap;
+                LargestHeap = Parent->Childs[Index].LargestHeap;
+                LargestHeapLength = Parent->Childs[Index].LargestHeap->HeapLength;
+                Indx = (UINT8)Index;
+            }
+        }
+    }
+    // Set lvl1
+    Parent->Parent->Childs[Parent->ParentItemIndex].IndexLargestHeap = Indx;
+    Parent->Parent->Childs[Parent->ParentItemIndex].LargestHeap = LargestHeap;
+    Parent->Parent->Childs[Parent->ParentItemIndex].ListHeadLargestHeap = LhLargestHeap;
+}
+
 void* RemoteFreePool(RFPROCESS Process, void* HeapAddress) {
     return NULL;
 }
@@ -83,7 +139,7 @@ RFMEMORY_SEGMENT KERNELAPI MemMgr_CreateInitialHeap(RFPROCESS Process, void* Hea
 
 #define _spalloc() _SIMD_AllocatePhysicalPage()
 
-#define _mm256_treeclr(_Tree) __stosq((unsigned long long*)_Tree, 0, 512)
+// #define _mm256_treeclr(_Tree) __stosq((unsigned long long*)_Tree, 0, 512)
 
 
 static inline BOOL KERNELAPI MmAllocateSlot(FREE_MEMORY_TREE* Tree, ULONG* _Indx) {
@@ -98,7 +154,17 @@ static inline BOOL KERNELAPI MmAllocateSlot(FREE_MEMORY_TREE* Tree, ULONG* _Indx
 
             Tree->Childs[Index].Child = _spalloc();
             if(!Tree->Childs[Index].Child) SET_SOD_MEMORY_MANAGEMENT;
-            _mm256_treeclr(Tree->Childs[Index].Child);
+            // _mm256_treeclr(Tree->Childs[Index].Child); :
+
+            FREE_MEMORY_TREE* t = Tree->Childs[Index].Child;
+            t->ParentItemIndex = Index;
+            t->Parent = Tree;
+            t->FullSlotCount = 0;
+            t->PresentSlotCount = 0;
+            for(int d = 0;d<MEMTREE_NUM_SLOT_GROUPS;d++) {
+                t->Present[d] = 0;
+                t->FullSlots[d] = 0;
+            }
             _bittestandset64((long long*)&Tree->Present[x], BiIndx);
             Tree->PresentSlotCount++;
             *_Indx = Index;
@@ -173,10 +239,7 @@ FREE_MEMORY_SEGMENT* KERNELAPI CreateHeap(FREE_MEMORY_TREE* Tree, void* HeapAddr
             ULONG idx1 = FindNextAvailableChild(Lvl1);
             if(idx1 == (ULONG)-1) SET_SOD_MEMORY_MANAGEMENT; // There is a software bug
 
-            FREE_MEMORY_TREE* Lvl2 = Lvl1->Childs[idx1].Child;
-            ULONG idx2 = FindNextAvailableChild(Lvl2);
-            if(idx2 == (ULONG)-1) SET_SOD_MEMORY_MANAGEMENT;
-            FREE_MEMORY_SEGMENT_LIST_HEAD* ListHead = Lvl2->Childs[idx2].Child;
+            FREE_MEMORY_SEGMENT_LIST_HEAD* ListHead = Lvl1->Childs[idx1].Child;
             ULONG idxlh = (ULONG)-1;
 
             // Now allocate a segment for the heap
@@ -194,33 +257,26 @@ FREE_MEMORY_SEGMENT* KERNELAPI CreateHeap(FREE_MEMORY_TREE* Tree, void* HeapAddr
 
             // Track full tree slots
             if(ListHead->NumUsedSlots == MEMTREE_MAX_SLOTS) {
-                Lvl2->FullSlotCount++;
-                _bittestandset64(&Lvl2->FullSlots[idx2 >> 6], (idx2 & 0x3F));
-                if(Lvl2->FullSlotCount == MEMTREE_MAX_SLOTS) {
-                    Lvl1->FullSlotCount++;
-                    _bittestandset64(&Lvl1->FullSlots[idx1 >> 6], (idx1 & 0x3F));
+                Lvl1->FullSlotCount++;
+                _bittestandset64(&Lvl1->FullSlots[idx1 >> 6], (idx1 & 0x3F));
                     if(Lvl1->FullSlotCount == MEMTREE_MAX_SLOTS) {
                         Current->FullSlotCount++;
                         _bittestandset64(&Current->FullSlots[idx1 >> 6], (idx1 & 0x3F));
                     }
-                }
             }
             // Release Tree
             _interlockedbittestandreset(&Current->Childs[idx].LockMutex, 0);
             
             ListHead->MemorySegments[idxlh].Address = HeapAddress;
             ListHead->MemorySegments[idxlh].HeapLength = HeapLength;
-
             // Check largest heap tree
-            if(!Lvl2->Childs[idx2].LargestHeap || Lvl2->Childs[idx2].LargestHeap->HeapLength < HeapLength) {
-                Lvl2->Childs[idx2].LargestHeap = &ListHead->MemorySegments[idxlh];
-                if(!Lvl2->Childs[idx2].LargestHeap || Lvl1->Childs[idx1].LargestHeap->HeapLength < HeapLength) {
+            
+                if(!Lvl1->Childs[idx1].LargestHeap || Lvl1->Childs[idx1].LargestHeap->HeapLength < HeapLength) {
                     Lvl1->Childs[idx1].LargestHeap = &ListHead->MemorySegments[idxlh];
                     if(!Current->Childs[idx].LargestHeap || Current->Childs[idx].LargestHeap->HeapLength < HeapLength) {
                         Current->Childs[idx].LargestHeap = &ListHead->MemorySegments[idxlh];
                     }
                 }
-            }
 
             return &ListHead->MemorySegments[idxlh];
         }
@@ -230,7 +286,7 @@ NextTree:
             while(1);
             Current->Next =  _spalloc();
             if(!Current->Next) SET_SOD_LESS_MEMORY;
-            _mm256_treeclr(Current->Next);
+            // _mm256_treeclr(Current->Next);
         }
         Current = Current->Next;
     }
