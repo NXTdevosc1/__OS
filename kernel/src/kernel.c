@@ -254,8 +254,9 @@ void __declspec(noreturn) __declspec(noinline) _kmain() {
 
 	for(;;) {
 	SystemDebugPrint(L"start");
-	for(UINT i = 0;i<4000000;i++) {
-		if(!AllocatePool(0x100)) {
+	for(UINT i = 0;i<5000;i++) {
+		void* addr = AllocatePool(0x100);
+		if(!addr) {
 			SystemDebugPrint(L"fail");
 			while(1);
 		}

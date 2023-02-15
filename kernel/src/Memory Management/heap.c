@@ -6,9 +6,9 @@
 
 FREE_MEMORY_SEGMENT* KERNELAPI CreateHeap(FREE_MEMORY_TREE* Tree, void* HeapAddress, UINT64 HeapLength);
 
-static inline void SetLargestHeap(FREE_MEMORY_SEGMENT_LIST_HEAD* SegmentList);
-BOOL b = 0;
-void* AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flags) {
+static inline void KERNELAPI SetLargestHeap(FREE_MEMORY_SEGMENT_LIST_HEAD* SegmentList);
+BOOL b23 = 0;
+void* KERNELAPI AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flags) {
     if(!NumBytes || !Process) return NULL;
     if(NumBytes & 0xF) {
         NumBytes += 0x10;
@@ -17,13 +17,6 @@ void* AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flag
     FREE_MEMORY_TREE* Current = &Process->MemoryManagementTable.FreeMemory;
     ULONG Index;
     UINT64 Bmp;
-    if(!b) {
-        b = 1;
-	SystemDebugPrint(L"ch.. ()");
-
-    if(!CreateHeap(Current, 0x1000, 0x100000000000)) SET_SOD_MEDIA_MANAGEMENT;
-    }
-	SystemDebugPrint(L"al.. ()");
 
     // Step 1 : Find a free block (TODO After multiprocessing : CPU Sync)
     for(;;) {
@@ -60,7 +53,7 @@ void* AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flag
                         } 
                     }
                     // Now set the largests heap
-                    SetLargestHeap(LhLargestHeap);
+                    SetLargestHeap(LhLargestHeap); // TODO : BOTTLENECK FIX
                     return Address;
                 }
             }
@@ -70,12 +63,19 @@ void* AllocatePoolEx(RFPROCESS Process, UINT64 NumBytes, UINT Align, UINT64 Flag
         Current = Current->Next;
     }
     
-
-    
-    return NULL;
+    // TODO : Lock process access to the pages, Allocate 2MB Pages
+    // If not found, allocate space
+    UINT64 NumPages = ALIGN_VALUE(NumBytes, 0x1000) >> 12;
+    void* Address = VirtualFindAvailableMemory(Process, Process->MemoryManagementTable.VirtualBase, Process->MemoryManagementTable.VirtualEnd, NumPages);
+    if(!KeAllocateFragmentedPages(Process, Address, NumPages)) return NULL;
+    if(NumBytes & 0xFFF) {
+        // There is still available memory
+        FREE_MEMORY_SEGMENT* Seg = CreateHeap(&Process->MemoryManagementTable.FreeMemory, (char*)Address + NumBytes, (NumPages << 12) - NumBytes);
+    }
+    return Address;
 }
 
-static inline void SetLargestHeap(FREE_MEMORY_SEGMENT_LIST_HEAD* SegmentList) {
+static inline void KERNELAPI SetLargestHeap(FREE_MEMORY_SEGMENT_LIST_HEAD* SegmentList) {
     FREE_MEMORY_SEGMENT* LargestHeap = NULL;
     FREE_MEMORY_SEGMENT_LIST_HEAD* LhLargestHeap = NULL;
     FREE_MEMORY_TREE* Parent = SegmentList->Parent;
@@ -96,7 +96,6 @@ static inline void SetLargestHeap(FREE_MEMORY_SEGMENT_LIST_HEAD* SegmentList) {
         }
     }
 
-	SystemDebugPrint(L"bl.. (%x) ", Parent);
     Parent->Childs[SegmentList->ParentItemIndex].LargestHeap = LargestHeap;
     Parent->Childs[SegmentList->ParentItemIndex].IndexLargestHeap = Indx;
     // Scan LVL2
@@ -275,6 +274,8 @@ FREE_MEMORY_SEGMENT* KERNELAPI CreateHeap(FREE_MEMORY_TREE* Tree, void* HeapAddr
                     Lvl1->Childs[idx1].LargestHeap = &ListHead->MemorySegments[idxlh];
                     if(!Current->Childs[idx].LargestHeap || Current->Childs[idx].LargestHeap->HeapLength < HeapLength) {
                         Current->Childs[idx].LargestHeap = &ListHead->MemorySegments[idxlh];
+                        Current->Childs[idx].IndexLargestHeap = (UINT8)idxlh;
+                        Current->Childs[idx].ListHeadLargestHeap = ListHead;
                     }
                 }
 

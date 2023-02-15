@@ -131,6 +131,8 @@ void ConfigureSystemSpace(){
     } else SOD(0, "Unknown Virtual Address width");
     // on 48 bit paging processors, physical address is up to 46 bits
 
+    kproc->MemoryManagementTable.VirtualBase = (char*)SystemSpaceBase + SYSTEM_SPACE48_RAM;
+    kproc->MemoryManagementTable.VirtualEnd = (char*)SystemSpaceBase + SYSTEM_SPACE48_MAX;
 }
 
 BOOL InitSystemSpace(RFPROCESS Process) {

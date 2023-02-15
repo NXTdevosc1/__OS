@@ -66,7 +66,7 @@ typedef struct _FREE_MEMORY_TREE {
 
     FREE_MEMORY_TREE* Next; // only in level1 tree
     BOOL Root;
-    UINT8 Rsv[322];
+    UINT8 Rsv[326];
 } FREE_MEMORY_TREE;
 
 // 3rd level of the tree
@@ -199,6 +199,7 @@ extern MEMORY_MANAGEMENT_TABLE MemoryManagementTable;
 // Only for user processes
 typedef struct _PROCESS_MEMORY_TABLE {
     void* VirtualBase;
+    void* VirtualEnd;
     UINT64 AllocatedPages;
     UINT64 ReservedPages;
     UINT64 CompressedPages;
